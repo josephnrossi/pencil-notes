@@ -1,4 +1,4 @@
-const CACHE = 'pencil-notes-v9';
+const CACHE = 'pencil-notes-v10';
 const ASSETS = ['./', 'index.html', 'styles.css', 'db.js', 'app.js', 'v7.js', 'vendor/pdfjs/pdf.min.mjs', 'vendor/pdfjs/pdf.worker.min.mjs', 'manifest.json',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/favicon.png'];
 self.addEventListener('install', e => {
@@ -12,6 +12,15 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  const u = new URL(req.url);
+  if (u.pathname.endsWith('/cal.ics') && u.searchParams.get('e')) {
+    // Serve a calendar event as a real .ics file so iPad shows Apple's "Add to Calendar" screen.
+    let ics = '';
+    try { const b = u.searchParams.get('e').replace(/-/g, '+').replace(/_/g, '/'); ics = decodeURIComponent(escape(atob(b))); } catch (err) { ics = ''; }
+    const name = (u.searchParams.get('n') || 'reminder').replace(/[^\w\- ]+/g, '') + '.ics';
+    e.respondWith(new Response(ics, { headers: { 'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': 'inline; filename="' + name + '"', 'Cache-Control': 'no-store' } }));
+    return;
+  }
   e.respondWith(caches.open(CACHE).then(async cache => {
     const key = req.mode === 'navigate' ? 'index.html' : req;
     const cached = await cache.match(key, { ignoreSearch: true });

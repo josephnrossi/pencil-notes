@@ -835,10 +835,13 @@ async function downloadIcs(it) {
   const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
   if (isIOS) {
     // iPad/iPhone: opening the event as a calendar link shows Apple's own "Add to Calendar" sheet.
-    const dataUrl = 'data:text/calendar;charset=utf8,' + encodeURIComponent(ics);
-    window.__lastIcsNav = dataUrl;
-    if (isStandalone) { const w = window.open(dataUrl, '_blank'); if (!w) location.href = dataUrl; }
-    else location.href = dataUrl;
+    let target;
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+      const b64 = btoa(unescape(encodeURIComponent(ics))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      target = new URL('cal.ics?n=' + encodeURIComponent(name.replace(/\.ics$/, '')) + '&e=' + b64, location.href).href;
+    } else target = 'data:text/calendar;charset=utf8,' + encodeURIComponent(ics);
+    window.__lastIcsNav = target;
+    if (!window.__icsDryRun) location.href = target;
     toast('Tap “Add to Calendar” on the screen that opens', 6000);
     return;
   }
