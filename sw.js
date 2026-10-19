@@ -1,4 +1,4 @@
-const CACHE = 'pencil-notes-v5';
+const CACHE = 'pencil-notes-v6';
 const ASSETS = ['./', 'index.html', 'styles.css', 'db.js', 'app.js', 'manifest.json',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/favicon.png'];
 self.addEventListener('install', e => {

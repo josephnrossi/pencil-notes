@@ -30,7 +30,7 @@ const S = {
   penWidth: +localStorage.getItem('penWidth') || PEN_WIDTHS[1],
   hlWidth: +localStorage.getItem('hlWidth') || HL_WIDTHS[1],
   filter: 'due', search: '', collapsed: new Set(JSON.parse(localStorage.getItem('collapsed') || '[]')),
-  undo: [], redo: [], scale: 1, pageW: 0,
+  undo: [], redo: [], scale: 1, pageW: 0, baseW: 0, zoom: 1,
 };
 const penSeen = () => localStorage.getItem('penSeen') === '1';
 function fingerDrawOn() {
@@ -49,7 +49,9 @@ function saveNote(note, immediate) {
 function flushSaves() { for (const [id, t] of saveTimers) { clearTimeout(t); const n = S.notes.find(x => x.id === id); if (n) DB.put('notes', n); } saveTimers.clear(); }
 const saveNotebook = nb => DB.put('notebooks', nb);
 
-function newPage() { return { id: uid('p'), strokes: [], texts: [], tasks: [] }; }
+// Page model v2. bg = per-page background (null | {type:'template'|'pdf', ...}); images = photos/stickers;
+// paper = per-page override (null → note.paper). Binary blobs (PDF pages, photos) go in the 'assets' IDB store.
+function newPage() { return { id: uid('p'), strokes: [], texts: [], tasks: [], images: [], bg: null, paper: null }; }
 function makeNote(notebookId, title) {
   return { id: uid('n'), notebookId, title: title || 'Untitled note', paper: 'lined', pages: [newPage()], reminders: [], createdAt: Date.now(), updatedAt: Date.now() };
 }
@@ -63,8 +65,8 @@ async function load() {
       const t = new Date(); t.setDate(t.getDate() + 1); t.setHours(9, 0, 0, 0);
       const seeds = [['Work', 'Work — start here', 'Prep notes for Monday standup'], ['Personal', 'Personal — start here', 'Call the dentist']];
       seeds.forEach(([name, title, task], i) => {
-        const nb = { id: uid('b'), name, createdAt: Date.now() + i };
-        const n = makeNote(nb.id, title); n.updatedAt = Date.now() - i;
+        const nb = { id: uid('b'), name, createdAt: Date.now() + i, order: i };
+        const n = makeNote(nb.id, title); n.updatedAt = Date.now() - i; n.order = 0;
         const pg = n.pages[0];
         pg.texts.push({ id: uid('x'), x: 100, y: 112, text: 'Welcome to Pencil Notes ✍️', size: 34, color: INK });
         pg.texts.push({ id: uid('x'), x: 100, y: 190, text: 'Circle handwriting with ➰ Lasso, then tap "Make task".\nTap ☑️ Task to drop a checkbox anywhere on the page.\nTasks with a time show up in 🔔 Reminders.', size: 24, color: INK });
@@ -80,7 +82,8 @@ async function load() {
     }
   }
   localStorage.setItem('seeded', '1');
-  for (const n of S.notes) { n.reminders = n.reminders || []; for (const p of n.pages) { p.strokes ||= []; p.texts ||= []; p.tasks ||= []; } }
+  for (const n of S.notes) { n.reminders = n.reminders || []; n.v = 2; for (const p of n.pages) { p.strokes ||= []; p.texts ||= []; p.tasks ||= []; p.images ||= []; if (!('bg' in p)) p.bg = null; if (!('paper' in p)) p.paper = null; } }
+  normalizeOrder();
   if (!S.notes.length) { const n = makeNote(S.notebooks[0].id); S.notes.push(n); await DB.put('notes', n); }
 }
 
@@ -151,30 +154,40 @@ function drawPaper(ctx, paper) {
   }
 }
 function setupCanvas(cv) {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  // Cap pixels per canvas (~5 MP) so zoomed pages stay within iOS Safari canvas memory limits.
+  const cssH = PAGE_H * S.scale, dpr = Math.min(window.devicePixelRatio || 1, 2.5, Math.sqrt(5e6 / (S.pageW * cssH)));
   cv.width = Math.round(S.pageW * dpr); cv.height = Math.round(PAGE_H * S.scale * dpr);
   const ctx = cv.getContext('2d'); ctx.setTransform(dpr * S.scale, 0, 0, dpr * S.scale, 0, 0); return ctx;
 }
 function renderPageInk(pi) {
   const note = curNote(), el = pageEls[pi]; if (!el) return;
-  const ctx = el.ctx; ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, el.base.width, el.base.height); ctx.restore();
-  drawPaper(ctx, note.paper);
+  if (!el.alive) return;
   const pg = note.pages[pi];
+  const ctx = el.ctx; ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, el.base.width, el.base.height); ctx.restore();
+  drawPaper(ctx, pg.paper || note.paper);
   for (const st of pg.strokes) if (st.tool === 'highlighter') drawStroke(ctx, st);
   for (const st of pg.strokes) if (st.tool !== 'highlighter') drawStroke(ctx, st);
 }
-function clearLive(el) { const c = el.lctx; c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, el.live.width, el.live.height); c.restore(); }
+function clearLive(el) { if (!el.alive) return; const c = el.lctx; c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, el.live.width, el.live.height); c.restore(); }
 
 /* ---------- pages DOM ---------- */
 let pageEls = [];
+// Only pages near the viewport keep pixel buffers; far ones are released (matters when zoomed or on long notes).
+const pageIO = new IntersectionObserver(entries => {
+  for (const en of entries) { const rec = en.target._rec; if (!rec) continue; if (en.isIntersecting) ensureAlive(rec.pi); else releasePage(rec); }
+}, { root: document.querySelector('#pages'), rootMargin: '120% 120%' });
+function ensureAlive(pi) { const r = pageEls[pi]; if (!r || r.alive) return; r.ctx = setupCanvas(r.base); r.lctx = setupCanvas(r.live); r.alive = true; renderPageInk(pi); }
+function releasePage(r) { if (!r.alive || (drawing && drawing.pi === r.pi) || (selection && selection.pi === r.pi)) return; r.base.width = r.base.height = r.live.width = r.live.height = 0; r.alive = false; }
 function buildPages() {
-  const wrap = $('#pages'), note = curNote();
+  const wrap = $('#pages'), inner = $('#pagesInner'), note = curNote();
   hideLasso();
-  wrap.innerHTML = '';
+  pageIO.disconnect();
+  inner.innerHTML = '';
   pageEls = [];
   if (!note) return;
   const edge = isDrawer() || $('#app').classList.contains('focus');
-  S.pageW = edge ? Math.max(280, wrap.clientWidth) : Math.max(280, Math.min(980, wrap.clientWidth - 32));
+  S.baseW = edge ? Math.max(280, wrap.clientWidth) : Math.max(280, Math.min(980, wrap.clientWidth - 32));
+  S.pageW = Math.round(S.baseW * S.zoom);
   S.scale = S.pageW / PAGE_W;
   note.pages.forEach((pg, pi) => {
     const el = document.createElement('div');
@@ -184,14 +197,15 @@ function buildPages() {
     live.className = 'live'; ov.className = 'overlay';
     const foot = document.createElement('div'); foot.className = 'page-foot';
     foot.innerHTML = `<span>Page ${pi + 1} of ${note.pages.length}</span>` + (note.pages.length > 1 ? `<button data-delpage="${pi}">Delete page</button>` : '');
-    el.append(base, live, ov, foot); wrap.append(el);
-    const rec = { el, base, live, ov, ctx: setupCanvas(base), lctx: setupCanvas(live) };
-    pageEls.push(rec);
+    el.append(base, live, ov, foot); inner.append(el);
+    const rec = { el, base, live, ov, alive: false, pi };
+    pageEls.push(rec); el._rec = rec;
     base.addEventListener('pointerdown', e => onDown(e, pi));
-    renderPageInk(pi); renderOverlay(pi);
+    if (pi < 2) ensureAlive(pi);
+    renderOverlay(pi); pageIO.observe(el);
   });
-  const add = document.createElement('button'); add.className = 'btn add-page'; add.textContent = '＋ Add page'; add.onclick = addPage; wrap.append(add);
-  applyFingerMode();
+  const add = document.createElement('button'); add.className = 'btn add-page'; add.textContent = '＋ Add page'; add.onclick = addPage; inner.append(add);
+  applyFingerMode(); updateZoomChip();
 }
 function addPage() { const n = curNote(); pushHistory(); n.pages.push(newPage()); saveNote(n); buildPages(); const w = $('#pages'); w.scrollTo({ top: w.scrollHeight, behavior: 'smooth' }); }
 $('#pages').addEventListener('click', e => {
@@ -271,6 +285,7 @@ function notePen() {
   }
 }
 function onDown(e, pi) {
+  ensureAlive(pi);
   const cv = pageEls[pi].base;
   if (e.pointerType === 'pen') notePen();
   if (e.pointerType === 'touch') {
@@ -304,7 +319,7 @@ function cancelDrawing() { if (!drawing) return; const r = pageEls[drawing.pi]; 
 window.addEventListener('pointermove', e => {
   if (e.pointerType === 'touch' && touches.has(e.pointerId)) {
     const t = touches.get(e.pointerId); t.x = e.clientX; t.y = e.clientY;
-    if (pan && touches.size >= 2) { const w = $('#pages'), y = avgY(), x = avgX(); w.scrollTop -= y - pan.y; w.scrollLeft -= x - pan.x; pan.y = y; pan.x = x; return; }
+    if (pan && touches.size >= 2) return; // two-finger pan/zoom handled by the pinch handler
   }
   if (!drawing || e.pointerId !== drawing.id) return;
   const rec = pageEls[drawing.pi]; if (!rec) return;
@@ -358,6 +373,63 @@ window.addEventListener('pointercancel', endPointer);
 
 // iOS: stop Apple Pencil from scrolling the page while letting fingers scroll.
 $('#pages').addEventListener('touchstart', e => { if ([...e.touches].some(t => t.touchType === 'stylus') && e.target.tagName === 'CANVAS') e.preventDefault(); }, { passive: false });
+
+/* ---------- pinch zoom (two fingers; also ctrl/⌘ + wheel / trackpad pinch) ---------- */
+const ZMIN = 1, ZMAX = 3;
+let pinch = null, lastPenUp = 0;
+window.addEventListener('pointerup', e => { if (e.pointerType === 'pen') lastPenUp = Date.now(); });
+const tdist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+$('#pages').addEventListener('touchstart', e => {
+  if (e.touches.length !== 2 || pinch) return;
+  const ts = [...e.touches];
+  if (ts.some(t => t.touchType === 'stylus') || (drawing && drawing.pointerType === 'pen') || Date.now() - lastPenUp < 300) return; // palm + Pencil: never zoom
+  cancelDrawing(); hideLasso();
+  const w = $('#pages'), r = w.getBoundingClientRect();
+  const cx = (ts[0].clientX + ts[1].clientX) / 2 - r.left, cy = (ts[0].clientY + ts[1].clientY) / 2 - r.top;
+  pinch = { d0: Math.max(20, tdist(ts[0], ts[1])), cx0: cx, cy0: cy, cx, cy, sx: w.scrollLeft, sy: w.scrollTop, ratio: 1 };
+  const inner = $('#pagesInner'); inner.style.transformOrigin = `${pinch.sx + cx}px ${pinch.sy + cy}px`;
+  if (e.cancelable) e.preventDefault();
+}, { passive: false });
+$('#pages').addEventListener('touchmove', e => {
+  if (!pinch || e.touches.length < 2) return;
+  if (e.cancelable) e.preventDefault();
+  const [a, b] = e.touches, r = $('#pages').getBoundingClientRect();
+  pinch.ratio = Math.max(ZMIN / S.zoom * 0.85, Math.min(ZMAX / S.zoom * 1.1, tdist(a, b) / pinch.d0));
+  pinch.cx = (a.clientX + b.clientX) / 2 - r.left; pinch.cy = (a.clientY + b.clientY) / 2 - r.top;
+  $('#pagesInner').style.transform = `translate(${pinch.cx - pinch.cx0}px, ${pinch.cy - pinch.cy0}px) scale(${pinch.ratio})`;
+}, { passive: false });
+function endPinch(e) {
+  if (!pinch || (e && e.touches && e.touches.length >= 2)) return;
+  const p = pinch; pinch = null;
+  const inner = $('#pagesInner'); inner.style.transform = ''; inner.style.transformOrigin = '';
+  zoomTo(S.zoom * p.ratio, p.cx0, p.cy0, p.cx, p.cy);
+}
+$('#pages').addEventListener('touchend', endPinch);
+$('#pages').addEventListener('touchcancel', endPinch);
+// Zoom so the page point under viewport point (fx,fy) of #pages ends up at viewport point (tx,ty).
+function zoomTo(z, fx, fy, tx = fx, ty = fy) {
+  const w = $('#pages'), wr = w.getBoundingClientRect();
+  if (fx === undefined) { fx = tx = w.clientWidth / 2; fy = ty = w.clientHeight / 2; }
+  z = Math.max(ZMIN, Math.min(ZMAX, z)); if (z < 1.06) z = 1; z = Math.round(z * 100) / 100;
+  if (z === S.zoom) { updateZoomChip(); return; }
+  // anchor: page under the focal point, in page units
+  let pi = 0, best = Infinity;
+  pageEls.forEach((r, i) => { const b = r.el.getBoundingClientRect(), d = wr.top + fy < b.top ? b.top - wr.top - fy : wr.top + fy > b.bottom ? wr.top + fy - b.bottom : 0; if (d < best) { best = d; pi = i; } });
+  const r0 = pageEls[pi].el.getBoundingClientRect(), ux = (wr.left + fx - r0.left) / S.scale, uy = (wr.top + fy - r0.top) / S.scale;
+  S.zoom = z; buildPages();
+  const r1 = pageEls[pi].el.getBoundingClientRect();
+  w.scrollLeft += r1.left + ux * S.scale - (wr.left + tx);
+  w.scrollTop += r1.top + uy * S.scale - (wr.top + ty);
+  positionLassoMenu();
+}
+function updateZoomChip() { const c = $('#zoomChip'); c.hidden = S.zoom === 1; c.textContent = Math.round(S.zoom * 100) + '%'; }
+$('#zoomChip').onclick = () => zoomTo(1);
+$('#pages').addEventListener('wheel', e => {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  const w = $('#pages'), r = w.getBoundingClientRect(), vx = e.clientX - r.left, vy = e.clientY - r.top;
+  zoomTo(S.zoom * Math.exp(-e.deltaY * 0.01), vx, vy);
+}, { passive: false });
 $('#pages').addEventListener('touchmove', e => { if ([...e.touches].some(t => t.touchType === 'stylus') && e.target.tagName === 'CANVAS') e.preventDefault(); }, { passive: false });
 
 function segDist(p, a, b) { const dx = b[0] - a[0], dy = b[1] - a[1], l = dx * dx + dy * dy; let t = l ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy); }
@@ -596,6 +668,7 @@ function inkThumb(note, pi, t, W = 128, H = 80) {
 
 /* ---------- panel ---------- */
 function renderPanel() {
+  if ((sw && sw.active) || swOpen) { panelDirty = true; return; }
   const list = $('#reminderList'), now = new Date(), sod = startOfDay(now);
   let items = allItems();
   if (S.filter === 'due') items = items.filter(i => !i.obj.done && i.obj.due);
@@ -634,12 +707,14 @@ function renderPanel() {
 function rowHTML(it) {
   const o = it.obj, od = o.due && !o.done && new Date(o.due) < Date.now();
   const thumb = o.kind === 'ink' ? inkThumb(it.note, it.page, o) : '';
-  return `<div class="ritem ${o.done ? 'done' : ''}" data-id="${o.id}" role="button">
+  return `<div class="rwrap" data-id="${o.id}"><div class="rbg-done">${o.done ? '↺ Not done' : '✓ Done'}</div>
+    <div class="ractions"><button data-sa="1h">⏰ 1 hour</button><button data-sa="tomorrow">🌅 Tmrw 9am</button><button data-sa="delete" class="del">🗑 Delete</button></div>
+    <div class="ritem ${o.done ? 'done' : ''}" data-id="${o.id}" role="button">
     <button class="rchk ${it.type === 'note' ? 'note' : ''}" aria-label="Done">${o.done ? '✓' : ''}</button>
     ${thumb ? `<img class="rthumb" src="${thumb}" alt="">` : ''}
     <div class="rbody"><div class="rt">${it.type === 'note' ? '⏰ ' : ''}${esc(itemTitle(it))}</div>
     <div class="rs">${o.due ? `<span class="${od ? 'od' : ''}">${esc(fmtDue(o.due))}${o.repeat ? ' ↻' : ''}</span> · ` : ''}${esc(it.note.title)}${it.page >= 0 ? ' · p' + (it.page + 1) : ''}</div></div>
-    ${o.due ? '<button class="rcal" title="Add to Calendar" aria-label="Add to Calendar">📅</button>' : ''}</div>`;
+    ${o.due ? '<button class="rcal" title="Add to Calendar" aria-label="Add to Calendar">📅</button>' : ''}</div></div>`;
 }
 $('#filterSeg').onclick = e => { const f = e.target.dataset.f; if (!f) return; S.filter = f; document.querySelectorAll('#filterSeg button').forEach(b => b.classList.toggle('on', b.dataset.f === f)); renderPanel(); };
 
@@ -735,15 +810,26 @@ async function downloadIcs(it) {
   toast('Calendar file ready — open it and tap “Add”');
 }
 
+/* ---------- ordering ---------- */
+const byOrder = (a, b) => (a.order ?? 1e9) - (b.order ?? 1e9);
+const sortedNotebooks = () => [...S.notebooks].sort((a, b) => byOrder(a, b) || a.createdAt - b.createdAt);
+const notesIn = nbId => S.notes.filter(n => n.notebookId === nbId).sort((a, b) => byOrder(a, b) || b.updatedAt - a.updatedAt);
+// Make order fields dense 0..n-1 (writes only what changed; doesn't touch updatedAt).
+function normalizeOrder() {
+  sortedNotebooks().forEach((nb, i) => { if (nb.order !== i) { nb.order = i; saveNotebook(nb); } });
+  for (const nb of S.notebooks) notesIn(nb.id).forEach((n, i) => { if (n.order !== i) { n.order = i; DB.put('notes', n); } });
+}
+
 /* ---------- sidebar ---------- */
 function noteSearchText(n) { return (n.title + ' ' + n.pages.map(p => p.texts.map(t => t.text).join(' ') + ' ' + p.tasks.map(t => t.text).join(' ')).join(' ')).toLowerCase(); }
 function renderSidebar() {
+  if (drag) { sidebarDirty = true; return; }
   const box = $('#notebookList'), q = S.search.trim().toLowerCase(), cur = curNote(), now = Date.now();
-  box.innerHTML = S.notebooks.sort((a, b) => a.createdAt - b.createdAt).map(nb => {
-    let notes = S.notes.filter(n => n.notebookId === nb.id).sort((a, b) => b.updatedAt - a.updatedAt);
+  box.innerHTML = sortedNotebooks().map(nb => {
+    let notes = notesIn(nb.id);
     if (q) notes = notes.filter(n => noteSearchText(n).includes(q));
     const col = S.collapsed.has(nb.id) && !q;
-    return `<div class="nb"><div class="nb-head ${cur && cur.notebookId === nb.id ? 'current' : ''}" data-nb="${nb.id}">
+    return `<div class="nb" data-nbid="${nb.id}"><div class="nb-head ${cur && cur.notebookId === nb.id ? 'current' : ''}" data-nb="${nb.id}">
       <button data-toggle aria-label="Collapse">${col ? '▸' : '▾'}</button><span class="name">${esc(nb.name)}</span>
       <button data-add aria-label="New note here">＋</button><button data-nbmore aria-label="Notebook options">⋯</button></div>
       ${col ? '' : notes.map(n => {
@@ -778,7 +864,7 @@ $('#notebookList').addEventListener('click', e => {
 function noteMenu(n) {
   actionSheet(n.title, [
     { label: 'Rename', fn: () => { const v = prompt('Note title', n.title); if (v && v.trim()) { n.title = v.trim(); saveNote(n); renderAll(); } } },
-    ...(S.notebooks.length > 1 ? [{ label: 'Move to notebook…', fn: () => actionSheet('Move to…', S.notebooks.filter(b => b.id !== n.notebookId).map(b => ({ label: b.name, fn: () => { n.notebookId = b.id; saveNote(n); renderSidebar(); } }))) }] : []),
+    ...(S.notebooks.length > 1 ? [{ label: 'Move to notebook…', fn: () => actionSheet('Move to…', S.notebooks.filter(b => b.id !== n.notebookId).map(b => ({ label: b.name, fn: () => { n.notebookId = b.id; n.order = -1; saveNote(n); normalizeOrder(); renderSidebar(); } }))) }] : []),
     { label: 'Delete note', danger: true, fn: () => deleteNote(n) }]);
 }
 async function deleteNote(n) {
@@ -794,13 +880,13 @@ async function deleteNotebook(nb) {
   renderAll();
 }
 function createNote(nbId) {
-  const n = makeNote(nbId || (curNote() && curNote().notebookId) || S.notebooks[0].id);
-  S.notes.push(n); saveNote(n, true); openNote(n.id);
+  const n = makeNote(nbId || (curNote() && curNote().notebookId) || sortedNotebooks()[0].id);
+  n.order = -1; S.notes.push(n); saveNote(n, true); normalizeOrder(); openNote(n.id);
   if (isDrawer()) setSidebar(false);
   setTimeout(() => { $('#noteTitle').focus(); $('#noteTitle').select(); }, 60);
 }
 $('#newNote').onclick = () => createNote();
-$('#newNotebook').onclick = () => { const v = prompt('New notebook name'); if (!v || !v.trim()) return; const nb = { id: uid('b'), name: v.trim(), createdAt: Date.now() }; S.notebooks.push(nb); saveNotebook(nb); createNote(nb.id); };
+$('#newNotebook').onclick = () => { const v = prompt('New notebook name'); if (!v || !v.trim()) return; const nb = { id: uid('b'), name: v.trim(), createdAt: Date.now(), order: S.notebooks.length }; S.notebooks.push(nb); saveNotebook(nb); createNote(nb.id); };
 $('#search').addEventListener('input', e => { S.search = e.target.value; renderSidebar(); });
 
 $('#noteTitle').addEventListener('input', e => { const n = curNote(); n.title = e.target.value || 'Untitled note'; saveNote(n); renderSidebar(); });
@@ -839,7 +925,7 @@ function setTheme(t) { localStorage.setItem('theme', t); applyTheme(); thumbCach
 
 function openNote(id) {
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-  S.cur = id; localStorage.setItem('cur', id); S.undo = []; S.redo = []; updateUndo();
+  S.cur = id; localStorage.setItem('cur', id); S.undo = []; S.redo = []; S.zoom = 1; updateUndo();
   const n = curNote(); $('#noteTitle').value = n.title;
   lastW = $('#pages').clientWidth; buildPages(); $('#pages').scrollTop = 0;
   renderNoteReminders(); renderSidebar();
@@ -849,6 +935,178 @@ function renderAll() {
   const n = curNote();
   if (n) { $('#noteTitle').value = n.title; for (let i = 0; i < pageEls.length; i++) renderOverlay(i); renderNoteReminders(); }
   renderSidebar(); renderPanel();
+}
+
+/* ---------- Clear-style press-and-hold drag to reorder (sidebar) ---------- */
+const LIFT_MS = 350, SLOP = 8;
+let pendingLift = null, drag = null, sidebarDirty = false, suppressSideClick = false;
+const LIST = $('#notebookList');
+LIST.addEventListener('contextmenu', e => { if (pendingLift || drag) e.preventDefault(); });
+LIST.addEventListener('pointerdown', e => {
+  if (drag || (e.pointerType === 'mouse' && e.button !== 0) || S.search.trim()) return;
+  if (e.target.closest('button')) return;
+  const row = e.target.closest('.note-row[data-note]'), head = e.target.closest('.nb-head');
+  const el = row || (head && head.parentElement);
+  if (!el) return;
+  clearTimeout(pendingLift?.timer);
+  pendingLift = { pid: e.pointerId, x: e.clientX, y: e.clientY, lastY: e.clientY, lastX: e.clientX, el, kind: row ? 'note' : 'nb' };
+  pendingLift.timer = setTimeout(lift, LIFT_MS);
+});
+function lift() {
+  const p = pendingLift; pendingLift = null; if (!p || !p.el.isConnected) return;
+  const container = p.kind === 'note' ? p.el.parentElement : LIST;
+  const sibs = [...container.children].filter(c => p.kind === 'note' ? c.matches('.note-row[data-note]') : c.matches('.nb'));
+  const sc = LIST.scrollTop;
+  const rects = sibs.map(c => { const r = c.getBoundingClientRect(); return { mid: r.top + sc + r.height / 2 }; });
+  const cs = getComputedStyle(p.el), H = p.el.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);
+  const idx = sibs.indexOf(p.el);
+  drag = { ...p, sibs, rects, idx, newIdx: idx, H, startScroll: sc, targetNb: null, srcNb: p.kind === 'note' ? container.dataset.nbid : null };
+  p.el.classList.add('lifted'); LIST.classList.add('dragging');
+  for (const c of sibs) if (c !== p.el) c.classList.add('shiftable');
+  p.el.style.transform = 'scale(1.035)';
+  try { navigator.vibrate && navigator.vibrate(8); } catch (_) {}
+  autoScroll();
+}
+function autoScroll() {
+  if (!drag) return;
+  const r = LIST.getBoundingClientRect(), y = drag.lastY;
+  if (y < r.top + 44) LIST.scrollTop -= Math.ceil((r.top + 44 - y) / 5);
+  else if (y > r.bottom - 44) LIST.scrollTop += Math.ceil((y - r.bottom + 44) / 5);
+  layoutDrag();
+  drag.raf = requestAnimationFrame(autoScroll);
+}
+function layoutDrag() {
+  const d = drag, sc = LIST.scrollTop, dy = d.lastY - d.y + (sc - d.startScroll), py = d.lastY + sc;
+  d.el.style.transform = `translateY(${dy}px) scale(1.035)`;
+  // Cross-notebook target (notes only): the notebook block under the finger, if it isn't the source.
+  let tgt = null;
+  if (d.kind === 'note') {
+    const under = document.elementFromPoint(d.lastX, d.lastY), nbEl = under && under.closest('.nb');
+    if (nbEl && nbEl.dataset.nbid !== d.srcNb) tgt = nbEl.dataset.nbid;
+  }
+  if (tgt !== d.targetNb) {
+    LIST.querySelectorAll('.nb-head.drop-target').forEach(h => h.classList.remove('drop-target'));
+    if (tgt) { const h = LIST.querySelector(`.nb[data-nbid="${tgt}"] .nb-head`); h && h.classList.add('drop-target'); }
+    d.targetNb = tgt;
+  }
+  let ni = 0; d.rects.forEach((r, j) => { if (j !== d.idx && r.mid < py) ni++; });
+  d.newIdx = tgt ? d.idx : ni;
+  d.sibs.forEach((c, j) => {
+    if (j === d.idx) return;
+    let t = 0;
+    if (!tgt) { if (d.idx < d.newIdx && j > d.idx && j <= d.newIdx) t = -d.H; else if (d.newIdx < d.idx && j >= d.newIdx && j < d.idx) t = d.H; }
+    c.style.transform = t ? `translateY(${t}px)` : '';
+  });
+}
+window.addEventListener('pointermove', e => {
+  if (pendingLift && e.pointerId === pendingLift.pid) {
+    if (Math.hypot(e.clientX - pendingLift.x, e.clientY - pendingLift.y) > SLOP) { clearTimeout(pendingLift.timer); pendingLift = null; } // it's a scroll
+    else { pendingLift.lastX = e.clientX; pendingLift.lastY = e.clientY; }
+  }
+  if (drag && e.pointerId === drag.pid) { drag.lastX = e.clientX; drag.lastY = e.clientY; }
+}, { passive: true });
+// Once lifted, stop the list from scrolling under the finger.
+LIST.addEventListener('touchmove', e => { if (drag && e.cancelable) e.preventDefault(); }, { passive: false });
+function endLift(e) {
+  if (pendingLift && e.pointerId === pendingLift.pid) { clearTimeout(pendingLift.timer); pendingLift = null; }
+  if (!drag || e.pointerId !== drag.pid) return;
+  const d = drag; drag = null; cancelAnimationFrame(d.raf);
+  suppressSideClick = true; setTimeout(() => suppressSideClick = false, 400);
+  LIST.classList.remove('dragging');
+  d.sibs.forEach(c => { c.style.transform = ''; c.classList.remove('shiftable', 'lifted'); });
+  let movedId = d.kind === 'note' ? d.el.dataset.note : d.el.dataset.nbid;
+  if (e.type !== 'pointercancel') {
+    if (d.kind === 'note' && d.targetNb) {
+      const n = S.notes.find(x => x.id === movedId); n.notebookId = d.targetNb; n.order = -1; DB.put('notes', n);
+      S.collapsed.delete(d.targetNb); localStorage.setItem('collapsed', JSON.stringify([...S.collapsed]));
+      toast('Moved to ' + (S.notebooks.find(b => b.id === d.targetNb)?.name || 'notebook'));
+    } else if (d.newIdx !== d.idx) {
+      const list = d.kind === 'note' ? notesIn(d.srcNb) : sortedNotebooks();
+      const [m] = list.splice(d.idx, 1); list.splice(d.newIdx, 0, m);
+      list.forEach((o, i) => { o.order = i; d.kind === 'note' ? DB.put('notes', o) : saveNotebook(o); });
+    }
+    normalizeOrder();
+  }
+  sidebarDirty = false; renderSidebar();
+  const sel = d.kind === 'note' ? `.note-row[data-note="${movedId}"]` : `.nb[data-nbid="${movedId}"]`;
+  const el = LIST.querySelector(sel); if (el) { el.classList.add('settle'); setTimeout(() => el.classList.remove('settle'), 450); }
+}
+window.addEventListener('pointerup', endLift);
+window.addEventListener('pointercancel', endLift);
+LIST.addEventListener('click', e => { if (suppressSideClick) { e.stopPropagation(); e.preventDefault(); suppressSideClick = false; } }, true);
+
+/* ---------- Clear-style swipes on Reminders rows ---------- */
+const ACT_W = 234, DONE_AT = 90;
+let sw = null, swOpen = null, swSuppress = false, panelDirty = false;
+const RL = $('#reminderList');
+function itemById(id) { return allItems().find(i => i.obj.id === id); }
+function closeSwipe(row, now) {
+  if (!row) return;
+  row.style.transition = now ? '' : 'transform .25s cubic-bezier(.2,.9,.3,1.3)'; row.style.transform = '';
+  const wrap = row.parentElement; setTimeout(() => wrap && wrap.classList.remove('reveal-done', 'reveal-actions', 'armed'), now ? 0 : 250);
+  if (swOpen === row) swOpen = null;
+  if (panelDirty && !swOpen) { panelDirty = false; setTimeout(renderPanel, 260); }
+}
+RL.addEventListener('pointerdown', e => {
+  const row = e.target.closest('.ritem'); if (!row || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  if (e.target.closest('.ractions')) return;
+  if (swOpen && swOpen !== row) closeSwipe(swOpen);
+  sw = { row, pid: e.pointerId, x: e.clientX, y: e.clientY, t: 0, active: false, base: row === swOpen ? -ACT_W : 0 };
+});
+window.addEventListener('pointermove', e => {
+  if (!sw || e.pointerId !== sw.pid) return;
+  const dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+  if (!sw.active) {
+    if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.2) { sw.active = true; sw.row.style.transition = 'none'; try { sw.row.setPointerCapture(e.pointerId); } catch (_) {} }
+    else if (Math.abs(dy) > 10) { sw = null; return; }
+    else return;
+  }
+  let t = sw.base + dx;
+  if (t > 120) t = 120 + (t - 120) * 0.3;
+  if (t < -ACT_W) t = -ACT_W + (t + ACT_W) * 0.3;
+  sw.t = t; sw.row.style.transform = `translateX(${t}px)`;
+  const wrap = sw.row.parentElement;
+  wrap.classList.toggle('reveal-done', t > 0); wrap.classList.toggle('reveal-actions', t < 0);
+  wrap.classList.toggle('armed', t > DONE_AT);
+}, { passive: true });
+RL.addEventListener('touchmove', e => { if (sw && sw.active && e.cancelable) e.preventDefault(); }, { passive: false });
+function endSwipe(e) {
+  if (!sw || e.pointerId !== sw.pid) return;
+  const s = sw; sw = null; if (!s.active) return;
+  swSuppress = true; setTimeout(() => swSuppress = false, 350);
+  const row = s.row, wrap = row.parentElement;
+  if (e.type !== 'pointercancel' && s.t > DONE_AT) {
+    const it = itemById(row.dataset.id);
+    wrap.classList.add('bounce'); closeSwipe(row);
+    setTimeout(() => { if (it) toggleDone(it); }, 260);
+  } else if (e.type !== 'pointercancel' && s.t < -60) {
+    row.style.transition = 'transform .28s cubic-bezier(.2,.9,.3,1.25)'; row.style.transform = `translateX(${-ACT_W}px)`; swOpen = row;
+  } else closeSwipe(row);
+}
+window.addEventListener('pointerup', endSwipe);
+window.addEventListener('pointercancel', endSwipe);
+RL.addEventListener('click', e => {
+  const a = e.target.closest('[data-sa]');
+  if (a) {
+    e.stopPropagation();
+    const it = itemById(a.closest('.rwrap').dataset.id); if (!it) return;
+    const row = a.closest('.rwrap').querySelector('.ritem'); closeSwipe(row, true);
+    if (a.dataset.sa === 'delete') return deleteItem(it);
+    const d = new Date(); if (a.dataset.sa === '1h') d.setTime(d.getTime() + 36e5); else { d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); }
+    if (it.type === 'task' && it.note.id === S.cur) pushHistory();
+    it.obj.due = d.toISOString(); it.obj.notified = false; it.obj.done = false; saveNote(it.note, true); renderAll();
+    toast('Snoozed to ' + fmtDue(it.obj.due));
+    return;
+  }
+  if (swSuppress) { e.stopPropagation(); swSuppress = false; return; }
+  const row = e.target.closest('.ritem');
+  if (row && row === swOpen) { e.stopPropagation(); closeSwipe(row); }
+}, true);
+function deleteItem(it) {
+  const n = it.note;
+  if (it.type === 'note') n.reminders = n.reminders.filter(r => r !== it.obj);
+  else { if (n.id === S.cur) pushHistory(); const pg = n.pages[it.page]; pg.tasks = pg.tasks.filter(t => t !== it.obj); }
+  saveNote(n, true); renderAll(); toast('Deleted “' + itemTitle(it) + '”');
 }
 
 /* ---------- backup ---------- */
@@ -869,6 +1127,8 @@ $('#importFile').onchange = async e => {
     for (const n of data.notes) { n.reminders ||= []; S.notes = S.notes.filter(x => x.id !== n.id).concat(n); await DB.put('notes', n); }
     for (const n of S.notes) if (!S.notebooks.find(b => b.id === n.notebookId)) n.notebookId = S.notebooks[0]?.id;
     if (!S.notebooks.length) await load();
+    for (const n of S.notes) for (const p of n.pages) { p.images ||= []; if (!('bg' in p)) p.bg = null; if (!('paper' in p)) p.paper = null; }
+    normalizeOrder();
     openNote((curNote() || S.notes[0]).id); renderAll(); toast(`Imported ${data.notes.length} notes`);
   };
   actionSheet(`Import ${data.notes.length} notes?`, [{ label: 'Merge with my notes', primary: true, fn: () => run(false) }, { label: 'Replace everything', danger: true, fn: () => run(true) }]);

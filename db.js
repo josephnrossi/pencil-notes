@@ -4,11 +4,13 @@ const DB = (() => {
   function open() {
     if (dbp) return dbp;
     dbp = new Promise((resolve, reject) => {
-      const r = indexedDB.open('inkminder', 1);
+      const r = indexedDB.open('inkminder', 2);
       r.onupgradeneeded = () => {
         const db = r.result;
         if (!db.objectStoreNames.contains('notebooks')) db.createObjectStore('notebooks', { keyPath: 'id' });
         if (!db.objectStoreNames.contains('notes')) db.createObjectStore('notes', { keyPath: 'id' });
+        // v2: binary assets (PDF pages, photos, stickers) referenced by id from page.bg / page.images
+        if (!db.objectStoreNames.contains('assets')) db.createObjectStore('assets', { keyPath: 'id' });
       };
       r.onsuccess = () => resolve(r.result);
       r.onerror = () => reject(r.error);
