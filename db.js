@@ -31,6 +31,7 @@ const DB = (() => {
   const req = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
   return {
     all: store => tx(store, 'readonly', s => req(s.getAll())),
+    get: (store, id) => tx(store, 'readonly', s => req(s.get(id))),
     put: (store, obj) => tx(store, 'readwrite', s => { s.put(obj); }),
     del: (store, id) => tx(store, 'readwrite', s => { s.delete(id); }),
     clear: store => tx(store, 'readwrite', s => { s.clear(); }),

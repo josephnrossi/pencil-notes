@@ -12,7 +12,7 @@ const isDrawer = () => drawerMQ.matches; // portrait iPad & phones: sidebar/pane
 const uid = p => (p || '') + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const sysDarkMQ = matchMedia('(prefers-color-scheme: dark)');
 const themePref = () => { const t = localStorage.getItem('theme'); return ['light', 'dark', 'system'].includes(t) ? t : 'dark'; };
-const isDark = () => { const p = themePref(); return p === 'system' ? sysDarkMQ.matches : p === 'dark'; };
+const isDark = () => { if (typeof renderLight !== 'undefined' && renderLight) return false; const p = themePref(); return p === 'system' ? sysDarkMQ.matches : p === 'dark'; };
 function applyTheme() {
   const dark = isDark();
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
@@ -45,13 +45,14 @@ function saveNote(note, immediate) {
   clearTimeout(saveTimers.get(note.id));
   const run = () => { saveTimers.delete(note.id); DB.put('notes', note).catch(err => toast('Save failed: ' + err.message)); };
   if (immediate) run(); else saveTimers.set(note.id, setTimeout(run, 250));
+  if (window.onNoteSaved) window.onNoteSaved(note);
 }
 function flushSaves() { for (const [id, t] of saveTimers) { clearTimeout(t); const n = S.notes.find(x => x.id === id); if (n) DB.put('notes', n); } saveTimers.clear(); }
 const saveNotebook = nb => DB.put('notebooks', nb);
 
 // Page model v2. bg = per-page background (null | {type:'template'|'pdf', ...}); images = photos/stickers;
 // paper = per-page override (null → note.paper). Binary blobs (PDF pages, photos) go in the 'assets' IDB store.
-function newPage() { return { id: uid('p'), strokes: [], texts: [], tasks: [], images: [], bg: null, paper: null }; }
+function newPage() { return { id: uid('p'), strokes: [], texts: [], tasks: [], images: [], labels: [], sections: [], bg: null, paper: null }; }
 function makeNote(notebookId, title) {
   return { id: uid('n'), notebookId, title: title || 'Untitled note', paper: 'lined', pages: [newPage()], reminders: [], createdAt: Date.now(), updatedAt: Date.now() };
 }
@@ -82,7 +83,7 @@ async function load() {
     }
   }
   localStorage.setItem('seeded', '1');
-  for (const n of S.notes) { n.reminders = n.reminders || []; n.v = 2; for (const p of n.pages) { p.strokes ||= []; p.texts ||= []; p.tasks ||= []; p.images ||= []; if (!('bg' in p)) p.bg = null; if (!('paper' in p)) p.paper = null; } }
+  for (const n of S.notes) { n.reminders = n.reminders || []; n.v = 2; for (const p of n.pages) { p.strokes ||= []; p.texts ||= []; p.tasks ||= []; p.images ||= []; p.labels ||= []; p.sections ||= []; if (!('bg' in p)) p.bg = null; if (!('paper' in p)) p.paper = null; } }
   normalizeOrder();
   if (!S.notes.length) { const n = makeNote(S.notebooks[0].id); S.notes.push(n); await DB.put('notes', n); }
 }
@@ -164,9 +165,18 @@ function renderPageInk(pi) {
   if (!el.alive) return;
   const pg = note.pages[pi];
   const ctx = el.ctx; ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, el.base.width, el.base.height); ctx.restore();
-  drawPaper(ctx, pg.paper || note.paper);
-  for (const st of pg.strokes) if (st.tool === 'highlighter') drawStroke(ctx, st);
-  for (const st of pg.strokes) if (st.tool !== 'highlighter') drawStroke(ctx, st);
+  drawPageContent(ctx, note, pg);
+}
+// Background (paper / template / PDF page) → photos & stickers → highlighter → ink. ctx is in page units.
+function drawPageContent(ctx, note, pg) {
+  // PDF pages stay white in dark mode, so their ink keeps its true colours (no dark-theme inversion).
+  if (pg.bg && pg.bg.type === 'pdf' && !renderLight) { renderLight = true; try { return drawPageContent(ctx, note, pg); } finally { renderLight = false; } }
+  const h = typeof liftHide !== 'undefined' && liftHide && liftHide.pg === pg.id ? liftHide : null;   // lifted content is drawn by the drag ghost
+  drawPageBackground(ctx, note, pg);
+  drawPageImages(ctx, h ? { images: (pg.images || []).filter(i => !h.images.has(i.id)) } : pg);
+  const strokes = h ? pg.strokes.filter(st => !h.strokes.has(st.id)) : pg.strokes;
+  for (const st of strokes) if (st.tool === 'highlighter') drawStroke(ctx, st);
+  for (const st of strokes) if (st.tool !== 'highlighter') drawStroke(ctx, st);
 }
 function clearLive(el) { if (!el.alive) return; const c = el.lctx; c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, el.live.width, el.live.height); c.restore(); }
 
@@ -207,7 +217,11 @@ function buildPages() {
   const add = document.createElement('button'); add.className = 'btn add-page'; add.textContent = '＋ Add page'; add.onclick = addPage; inner.append(add);
   applyFingerMode(); updateZoomChip();
 }
-function addPage() { const n = curNote(); pushHistory(); n.pages.push(newPage()); saveNote(n); buildPages(); const w = $('#pages'); w.scrollTo({ top: w.scrollHeight, behavior: 'smooth' }); }
+async function addPage(kind) {
+  if (typeof kind !== 'string') kind = await chooseTemplate('Add page');
+  const n = curNote(); pushHistory(); n.pages.push(makeTemplatePage(kind, n)); saveNote(n); buildPages();
+  const w = $('#pages'), el = pageEls[pageEls.length - 1].el; w.scrollTo({ top: el.offsetTop, behavior: 'smooth' });
+}
 $('#pages').addEventListener('click', e => {
   const b = e.target.closest('[data-delpage]'); if (!b) return;
   const n = curNote(), pi = +b.dataset.delpage;
@@ -216,6 +230,9 @@ $('#pages').addEventListener('click', e => {
 
 function renderOverlay(pi) {
   const note = curNote(), rec = pageEls[pi]; if (!rec) return;
+  const pdfPg = note.pages[pi] && note.pages[pi].bg && note.pages[pi].bg.type === 'pdf';
+  rec.el.classList.toggle('pdf-page', !!pdfPg);
+  if (pdfPg && !renderLight) { renderLight = true; try { return renderOverlay(pi); } finally { renderLight = false; } }
   const pg = note.pages[pi], s = S.scale, ov = rec.ov;
   ov.innerHTML = '';
   for (const tb of pg.texts) {
@@ -234,7 +251,7 @@ function renderOverlay(pi) {
     const overdue = t.due && !t.done && new Date(t.due) < now;
     const chip = `<button class="due ${t.due ? (overdue ? 'overdue' : '') : 'none'}" data-act="edit">${t.due ? '⏰ ' + esc(fmtDue(t.due)) + (t.repeat ? ' ↻' : '') : '＋ Remind'}</button>`;
     const chk = `<button class="chk" data-act="toggle" aria-label="Mark done">${t.done ? '✓' : ''}</button>`;
-    const fs = 26 * s;
+    const fs = (t.fs || 26) * s;
     if (t.kind === 'ink') {
       const r = document.createElement('div'); r.className = 'task-region' + (t.done ? ' done' : ''); r.dataset.id = t.id;
       Object.assign(r.style, { left: t.x * s + 'px', top: t.y * s + 'px', width: t.w * s + 'px', height: t.h * s + 'px' });
@@ -242,10 +259,10 @@ function renderOverlay(pi) {
       const left = document.createElement('div'); left.className = 'task' + (t.done ? ' done' : ''); left.dataset.id = t.id;
       left.style.fontSize = fs + 'px';
       const cx = t.x - 44 >= 0 ? t.x - 44 : t.x + 6;
-      left.style.left = cx * s + 'px'; left.style.top = (t.y + Math.min(t.h / 2, 40) - 17) * s + 'px';
+      left.style.left = cx * s + 'px'; left.style.top = (t.slot ? t.y + t.h / 2 - (t.fs || 26) * 0.68 : t.y + Math.min(t.h / 2, 40) - 17) * s + 'px';
       left.innerHTML = chk; ov.append(left);
       const c2 = document.createElement('div'); c2.className = 'task'; c2.dataset.id = t.id; c2.style.fontSize = fs + 'px';
-      c2.style.left = t.x * s + 'px'; c2.style.top = (t.y + t.h + 4) * s + 'px';
+      if (t.slot) { c2.style.left = (t.x + t.w + 8) * s + 'px'; c2.style.top = (t.y + t.h / 2 - (t.fs || 26) * 0.68) * s + 'px'; } else { c2.style.left = t.x * s + 'px'; c2.style.top = (t.y + t.h + 4) * s + 'px'; }
       c2.innerHTML = (t.text ? `<span class="label" data-act="edit" style="font-size:.7em;opacity:.75">${esc(t.text)}</span>` : '') + chip;
       ov.append(c2);
     } else {
@@ -257,14 +274,16 @@ function renderOverlay(pi) {
     }
   }
   ov.querySelectorAll('[data-act]').forEach(b => {
-    b.addEventListener('pointerdown', e => e.stopPropagation());
+    b.addEventListener('pointerdown', e => { e.stopPropagation(); taskHoldStart(e, note, pi, b.closest('[data-id]').dataset.id); });
     b.addEventListener('click', e => {
       e.stopPropagation();
       const id = b.closest('[data-id]').dataset.id, t = pg.tasks.find(x => x.id === id);
+      if (!t) return;
       if (b.dataset.act === 'toggle') { pushHistory(); toggleDone({ type: 'task', note, obj: t, page: pi }); }
       else openEditor({ type: 'task', note, obj: t, page: pi });
     });
   });
+  v7OverlayHook(pi);
 }
 
 /* ---------- input ---------- */
@@ -287,6 +306,8 @@ function notePen() {
 function onDown(e, pi) {
   ensureAlive(pi);
   const cv = pageEls[pi].base;
+  if (S.tool === 'lasso' && !drawing && !(e.pointerType === 'touch' && touches.size) && !(e.pointerType === 'mouse' && e.button !== 0) && v7LassoDown(e, pi)) return;
+  v7ObjectDown(e, pi);   // long-press on a task / text / photo / sticker / selection lifts it (never draws with a finger)
   if (e.pointerType === 'pen') notePen();
   if (e.pointerType === 'touch') {
     touches.set(e.pointerId, { x: e.clientX, y: e.clientY, t: Date.now(), pi });
@@ -360,11 +381,12 @@ function endPointer(e) {
     d.stroke.bb = bbox(d.stroke.points);
     pushHistory(); pg.strokes.push(d.stroke); saveNote(note);
     clearLive(rec); renderPageInk(d.pi);
+    if (window.onStrokeAdded) window.onStrokeAdded(d.pi, d.stroke);
   } else if (d.tool === 'eraser') {
     if (d.erased) { S.undo.push(d.snap); S.redo = []; updateUndo(); saveNote(note); }
   } else if (d.lasso) {
     clearLive(rec); finishLasso(d.pi, d.lasso);
-  } else if ((d.tool === 'task' || d.tool === 'text') && d.moved < 8) {
+  } else if ((d.tool === 'task' || d.tool === 'text' || d.tool === 'section') && d.moved < 8) {
     placeAt(d.pi, d.start);
   }
 }
@@ -457,30 +479,33 @@ function inPoly(p, poly) { let c = false; for (let i = 0, j = poly.length - 1; i
 function finishLasso(pi, poly) {
   if (poly.length < 5) return;
   const pg = curNote().pages[pi];
-  const ids = pg.strokes.filter(st => { let n = 0; for (const p of st.points) if (inPoly(p, poly)) n++; return n / st.points.length >= 0.6; }).map(s => s.id);
-  if (!ids.length) { hint('Nothing selected — circle some handwriting'); return; }
-  const strokes = pg.strokes.filter(s => ids.includes(s.id));
-  let bb = [Infinity, Infinity, -Infinity, -Infinity];
-  for (const s of strokes) { const b = s.bb || bbox(s.points); bb = [Math.min(bb[0], b[0] - s.width), Math.min(bb[1], b[1] - s.width), Math.max(bb[2], b[2] + s.width), Math.max(bb[3], b[3] + s.width)]; }
-  const pad = 8; bb = [Math.max(0, bb[0] - pad), Math.max(0, bb[1] - pad), Math.min(PAGE_W, bb[2] + pad), Math.min(PAGE_H, bb[3] + pad)];
-  selection = { pi, ids, bb };
-  const rec = pageEls[pi]; clearLive(rec);
-  const c = rec.lctx; c.save(); c.setLineDash([6, 5]); c.lineWidth = 2; c.strokeStyle = '#4f46e5'; c.fillStyle = 'rgba(79,70,229,.08)';
-  c.fillRect(bb[0], bb[1], bb[2] - bb[0], bb[3] - bb[1]); c.strokeRect(bb[0], bb[1], bb[2] - bb[0], bb[3] - bb[1]); c.restore();
-  positionLassoMenu(); $('#lassoMenu').hidden = false;
+  const ids = new Set(pg.strokes.filter(st => { let n = 0; for (const p of st.points) if (inPoly(p, poly)) n++; return n / st.points.length >= 0.6; }).map(s => s.id));
+  const G = { strokes: [], tasks: [], texts: [], images: [], sections: [] };
+  for (const t of pg.tasks) {            // a selection that touches an anchored task carries the task (and its reminder)
+    if (t.kind === 'ink') { if (t.strokeIds.some(id => ids.has(id))) { G.tasks.push(t.id); t.strokeIds.forEach(id => ids.add(id)); } }
+    else if (inPoly([t.x + 14, t.y + (t.fs || 26) * 0.6], poly) || inPoly([t.x + 70, t.y + (t.fs || 26) * 0.6], poly)) G.tasks.push(t.id);
+  }
+  G.strokes = [...ids];
+  G.texts = pg.texts.filter(tb => inPoly([tb.x + 10, tb.y + (tb.size || 24) * 0.6], poly)).map(tb => tb.id);
+  G.images = (pg.images || []).filter(im => inPoly([im.x + im.w / 2, im.y + im.h / 2], poly)).map(im => im.id);
+  G.sections = (pg.sections || []).filter(sc => inPoly([sc.x + 22, sc.y + 22], poly)).map(sc => sc.id);
+  if (!G.strokes.length && !G.tasks.length && !G.texts.length && !G.images.length && !G.sections.length) { hint('Nothing selected — circle some handwriting'); return; }
+  setSelection(pi, G);
+  hint('Drag the selection to move it · corner to resize · top knob to rotate');
 }
 function positionLassoMenu() {
   if (!selection) return;
   const m = $('#lassoMenu'), rec = pageEls[selection.pi]; if (!rec) return;
   const r = rec.el.getBoundingClientRect(), mr = $('#main').getBoundingClientRect();
-  let x = r.left - mr.left + selection.bb[0] * S.scale, y = r.top - mr.top + selection.bb[1] * S.scale - 58;
-  if (y < 110) y = r.top - mr.top + selection.bb[3] * S.scale + 10;
+  const mh = (m.hidden ? 50 : m.offsetHeight) + 12;
+  let x = r.left - mr.left + selection.bb[0] * S.scale, y = r.top - mr.top + selection.bb[1] * S.scale - mh - 40;   // clear of the rotate knob
+  if (y < 110) y = r.top - mr.top + selection.bb[3] * S.scale + 26;
   m.style.left = Math.max(8, Math.min(x, mr.width - 300)) + 'px'; m.style.top = y + 'px';
 }
-function hideLasso() { if (selection) { const rec = pageEls[selection.pi]; if (rec) clearLive(rec); } selection = null; $('#lassoMenu').hidden = true; }
+function hideLasso() { if (selection) { const rec = pageEls[selection.pi]; if (rec) clearLive(rec); } selection = null; $('#lassoMenu').hidden = true; document.querySelectorAll('.sel-box').forEach(e => e.remove()); }
 $('#pages').addEventListener('scroll', positionLassoMenu, { passive: true });
 $('#lassoCancel').onclick = hideLasso;
-$('#lassoDelete').onclick = () => { const n = curNote(), sel = selection; pushHistory(); const pg = n.pages[sel.pi]; pg.strokes = pg.strokes.filter(s => !sel.ids.includes(s.id)); saveNote(n); hideLasso(); renderPageInk(sel.pi); };
+$('#lassoDelete').onclick = () => deleteSelection();
 $('#lassoTask').onclick = () => {
   const n = curNote(), sel = selection; if (!sel) return;
   const [x0, y0, x1, y1] = sel.bb;
@@ -491,8 +516,12 @@ $('#lassoTask').onclick = () => {
 
 function placeAt(pi, p) {
   const n = curNote(), pg = n.pages[pi];
+  if (S.tool === 'section') return insertSectionAt(pi, p);
   if (S.tool === 'task') {
     const t = { id: uid('t'), kind: 'typed', x: Math.max(4, Math.min(p[0] - 14, PAGE_W - 200)), y: Math.max(4, p[1] - 18), text: '', color: S.penColor, done: false, due: null, repeat: '', notified: false, createdAt: Date.now() };
+    const bg = pg.bg;
+    if (bg && bg.name === 'planner') { const sl = slotAtY(bg, p[1]); if (sl) placeTaskInSlot(pg, t, sl, bg); }        // snaps + reminder = slot time
+    else if (bg && bg.name === 'meeting') { const ry = meetingActionRowY(p[1]); if (ry !== null) { t.x = 62; t.y = ry; } }
     openEditor({ type: 'task', note: n, obj: t, page: pi }, true);
   } else if (S.tool === 'text') {
     const tb = { id: uid('x'), x: Math.max(4, p[0] - 4), y: Math.max(4, p[1] - 18), text: '', size: 24, color: S.penColor };
@@ -536,10 +565,11 @@ $('#toolbar').addEventListener('click', e => {
   if (w) { if (S.tool === 'highlighter') { S.hlWidth = +w.dataset.w; localStorage.setItem('hlWidth', S.hlWidth); } else { S.penWidth = +w.dataset.w; localStorage.setItem('penWidth', S.penWidth); } renderToolbar(); }
 });
 function selectTool(tool) {
-  S.tool = tool; localStorage.setItem('tool', S.tool); hideLasso(); renderToolbar();
+  S.tool = tool; localStorage.setItem('tool', S.tool); hideLasso(); if (imgSel) deselectImage(); renderToolbar();
   if (S.tool === 'task') hint('Tap anywhere on the page to add a task');
   if (S.tool === 'lasso') hint('Circle handwriting, then tap "Make task"');
   if (S.tool === 'text') hint('Tap the page to type');
+  if (S.tool === 'section') hint('Tap at the start of a line to add the next section number');
 }
 $('#focusBar').addEventListener('click', e => {
   const t = e.target.closest('.tool'); if (t) return selectTool(t.dataset.tool);
@@ -671,7 +701,8 @@ function renderPanel() {
   if ((sw && sw.active) || swOpen) { panelDirty = true; return; }
   const list = $('#reminderList'), now = new Date(), sod = startOfDay(now);
   let items = allItems();
-  if (S.filter === 'due') items = items.filter(i => !i.obj.done && i.obj.due);
+  if (S.filter === 'today') items = todayItems();
+  else if (S.filter === 'due') items = items.filter(i => !i.obj.done && i.obj.due);
   else if (S.filter === 'open') items = items.filter(i => !i.obj.done);
   else items = items.filter(i => i.obj.done);
   const groups = new Map();
@@ -687,7 +718,7 @@ function renderPanel() {
   }
   const order = ['Overdue', 'Today', 'Tomorrow', 'Next 7 days', 'Later', 'No date', 'Completed'];
   if (!items.length) {
-    list.innerHTML = `<div class="empty">${S.filter === 'done' ? 'Nothing completed yet.' : 'No reminders yet.<br><br>Open a note, tap <b>☑️ Task</b> and tap the page — or lasso some handwriting and tap <b>Make task</b>. Add a time to get reminded.'}</div>`;
+    list.innerHTML = `<div class="empty">${S.filter === 'today' ? '<div class="big">☀️</div>Nothing due today' : S.filter === 'done' ? 'Nothing completed yet.' : 'No reminders yet.<br><br>Open a note, tap <b>☑️ Task</b> and tap the page — or lasso some handwriting and tap <b>Make task</b>. Add a time to get reminded.'}</div>`;
   } else {
     list.innerHTML = order.filter(k => groups.has(k)).map(k => `<div class="rgroup ${k === 'Overdue' ? 'overdue' : ''}"><h4>${k}</h4>${groups.get(k).map(rowHTML).join('')}</div>`).join('');
   }
@@ -821,11 +852,12 @@ function normalizeOrder() {
 }
 
 /* ---------- sidebar ---------- */
-function noteSearchText(n) { return (n.title + ' ' + n.pages.map(p => p.texts.map(t => t.text).join(' ') + ' ' + p.tasks.map(t => t.text).join(' ')).join(' ')).toLowerCase(); }
+function noteSearchText(n) { return [n.title, ...n.pages.flatMap(p => [...p.texts.map(t => t.text), ...p.tasks.map(t => t.text || ''), ...(p.labels || []).map(l => l.text), p.inkText || ''])].join(' ').toLowerCase(); }
 function renderSidebar() {
   if (drag) { sidebarDirty = true; return; }
   const box = $('#notebookList'), q = S.search.trim().toLowerCase(), cur = curNote(), now = Date.now();
-  box.innerHTML = sortedNotebooks().map(nb => {
+  const tc = todayItems().length;
+  box.innerHTML = `<div class="today-row" id="todayRow" role="button">☀️ <span class="name">Today</span><span class="cnt ${tc ? 'on' : ''}">${tc}</span></div>` + sortedNotebooks().map(nb => {
     let notes = notesIn(nb.id);
     if (q) notes = notes.filter(n => noteSearchText(n).includes(q));
     const col = S.collapsed.has(nb.id) && !q;
@@ -838,17 +870,19 @@ function renderSidebar() {
         const next = tasks.filter(t => t.due && new Date(t.due) >= now).sort((a, b) => new Date(a.due) - new Date(b.due))[0];
         const sub = [new Date(n.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })];
         if (tasks.length) sub.push(`${tasks.length} open`);
+        const hit = q ? searchMatch(n, q) : null;
         return `<div class="note-row ${cur && cur.id === n.id ? 'active' : ''}" data-note="${n.id}" role="button"><div class="meta"><div class="t">${esc(n.title)}</div>
-          <div class="s">${sub.join(' · ')}${od ? ` · <span class="od">${od} overdue</span>` : next ? ' · ⏰ ' + esc(fmtDue(next.due)) : ''}</div></div>
+          ${hit ? `<div class="s hit">${esc(hit)}</div>` : ''}<div class="s">${sub.join(' · ')}${od ? ` · <span class="od">${od} overdue</span>` : next ? ' · ⏰ ' + esc(fmtDue(next.due)) : ''}</div></div>
           <button class="more" data-more aria-label="Note options">⋯</button></div>`;
       }).join('') || (q ? '' : '<div class="note-row"><div class="meta"><div class="s">No notes</div></div></div>')}</div>`;
   }).join('');
 }
 $('#notebookList').addEventListener('click', e => {
+  if (e.target.closest('#todayRow')) return openToday();
   const head = e.target.closest('[data-nb]'), row = e.target.closest('[data-note]');
   if (head) {
     const nb = S.notebooks.find(b => b.id === head.dataset.nb);
-    if (e.target.closest('[data-add]')) return createNote(nb.id);
+    if (e.target.closest('[data-add]')) return newNoteFlow(nb.id);
     if (e.target.closest('[data-nbmore]')) return actionSheet(nb.name, [
       { label: 'Rename notebook', fn: () => { const v = prompt('Notebook name', nb.name); if (v && v.trim()) { nb.name = v.trim(); saveNotebook(nb); renderSidebar(); } } },
       { label: 'Delete notebook and its notes', danger: true, fn: () => deleteNotebook(nb) }]);
@@ -879,13 +913,19 @@ async function deleteNotebook(nb) {
   if (!curNote()) { if (S.notes.length) openNote(S.notes[0].id); else createNote(S.notebooks[0].id); }
   renderAll();
 }
-function createNote(nbId) {
+function createNote(nbId, kind) {
   const n = makeNote(nbId || (curNote() && curNote().notebookId) || sortedNotebooks()[0].id);
+  if (kind) {
+    n.pages = [makeTemplatePage(kind, n)];
+    if (['lined', 'grid', 'blank'].includes(kind)) n.paper = kind;
+    const md = new Date().toLocaleDateString([], { month: 'short', day: 'numeric' });
+    if (kind === 'meeting') n.title = 'Meeting — ' + md; if (kind === 'planner') n.title = 'Planner — ' + md;
+  }
   n.order = -1; S.notes.push(n); saveNote(n, true); normalizeOrder(); openNote(n.id);
   if (isDrawer()) setSidebar(false);
   setTimeout(() => { $('#noteTitle').focus(); $('#noteTitle').select(); }, 60);
 }
-$('#newNote').onclick = () => createNote();
+$('#newNote').onclick = () => newNoteFlow();
 $('#newNotebook').onclick = () => { const v = prompt('New notebook name'); if (!v || !v.trim()) return; const nb = { id: uid('b'), name: v.trim(), createdAt: Date.now(), order: S.notebooks.length }; S.notebooks.push(nb); saveNotebook(nb); createNote(nb.id); };
 $('#search').addEventListener('input', e => { S.search = e.target.value; renderSidebar(); });
 
@@ -897,7 +937,11 @@ $('#noteMenuBtn').onclick = () => {
   const setPaper = p => () => { n.paper = p; saveNote(n); for (let i = 0; i < pageEls.length; i++) renderPageInk(i); };
   actionSheet('Note options', [
     { label: mark('lined') + 'Lined paper', fn: setPaper('lined') }, { label: mark('grid') + 'Grid paper', fn: setPaper('grid') }, { label: mark('blank') + 'Blank paper', fn: setPaper('blank') },
-    { label: '＋ Add page', fn: addPage }, { label: 'Rename / move / delete…', fn: () => noteMenu(n) },
+    { label: '＋ Add page…', fn: addPage }, { label: '🗓 Planner settings…', fn: plannerSettings },
+    { label: '📄 Import PDF…', fn: () => { pdfTargetNb = n.notebookId; $('#pdfFile').click(); } }, { label: '⬇︎ Export note as PDF', fn: () => exportNotePdf(n) },
+    ...(clip ? [{ label: '📋 Paste', fn: pasteClip }] : []),
+    { label: (localStorage.getItem('autoNumber') === '0' ? 'Turn on' : 'Turn off') + ' handwritten 1. 2. 3. detection', fn: () => { const on = localStorage.getItem('autoNumber') === '0'; localStorage.setItem('autoNumber', on ? '1' : '0'); toast(on ? 'Handwritten numbers become section badges' : 'Handwritten numbers stay as ink'); } },
+    { label: 'Rename / move / delete…', fn: () => noteMenu(n) },
     { label: 'Appearance: ' + { dark: 'Dark', light: 'Light', system: 'System' }[themePref()] + '…', fn: themeMenu }]);
 };
 function themeMenu() {
@@ -1110,9 +1154,9 @@ function deleteItem(it) {
 }
 
 /* ---------- backup ---------- */
-$('#exportBtn').onclick = () => {
+$('#exportBtn').onclick = async () => {
   flushSaves();
-  const data = { app: 'inkminder', version: 1, exportedAt: new Date().toISOString(), notebooks: S.notebooks, notes: S.notes };
+  const data = { app: 'inkminder', version: 2, exportedAt: new Date().toISOString(), notebooks: S.notebooks, notes: S.notes, assets: await exportAssets(S.notes) };
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
   a.download = 'pencil-notes-backup-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.append(a); a.click(); a.remove();
   toast('Backup downloaded');
@@ -1123,11 +1167,12 @@ $('#importFile').onchange = async e => {
   let data; try { data = JSON.parse(await f.text()); if (data.app !== 'inkminder' || !Array.isArray(data.notes)) throw 0; } catch (_) { toast('That file is not a Pencil Notes backup'); return; }
   const run = async replace => {
     if (replace) { await DB.clear('notes'); await DB.clear('notebooks'); S.notes = []; S.notebooks = []; }
+    await importAssets(data.assets);
     for (const nb of data.notebooks || []) { S.notebooks = S.notebooks.filter(x => x.id !== nb.id).concat(nb); await saveNotebook(nb); }
     for (const n of data.notes) { n.reminders ||= []; S.notes = S.notes.filter(x => x.id !== n.id).concat(n); await DB.put('notes', n); }
     for (const n of S.notes) if (!S.notebooks.find(b => b.id === n.notebookId)) n.notebookId = S.notebooks[0]?.id;
     if (!S.notebooks.length) await load();
-    for (const n of S.notes) for (const p of n.pages) { p.images ||= []; if (!('bg' in p)) p.bg = null; if (!('paper' in p)) p.paper = null; }
+    for (const n of S.notes) for (const p of n.pages) { p.images ||= []; p.labels ||= []; p.sections ||= []; if (!('bg' in p)) p.bg = null; if (!('paper' in p)) p.paper = null; }
     normalizeOrder();
     openNote((curNote() || S.notes[0]).id); renderAll(); toast(`Imported ${data.notes.length} notes`);
   };

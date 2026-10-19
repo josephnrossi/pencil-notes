@@ -23,7 +23,8 @@
       <div class="brand"><img src="icons/icon-192.png" alt=""><span>Pencil Notes</span></div>
       <button class="icon-btn only-narrow" id="closeSidebar" aria-label="Close sidebar">✕</button>
     </div>
-    <input id="search" type="search" placeholder="Search notes" autocomplete="off">
+    <input id="search" type="search" placeholder="Search notes & handwriting labels" autocomplete="off">
+    <p id="searchHint" class="fine" hidden></p>
     <div id="notebookList"></div>
     <div class="side-actions">
       <button class="btn primary" id="newNote">＋ New note</button>
@@ -33,6 +34,8 @@
       <button class="btn small" id="exportBtn">⬇︎ Export backup</button>
       <button class="btn small" id="importBtn">⬆︎ Import</button>
       <input type="file" id="importFile" accept="application/json,.json" hidden>
+      <input type="file" id="pdfFile" accept="application/pdf,.pdf" hidden>
+      <input type="file" id="photoFile" accept="image/*" hidden>
     </div>
   </aside>
   <div id="scrim"></div>
@@ -44,6 +47,7 @@
       <div class="spacer"></div>
       <button class="icon-btn" id="undoBtn" aria-label="Undo" title="Undo">↶</button>
       <button class="icon-btn" id="redoBtn" aria-label="Redo" title="Redo">↷</button>
+      <button class="icon-btn" id="todayBtn" aria-label="Today" title="Today">☀️</button>
       <button class="icon-btn" id="focusBtn" aria-label="Full screen" title="Full screen writing">⤢</button>
       <button class="icon-btn" id="noteMenuBtn" aria-label="Note options" title="Note options">⋯</button>
       <button class="icon-btn" id="togglePanel" aria-label="Reminders" title="Reminders &amp; tasks">🔔<span id="dueBadge" class="badge" hidden></span></button>
@@ -57,10 +61,13 @@
         <button class="tool" data-tool="lasso" title="Lasso: circle handwriting to turn it into a task">➰<span>Lasso</span></button>
         <button class="tool" data-tool="text" title="Text box">🔤<span>Text</span></button>
         <button class="tool task-tool" data-tool="task" title="Tap the page to drop a task checkbox">☑️<span>Task</span></button>
+        <button class="tool" data-tool="section" title="Section number: tap the start of a line">§<span>Section</span></button>
       </div>
       <div class="group colors" id="colors"></div>
       <div class="group widths" id="widths"></div>
       <div class="group misc">
+        <button class="chip-btn" id="photoBtn" title="Insert photo">🖼 Photo</button>
+        <button class="chip-btn" id="stickerBtn" title="Insert sticker">⭐ Sticker</button>
         <button class="chip-btn" id="remindNoteBtn" title="Add a reminder to this note">⏰ Remind</button>
         <button class="chip-btn" id="fingerBtn" title="Draw with finger">☝️ Finger</button>
       </div>
@@ -71,6 +78,13 @@
     <button id="zoomChip" hidden title="Reset zoom">100%</button>
     <div id="lassoMenu" class="float-menu" hidden>
       <button id="lassoTask" class="primary">☑️ Make task</button>
+      <button id="lassoPlanner">📅 To planner</button>
+      <button id="lassoLabel">🏷 Label</button>
+      <button id="lassoSection">§ Make section number</button>
+      <button id="lassoCut">✂️ Cut</button>
+      <button id="lassoCopy">⧉ Copy</button>
+      <button id="lassoPaste" hidden>📋 Paste</button>
+      <button id="lassoDup">⎘ Duplicate</button>
       <button id="lassoDelete">🗑 Delete</button>
       <button id="lassoCancel">✕</button>
     </div>
@@ -81,6 +95,7 @@
       <button class="tool" data-tool="eraser" aria-label="Eraser">🧽</button>
       <button class="tool" data-tool="lasso" aria-label="Lasso">➰</button>
       <button class="tool task-tool" data-tool="task" aria-label="Task">☑️</button>
+      <button class="tool" data-tool="section" aria-label="Section number">§</button>
       <button class="icon-btn" data-fa="undo" id="fUndo" aria-label="Undo">↶</button>
       <button class="icon-btn" data-fa="redo" id="fRedo" aria-label="Redo">↷</button>
       <button class="icon-btn" data-fa="exit" aria-label="Exit full screen">⤡</button>
@@ -93,6 +108,7 @@
       <button class="icon-btn" id="closePanel" aria-label="Close">✕</button>
     </div>
     <div class="seg" id="filterSeg">
+      <button data-f="today">Today</button>
       <button data-f="due" class="on">Scheduled</button>
       <button data-f="open">All open</button>
       <button data-f="done">Done</button>
@@ -132,5 +148,6 @@
 
 <script src="db.js"></script>
 <script src="app.js"></script>
+<script src="v7.js"></script>
 </body>
 </html>
