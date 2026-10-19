@@ -833,9 +833,14 @@ async function downloadIcs(it) {
   if (!it.obj.due) { toast('Set a date first'); return; }
   const ics = buildIcs(it), name = (itemTitle(it).replace(/[^\w\- ]+/g, '').trim().slice(0, 40) || 'reminder') + '.ics';
   const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
-  if (isIOS && isStandalone && navigator.canShare) {
-    const file = new File([blob], name, { type: 'text/calendar' });
-    if (navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: itemTitle(it) }); return; } catch (e) { if (e.name === 'AbortError') return; } }
+  if (isIOS) {
+    // iPad/iPhone: opening the event as a calendar link shows Apple's own "Add to Calendar" sheet.
+    const dataUrl = 'data:text/calendar;charset=utf8,' + encodeURIComponent(ics);
+    window.__lastIcsNav = dataUrl;
+    if (isStandalone) { const w = window.open(dataUrl, '_blank'); if (!w) location.href = dataUrl; }
+    else location.href = dataUrl;
+    toast('Tap “Add to Calendar” on the screen that opens', 6000);
+    return;
   }
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 20000);
