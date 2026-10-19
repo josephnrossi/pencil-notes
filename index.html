@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Pencil Notes</title>
+<meta name="description" content="Handwritten notes with tasks and reminders">
+<meta name="theme-color" content="#111114">
+<script>try{var t=localStorage.getItem("theme");if(t==="light"||(t==="system"&&!matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.dataset.theme="light";}catch(e){}</script>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pencil Notes">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" href="icons/favicon.png">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar" aria-label="Notebooks">
+    <div class="side-head">
+      <div class="brand"><img src="icons/icon-192.png" alt=""><span>Pencil Notes</span></div>
+      <button class="icon-btn only-narrow" id="closeSidebar" aria-label="Close sidebar">✕</button>
+    </div>
+    <input id="search" type="search" placeholder="Search notes" autocomplete="off">
+    <div id="notebookList"></div>
+    <div class="side-actions">
+      <button class="btn primary" id="newNote">＋ New note</button>
+      <button class="btn" id="newNotebook">＋ Notebook</button>
+    </div>
+    <div class="side-foot">
+      <button class="btn small" id="exportBtn">⬇︎ Export backup</button>
+      <button class="btn small" id="importBtn">⬆︎ Import</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+    </div>
+  </aside>
+  <div id="scrim"></div>
+
+  <main id="main">
+    <header id="topbar">
+      <button class="icon-btn" id="toggleSidebar" aria-label="Notes">☰</button>
+      <input id="noteTitle" aria-label="Note title" placeholder="Untitled">
+      <div class="spacer"></div>
+      <button class="icon-btn" id="undoBtn" aria-label="Undo" title="Undo">↶</button>
+      <button class="icon-btn" id="redoBtn" aria-label="Redo" title="Redo">↷</button>
+      <button class="icon-btn" id="noteMenuBtn" aria-label="Note options" title="Note options">⋯</button>
+      <button class="icon-btn" id="togglePanel" aria-label="Reminders" title="Reminders &amp; tasks">🔔<span id="dueBadge" class="badge" hidden></span></button>
+    </header>
+
+    <div id="toolbar" role="toolbar">
+      <div class="group tools">
+        <button class="tool" data-tool="pen" title="Pen">✒️<span>Pen</span></button>
+        <button class="tool" data-tool="highlighter" title="Highlighter">🖍️<span>Highlight</span></button>
+        <button class="tool" data-tool="eraser" title="Eraser">🧽<span>Erase</span></button>
+        <button class="tool" data-tool="lasso" title="Lasso: circle handwriting to turn it into a task">➰<span>Lasso</span></button>
+        <button class="tool" data-tool="text" title="Text box">🔤<span>Text</span></button>
+        <button class="tool task-tool" data-tool="task" title="Tap the page to drop a task checkbox">☑️<span>Task</span></button>
+      </div>
+      <div class="group colors" id="colors"></div>
+      <div class="group widths" id="widths"></div>
+      <div class="group misc">
+        <button class="chip-btn" id="remindNoteBtn" title="Add a reminder to this note">⏰ Remind</button>
+        <button class="chip-btn" id="fingerBtn" title="Draw with finger">☝️ Finger</button>
+      </div>
+    </div>
+
+    <div id="noteReminders"></div>
+    <div id="pages" tabindex="-1"></div>
+    <div id="lassoMenu" class="float-menu" hidden>
+      <button id="lassoTask" class="primary">☑️ Make task</button>
+      <button id="lassoDelete">🗑 Delete</button>
+      <button id="lassoCancel">✕</button>
+    </div>
+    <div id="toolHint" hidden></div>
+  </main>
+
+  <aside id="panel" aria-label="Reminders and tasks">
+    <div class="panel-head">
+      <h2>Reminders &amp; Tasks</h2>
+      <button class="icon-btn" id="closePanel" aria-label="Close">✕</button>
+    </div>
+    <div class="seg" id="filterSeg">
+      <button data-f="due" class="on">Scheduled</button>
+      <button data-f="open">All open</button>
+      <button data-f="done">Done</button>
+    </div>
+    <div id="reminderList"></div>
+    <div class="panel-foot">
+      <button class="btn small" id="notifBtn">🔔 Enable notifications</button>
+      <p class="fine" id="notifNote"></p>
+    </div>
+  </aside>
+</div>
+
+<div id="banners" aria-live="assertive"></div>
+
+<div id="sheetWrap" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <h3 id="sheetTitle">Task</h3>
+    <div id="sheetThumb"></div>
+    <label>Title<input id="fTitle" placeholder="What needs doing?" autocomplete="off"></label>
+    <label>Remind me at<input id="fDue" type="datetime-local"></label>
+    <div class="quick" id="quickDue">
+      <button data-q="1h">In 1 hour</button><button data-q="tonight">Tonight 6 PM</button><button data-q="tomorrow">Tomorrow 9 AM</button><button data-q="nextweek">Next week</button><button data-q="clear">No date</button>
+    </div>
+    <label>Repeat<select id="fRepeat"><option value="">Never</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
+    <div class="sheet-actions">
+      <button class="btn danger" id="fDelete">Delete</button>
+      <button class="btn" id="fIcs">📅 Add to Calendar</button>
+      <div class="spacer"></div>
+      <button class="btn" id="fCancel">Cancel</button>
+      <button class="btn primary" id="fSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="actionWrap" hidden><div class="sheet action-sheet"><h3 id="actionTitle"></h3><div id="actionBtns"></div></div></div>
+<div id="toast" hidden></div>
+
+<script src="db.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
