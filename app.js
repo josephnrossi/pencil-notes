@@ -466,7 +466,8 @@ function eraseAt(pi, p) {
     for (let i = 1; i < pts.length; i++) if (segDist(p, pts[i - 1], pts[i]) <= lim) return false;
     return true;
   });
-  if (pg.strokes.length !== before) { if (drawing) drawing.erased = true; renderPageInk(pi); }
+  let secHit = false; if (typeof eraseSectionsAt === 'function') secHit = eraseSectionsAt(pi, p);
+  if (pg.strokes.length !== before || secHit) { if (drawing) drawing.erased = true; renderPageInk(pi); }
 }
 
 /* ---------- lasso → task ---------- */

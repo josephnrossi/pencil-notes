@@ -1060,20 +1060,33 @@ function badgeDown(e, pi, id) {
   e.stopPropagation(); e.preventDefault();
   if ((e.pointerType === 'mouse' && e.button !== 0) || carry) return;
   if (e.pointerType === 'pen') notePen();
+  if (S.tool === 'eraser') { removeSectionNumber(pi, id); return; }
   const st = { pid: e.pointerId, x: e.clientX, y: e.clientY }, tol = e.pointerType === 'pen' ? 4 : 6;
   const cleanup = () => { clearTimeout(timer); window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
   const mv = ev => { if (ev.pointerId !== st.pid || Math.hypot(ev.clientX - st.x, ev.clientY - st.y) <= tol) return; cleanup(); taskDragSuppress = true; startCarry(st.x, st.y, st.pid, { kind: 'section', note: curNote(), pi, id }); if (carry) { carry.x = ev.clientX; carry.y = ev.clientY; carryMove(); } };
-  const up = ev => { if (ev.pointerId === st.pid) cleanup(); };
+  const up = ev => { if (ev.pointerId === st.pid) { cleanup(); badgeMenu(pi, id); } };
   const timer = setTimeout(() => { cleanup(); badgeMenu(pi, id); }, 500);
   window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
 }
 function badgeMenu(pi, id) {
   const n = curNote(), pg = n.pages[pi], sc = (pg.sections || []).find(x => x.id === id); if (!sc) return;
   actionSheet(`Section ${secNumber(n, pg, sc)}`, [
-    { label: 'Unnumber (keep the content)', fn: () => { pushHistory(); pg.sections = pg.sections.filter(x => x !== sc); saveNote(n, true); rerenderOverlays(); } },
+    { label: 'Remove number (keep the notes)', fn: () => removeSectionNumber(pi, id) },
     { label: `Use ${sc.style === ')' ? '1.' : '1)'} style`, fn: () => { pushHistory(); sc.style = sc.style === ')' ? '.' : ')'; saveNote(n, true); rerenderOverlays(); } },
-    { label: 'Delete section and its content', danger: true, fn: () => { const G = sectionGroup(pg, id); setSelection(pi, G); deleteSelection(); toast('Section deleted — Undo brings it back'); } },
+    { label: 'Delete section and its notes', danger: true, fn: () => { const G = sectionGroup(pg, id); setSelection(pi, G); deleteSelection(); toast('Section deleted — Undo brings it back'); } },
   ]);
+}
+function removeSectionNumber(pi, id) {
+  const n = curNote(), pg = n.pages[pi]; if (!(pg.sections || []).some(x => x.id === id)) return;
+  pushHistory(); pg.sections = pg.sections.filter(x => x.id !== id);
+  saveNote(n, true); thumbCache.clear(); renderPageInk(pi); rerenderOverlays();
+  toast('Number removed — the other sections renumbered. Undo brings it back');
+}
+function eraseSectionsAt(pi, p) {
+  const pg = curNote().pages[pi]; if (!pg.sections || !pg.sections.length) return false;
+  const hit = pg.sections.find(sc => p[0] >= sc.x - 6 && p[0] <= sc.x + SEC_H * 1.6 && p[1] >= sc.y - 6 && p[1] <= sc.y + SEC_H + 6);
+  if (!hit) return false;
+  pg.sections = pg.sections.filter(x => x !== hit); saveNote(curNote(), true); thumbCache.clear(); rerenderOverlays(); return true;
 }
 function addSection(pi, x, y, style = '.') {
   const n = curNote(), pg = n.pages[pi]; pushHistory();
