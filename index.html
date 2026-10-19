@@ -44,6 +44,7 @@
       <div class="spacer"></div>
       <button class="icon-btn" id="undoBtn" aria-label="Undo" title="Undo">↶</button>
       <button class="icon-btn" id="redoBtn" aria-label="Redo" title="Redo">↷</button>
+      <button class="icon-btn" id="focusBtn" aria-label="Full screen" title="Full screen writing">⤢</button>
       <button class="icon-btn" id="noteMenuBtn" aria-label="Note options" title="Note options">⋯</button>
       <button class="icon-btn" id="togglePanel" aria-label="Reminders" title="Reminders &amp; tasks">🔔<span id="dueBadge" class="badge" hidden></span></button>
     </header>
@@ -73,6 +74,16 @@
       <button id="lassoCancel">✕</button>
     </div>
     <div id="toolHint" hidden></div>
+    <div id="focusBar" role="toolbar" aria-label="Full screen tools">
+      <button class="tool" data-tool="pen" aria-label="Pen">✒️</button>
+      <button class="tool" data-tool="highlighter" aria-label="Highlighter">🖍️</button>
+      <button class="tool" data-tool="eraser" aria-label="Eraser">🧽</button>
+      <button class="tool" data-tool="lasso" aria-label="Lasso">➰</button>
+      <button class="tool task-tool" data-tool="task" aria-label="Task">☑️</button>
+      <button class="icon-btn" data-fa="undo" id="fUndo" aria-label="Undo">↶</button>
+      <button class="icon-btn" data-fa="redo" id="fRedo" aria-label="Redo">↷</button>
+      <button class="icon-btn" data-fa="exit" aria-label="Exit full screen">⤡</button>
+    </div>
   </main>
 
   <aside id="panel" aria-label="Reminders and tasks">

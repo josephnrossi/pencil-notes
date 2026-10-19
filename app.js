@@ -1,12 +1,14 @@
 'use strict';
 /* Pencil Notes — handwritten notes with tasks & reminders anchored on the page. */
-const PAGE_W = 1000, PAGE_H = 1294;
+const PAGE_W = 1000, PAGE_H = 1430; // ≈ iPad portrait screen aspect (820×1180, 834×1194)
 const INK = 'ink';
 const PEN_COLORS = [INK, '#2563eb', '#dc2626', '#16a34a', '#7c3aed', '#ea580c'];
 const HL_COLORS = ['#ffd60a', '#4ade80', '#f472b6', '#60a5fa'];
 const PEN_WIDTHS = [1.6, 3, 5, 8];
 const HL_WIDTHS = [14, 22, 32];
 const $ = s => document.querySelector(s);
+const drawerMQ = matchMedia('(max-width: 1100px), (orientation: portrait)');
+const isDrawer = () => drawerMQ.matches; // portrait iPad & phones: sidebar/panel are overlay drawers, page is edge-to-edge
 const uid = p => (p || '') + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const sysDarkMQ = matchMedia('(prefers-color-scheme: dark)');
 const themePref = () => { const t = localStorage.getItem('theme'); return ['light', 'dark', 'system'].includes(t) ? t : 'dark'; };
@@ -171,8 +173,8 @@ function buildPages() {
   wrap.innerHTML = '';
   pageEls = [];
   if (!note) return;
-  const avail = wrap.clientWidth - (innerWidth <= 760 ? 12 : 32);
-  S.pageW = Math.max(280, Math.min(980, avail));
+  const edge = isDrawer() || $('#app').classList.contains('focus');
+  S.pageW = edge ? Math.max(280, wrap.clientWidth) : Math.max(280, Math.min(980, wrap.clientWidth - 32));
   S.scale = S.pageW / PAGE_W;
   note.pages.forEach((pg, pi) => {
     const el = document.createElement('div');
@@ -434,7 +436,7 @@ function restore(from, to) {
   const n = curNote(); if (!from.length) return;
   to.push(snapshot()); n.pages = JSON.parse(from.pop()); saveNote(n); buildPages(); renderPanel(); renderSidebar(); updateUndo();
 }
-function updateUndo() { $('#undoBtn').disabled = !S.undo.length; $('#redoBtn').disabled = !S.redo.length; }
+function updateUndo() { $('#undoBtn').disabled = $('#fUndo').disabled = !S.undo.length; $('#redoBtn').disabled = $('#fRedo').disabled = !S.redo.length; }
 $('#undoBtn').onclick = () => restore(S.undo, S.redo);
 $('#redoBtn').onclick = () => restore(S.redo, S.undo);
 document.addEventListener('keydown', e => {
@@ -457,15 +459,37 @@ function renderToolbar() {
 }
 $('#toolbar').addEventListener('click', e => {
   const t = e.target.closest('.tool'), c = e.target.closest('.swatch'), w = e.target.closest('.wbtn');
-  if (t) {
-    S.tool = t.dataset.tool; localStorage.setItem('tool', S.tool); hideLasso(); renderToolbar();
-    if (S.tool === 'task') hint('Tap anywhere on the page to add a task');
-    if (S.tool === 'lasso') hint('Circle handwriting, then tap "Make task"');
-    if (S.tool === 'text') hint('Tap the page to type');
-  }
+  if (t) selectTool(t.dataset.tool);
   if (c) { if (S.tool === 'highlighter') { S.hlColor = c.dataset.c; localStorage.setItem('hlColor', S.hlColor); } else { S.penColor = c.dataset.c; localStorage.setItem('penColor', S.penColor); } renderToolbar(); }
   if (w) { if (S.tool === 'highlighter') { S.hlWidth = +w.dataset.w; localStorage.setItem('hlWidth', S.hlWidth); } else { S.penWidth = +w.dataset.w; localStorage.setItem('penWidth', S.penWidth); } renderToolbar(); }
 });
+function selectTool(tool) {
+  S.tool = tool; localStorage.setItem('tool', S.tool); hideLasso(); renderToolbar();
+  if (S.tool === 'task') hint('Tap anywhere on the page to add a task');
+  if (S.tool === 'lasso') hint('Circle handwriting, then tap "Make task"');
+  if (S.tool === 'text') hint('Tap the page to type');
+}
+$('#focusBar').addEventListener('click', e => {
+  const t = e.target.closest('.tool'); if (t) return selectTool(t.dataset.tool);
+  const a = e.target.closest('[data-fa]'); if (!a) return;
+  if (a.dataset.fa === 'undo') restore(S.undo, S.redo);
+  if (a.dataset.fa === 'redo') restore(S.redo, S.undo);
+  if (a.dataset.fa === 'exit') setFocus(false);
+});
+function setFocus(on) {
+  const app = $('#app'); if (app.classList.contains('focus') === on) return;
+  const w = $('#pages'), frac = w.scrollTop / (w.scrollHeight || 1);
+  app.classList.toggle('focus', on); hideLasso();
+  const de = document.documentElement;
+  try {
+    if (on && !document.fullscreenElement && !document.webkitFullscreenElement) { const r = (de.requestFullscreen || de.webkitRequestFullscreen)?.call(de); r && r.catch && r.catch(() => {}); }
+    if (!on && (document.fullscreenElement || document.webkitFullscreenElement)) { const r = (document.exitFullscreen || document.webkitExitFullscreen)?.call(document); r && r.catch && r.catch(() => {}); }
+  } catch (_) {}
+  lastW = 0; relayout(); w.scrollTop = frac * w.scrollHeight;
+  if (on) hint('Full screen — tap ⤡ to exit');
+}
+$('#focusBtn').onclick = () => setFocus(true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#app').classList.contains('focus')) setFocus(false); });
 $('#fingerBtn').onclick = () => { const on = !fingerDrawOn(); localStorage.setItem('fingerDraw', on ? '1' : '0'); applyFingerMode(); toast(on ? 'Finger drawing on — use two fingers to scroll' : 'Finger drawing off — fingers scroll, Pencil draws'); };
 $('#remindNoteBtn').onclick = () => { const n = curNote(); openEditor({ type: 'note', note: n, obj: { id: uid('r'), title: n.title, due: null, repeat: '', done: false, notified: false, createdAt: Date.now() }, page: -1 }, true); };
 
@@ -622,7 +646,7 @@ $('#filterSeg').onclick = e => { const f = e.target.dataset.f; if (!f) return; S
 function jumpTo(noteId, taskId) {
   if (!S.notes.find(n => n.id === noteId)) return;
   if (S.cur !== noteId) openNote(noteId);
-  if (innerWidth <= 1100) setPanel(false);
+  if (isDrawer()) setPanel(false);
   if (!taskId) { $('#pages').scrollTo({ top: 0, behavior: 'smooth' }); return; }
   const n = curNote(); let pi = -1, t;
   n.pages.forEach((pg, i) => { const f = pg.tasks.find(x => x.id === taskId); if (f) { pi = i; t = f; } });
@@ -748,7 +772,7 @@ $('#notebookList').addEventListener('click', e => {
   if (row && row.dataset.note) {
     const n = S.notes.find(x => x.id === row.dataset.note);
     if (e.target.closest('[data-more]')) return noteMenu(n);
-    openNote(n.id); if (innerWidth <= 760) setSidebar(false);
+    openNote(n.id); if (isDrawer()) setSidebar(false);
   }
 });
 function noteMenu(n) {
@@ -772,7 +796,7 @@ async function deleteNotebook(nb) {
 function createNote(nbId) {
   const n = makeNote(nbId || (curNote() && curNote().notebookId) || S.notebooks[0].id);
   S.notes.push(n); saveNote(n, true); openNote(n.id);
-  if (innerWidth <= 760) setSidebar(false);
+  if (isDrawer()) setSidebar(false);
   setTimeout(() => { $('#noteTitle').focus(); $('#noteTitle').select(); }, 60);
 }
 $('#newNote').onclick = () => createNote();
@@ -797,18 +821,19 @@ function themeMenu() {
 
 /* ---------- layout ---------- */
 function setSidebar(open) {
-  if (innerWidth <= 760) $('#app').classList.toggle('side-open', open);
+  if (isDrawer()) $('#app').classList.toggle('side-open', open);
   else { $('#app').classList.toggle('side-collapsed', !open); setTimeout(relayout, 0); }
 }
-$('#toggleSidebar').onclick = () => setSidebar(innerWidth <= 760 ? !$('#app').classList.contains('side-open') : $('#app').classList.contains('side-collapsed'));
+$('#toggleSidebar').onclick = () => setSidebar(isDrawer() ? !$('#app').classList.contains('side-open') : $('#app').classList.contains('side-collapsed'));
 $('#closeSidebar').onclick = () => setSidebar(false);
 $('#scrim').onclick = () => setSidebar(false);
-function setPanel(open) { $('#app').classList.toggle('panel-closed', !open); if (innerWidth > 1100) setTimeout(relayout, 0); }
+function setPanel(open) { $('#app').classList.toggle('panel-closed', !open); if (!isDrawer()) setTimeout(relayout, 0); }
 $('#togglePanel').onclick = () => setPanel($('#app').classList.contains('panel-closed'));
 $('#closePanel').onclick = () => setPanel(false);
 let lastW = 0;
 function relayout() { const w = $('#pages').clientWidth; if (w && w !== lastW) { lastW = w; const st = $('#pages').scrollTop / ($('#pages').scrollHeight || 1); buildPages(); $('#pages').scrollTop = st * $('#pages').scrollHeight; } }
 let rt; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(relayout, 150); });
+drawerMQ.addEventListener?.('change', () => { const app = $('#app'); app.classList.remove('side-open'); if (isDrawer()) app.classList.add('panel-closed'); setTimeout(() => { lastW = 0; relayout(); }, 50); });
 sysDarkMQ.addEventListener?.('change', () => { if (themePref() === 'system') setTheme('system'); });
 function setTheme(t) { localStorage.setItem('theme', t); applyTheme(); thumbCache.clear(); renderToolbar(); buildPages(); renderAll(); }
 
@@ -861,7 +886,7 @@ navigator.serviceWorker?.addEventListener('message', e => { if (e.data?.type ===
 (async function boot() {
   const initialHash = location.hash;
   await load();
-  if (innerWidth <= 1100) $('#app').classList.add('panel-closed');
+  if (isDrawer()) $('#app').classList.add('panel-closed');
   renderToolbar();
   const last = localStorage.getItem('cur');
   openNote(S.notes.find(n => n.id === last) ? last : S.notes.sort((a, b) => b.updatedAt - a.updatedAt)[0].id);

@@ -183,17 +183,22 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .only-narrow { display: none; }
 
-/* iPad portrait / smaller: panel overlays */
-@media (max-width: 1100px) {
-  #panel { position: fixed; right: 0; top: 0; bottom: 0; box-shadow: var(--shadow); padding-right: var(--sar); }
-}
-/* Phones / narrow: sidebar becomes a drawer */
-@media (max-width: 760px) {
-  :root { --side-w: min(86vw, 320px); }
+/* Drawer layout: iPad portrait (any size) and anything ≤1100px wide.
+   Sidebar + Reminders panel become overlay drawers; pages go edge to edge. */
+@media (max-width: 1100px), (orientation: portrait) {
   .only-narrow { display: inline-block; }
-  #sidebar { position: fixed; left: 0; top: 0; bottom: 0; transform: translateX(-105%); transition: transform .25s ease; box-shadow: var(--shadow); padding-left: calc(12px + var(--sal)); }
+  #sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: min(86vw, 320px); transform: translateX(-105%); transition: transform .25s ease; box-shadow: var(--shadow); padding-left: calc(12px + var(--sal)); }
   #app.side-open #sidebar { transform: none; }
-  #app.side-open #scrim { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.3); z-index: 29; }
+  #app.side-open #scrim { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 29; }
+  #panel { position: fixed; right: 0; top: 0; bottom: 0; width: min(380px, 100%); box-shadow: var(--shadow); padding-right: var(--sar); }
+  #pages { padding: 0 0 calc(40px + var(--sab)); }
+  .page { border-radius: 0; box-shadow: none; margin: 0 0 6px; }
+  .page canvas { border-radius: 0; }
+  .page-foot { bottom: 8px; right: 12px; opacity: .7; }
+  .add-page { margin-top: 12px; }
+}
+/* Phones */
+@media (max-width: 760px) {
   #panel { width: 100%; left: 0; padding-left: var(--sal); }
   #noteTitle { font-size: 17px; }
   .tool { width: 46px; height: 46px; font-size: 18px; }
@@ -201,7 +206,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .swatch { width: 30px; height: 30px; }
   .wbtn { width: 34px; height: 34px; }
   .group { padding: 0 3px; }
-  #pages { padding: 10px 6px calc(40px + var(--sab)); }
   .sheet-actions .btn { flex: 1 1 auto; }
 }
-@media (min-width: 761px) { #app.side-collapsed #sidebar { display: none; } }
+@media (min-width: 1101px) and (orientation: landscape) { #app.side-collapsed #sidebar { display: none; } }
+
+/* Full-screen writing: only the page(s) + a floating mini toolbar */
+#focusBar { display: none; }
+#app.focus #topbar, #app.focus #toolbar, #app.focus #noteReminders, #app.focus #sidebar, #app.focus #panel, #app.focus #scrim { display: none !important; }
+#app.focus #pages { padding: 0; scroll-snap-type: y proximity; }
+#app.focus .page { border-radius: 0; box-shadow: none; margin: 0 0 2px; scroll-snap-align: start; }
+#app.focus .page canvas { border-radius: 0; }
+#app.focus .page-foot { bottom: 8px; right: 12px; opacity: .6; }
+#app.focus #focusBar { display: flex; position: fixed; z-index: 40; left: 50%; transform: translateX(-50%); bottom: calc(14px + var(--sab));
+  gap: 2px; padding: 5px; border-radius: 22px; background: var(--surface); background: color-mix(in srgb, var(--surface) 88%, transparent);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border: 1px solid var(--line); box-shadow: var(--shadow); }
+#focusBar .tool { width: 46px; height: 46px; font-size: 20px; }
+#focusBar .icon-btn { min-width: 44px; height: 46px; font-size: 20px; }
