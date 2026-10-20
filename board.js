@@ -5,6 +5,10 @@
    so reminders, Today, 📅 Add to Calendar, search, Export/Import and undo (pushHistory) all work unchanged.
    Gestures (Apple Pencil, finger and mouse alike): press & hold to lift a card or a column header,
    swipe a card right = done (moves to the last column), left = delete (Undo), pull down a column = new card. */
+/* v13: t.items = checklist [{id, done, strokes, text, typed}], t.color, t.prio (0-3), t.plan = {noteId, pageId, time} (planner link),
+   board.compact (collapsed cards). */
+const LABELS = { red: '#ef4444', orange: '#f97316', yellow: '#eab308', green: '#22c55e', blue: '#3b82f6', purple: '#a855f7' };
+const PRIO = ['None', 'Low', 'Medium', 'High'], ITEM_H = 46, SOON_MS = 864e5;
 const INK_W = 300, INK_H = 240, TITLE_H = 58, H_MIN = 90, H_MAX = 760, B_LIFT = 420, B_SLOP = 8, CW_MIN = 0.75, CW_MAX = 3;
 /* v12: t.h = body ink height (ink units; 300 units = card width), t.tstrokes = handwritten title, t.typed = typed title on;
    column.w = width factor (1 = a third of the board). */
@@ -25,30 +29,51 @@ function renumber(pg, colId) { colCards(pg, colId).forEach((t, i) => t.ord = i);
 const lastColId = pg => { const c = boardCols(pg); return c[c.length - 1].id; };
 const BS = { g: null, editing: false, dirty: false, suppress: false, keep: {} };
 const boardBusy = () => BS.editing || !!(BS.g && (BS.g.mode !== 'pending' || BS.g.ink));
-function buzz() { try { navigator.vibrate && navigator.vibrate(8); } catch (_) {} }
+function buzz() { try { if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) navigator.vibrate(8); } catch (_) {} }
 function suppressClicks() { BS.suppress = true; clearTimeout(suppressClicks.t); suppressClicks.t = setTimeout(() => BS.suppress = false, 400); }
 const cardWrap = (pi, id) => pageEls[pi] && pageEls[pi].el.querySelector(`.bcard-wrap[data-id="${id}"]`);
 const findCard = (pi, id) => { const n = curNote(), pg = n && n.pages[pi]; return pg ? pg.tasks.find(t => t.id === id) : null; };
 
 /* ---------- render ---------- */
-function cardHTML(t, now) {
-  const od = t.due && !t.done && new Date(t.due) < now;
+function warnOf(t, pg, now = Date.now()) {
+  if (!t.due || t.done || (boardCols(pg).length > 1 && t.col === lastColId(pg))) return '';
+  const d = new Date(t.due) - now; return d < 0 ? 'overdue' : d < SOON_MS ? 'soon' : '';
+}
+function planOK(t) {   // a planner link is valid while the card's reminder still equals the slot time
+  const p = t.plan; if (!p || !t.due) return null;
+  const n = S.notes.find(x => x.id === p.noteId), pg = n && n.pages.find(q => q.id === p.pageId);
+  if (!pg || !pg.bg || pg.bg.name !== 'planner') return null;
+  return slotDate(pg.bg.date, p.time).toISOString() === t.due ? { n, pg } : null;
+}
+function itemHTML(it) {
+  return `<div class="bc-item ${it.done ? 'done' : ''}" data-item="${it.id}"><button class="bc-tick" data-bact="tick" aria-label="Tick">${it.done ? '✓' : ''}</button>
+    ${it.typed ? `<span class="bc-itext ${it.text ? '' : 'ph'}" data-bact="itext">${it.text ? esc(it.text) : 'Item'}</span>` : `<canvas class="bc-iink" data-ink="item" data-item="${it.id}" aria-label="Write the item"></canvas>`}
+    <button class="bc-ikb" data-bact="ikb" aria-label="${it.typed ? 'Handwrite' : 'Type'} this item">${it.typed ? '✍︎' : '⌨︎'}</button></div>`;
+}
+function cardHTML(t, now, pg) {
+  const w = warnOf(t, pg, now), items = t.items || [], nd = items.filter(i => i.done).length, plan = planOK(t);
   return `<div class="bcard-wrap" data-id="${t.id}"><div class="bsw bsw-done">✓ Done</div><div class="bsw bsw-del">Delete 🗑</div>
-    <div class="bcard ${t.done ? 'done' : ''} ${od ? 'overdue' : ''}" data-id="${t.id}">
-      <div class="bc-grip" aria-label="Hold to drag · swipe to finish or delete">⠿</div>
+    <div class="bcard ${t.done ? 'done' : ''} ${w} ${t.color ? 'labeled' : ''} prio${t.prio || 0}" data-id="${t.id}" ${t.color ? `style="--lc:${LABELS[t.color]}"` : ''}>
+      <div class="bc-grip" aria-label="Hold to drag · hold & release for color/priority · swipe to finish or delete">⠿</div>
       <div class="bc-main"><div class="bc-top">${isTyped(t) ? `<span class="bc-title ${t.text ? '' : 'ph'}" data-bact="title">${t.text ? esc(t.text) : 'Title'}</span>` : `<canvas class="bc-tink" data-ink="title" aria-label="Write the title"></canvas>`}
       <button class="bc-kb ${isTyped(t) ? 'on' : ''}" data-bact="kb" aria-label="${isTyped(t) ? 'Handwrite the title' : 'Type the title'}">${isTyped(t) ? '✍︎' : '⌨︎'}</button>
-      ${t.due ? '' : `<button class="bc-due none" data-bact="due" aria-label="Reminder">⏰</button>`}</div>
-      ${t.due ? `<div class="bc-meta"><button class="bc-due ${od ? 'overdue' : ''}" data-bact="due" aria-label="Reminder">⏰ ${esc(fmtDue(t.due)) + (t.repeat ? ' ↻' : '')}</button></div>` : ''}
+      <button class="bc-more" data-bact="cmenu" aria-label="Card options">⋯</button></div>
+      <div class="bc-meta">${t.prio ? `<span class="bc-prio p${t.prio}">⚑ ${PRIO[t.prio]}</span>` : ''}
+      ${t.due ? `<button class="bc-due" data-bact="due" aria-label="Reminder">${plan ? '🗓' : '⏰'} ${esc(fmtDue(t.due)) + (t.repeat ? ' ↻' : '')}</button>` : `<button class="bc-due none" data-bact="due" aria-label="Reminder">⏰</button>`}
+      <span class="bc-od">Overdue</span><span class="bc-soon">Due soon</span>
+      ${items.length ? `<span class="bc-prog" title="Checklist"><b><i style="width:${Math.round(nd / items.length * 100)}%"></i></b>${nd}/${items.length}</span>` : ''}
+      <span class="spacer"></span><button class="bc-addi" data-bact="additem" aria-label="Add checklist item">☑︎</button></div>
+      ${items.length ? `<div class="bc-items">${items.map(itemHTML).join('')}</div>` : ''}
       <canvas class="bc-ink" data-ink="body" aria-label="Write here"></canvas></div>
       <div class="bc-resize" aria-label="Drag to resize the card"></div></div></div>`;
 }
 function colStyle(w) { w = Math.max(CW_MIN, Math.min(CW_MAX, +w || 1)); return w === 1 ? '' : `flex-basis: calc((100% - 24px) / 3 * ${w}); min-width: ${Math.round(228 * w)}px`; }
 function layoutCard(w, t) {
-  const body = w.querySelector('.bc-ink'), k = (body.clientWidth || 200) / INK_W;
+  const body = w.querySelector('.bc-ink'), k = (w.querySelector('.bc-main').clientWidth || 200) / INK_W;
   body.style.height = Math.round(cardH(t) * k) + 'px';
   const ti = w.querySelector('.bc-tink'); if (ti) ti.style.height = Math.round(TITLE_H * k) + 'px';
-  drawInk(body, t.strokes, k); if (ti) drawInk(ti, t.tstrokes, k);
+  if (body.clientWidth) drawInk(body, t.strokes, k); if (ti) drawInk(ti, t.tstrokes, k);
+  w.querySelectorAll('.bc-iink').forEach(cv => { const it = (t.items || []).find(x => x.id === cv.dataset.item); cv.style.height = Math.round(ITEM_H * k) + 'px'; if (cv.clientWidth) drawInk(cv, it && it.strokes, k); });
 }
 function renderBoard(pi) {
   const note = curNote(), pg = note && note.pages[pi], rec = pageEls[pi]; if (!rec || !isBoardPage(pg)) return;
@@ -59,23 +84,30 @@ function renderBoard(pi) {
   if (!b) { b = document.createElement('div'); b.className = 'board'; rec.el.append(b); }
   const cols = boardCols(pg), ids = new Set(cols.map(c => c.id));
   for (const t of pg.tasks) if (isCard(t) && !ids.has(t.col)) t.col = cols[0].id;   // orphans land in the first column
-  const now = Date.now(), cards = pg.tasks.filter(isCard), open = cards.filter(t => !t.done).length;
-  b.innerHTML = `<div class="bhead"><span class="btitle">📋 Project Board</span><span class="bsum">${open} open · ${cards.length - open} done</span><div class="spacer"></div>
-    <button class="bbtn" data-bact="addcol">＋ Column</button></div>
+  const now = Date.now(), cards = pg.tasks.filter(isCard), open = cards.filter(t => !t.done).length, F = boardFilter(pg);
+  b.classList.toggle('compact', !!pg.board.compact);
+  b.innerHTML = `<div class="bhead"><span class="btitle">📋 Project Board</span><span class="bsum">${open} open · ${cards.length - open} done</span><span class="bwarn"></span><div class="spacer"></div>
+    <button class="bbtn" data-bact="compact" aria-label="Compact cards">${pg.board.compact ? '▦ Full' : '▤ Compact'}</button><button class="bbtn" data-bact="addcol">＋ Column</button></div>
+    <div class="bfilter"><span class="bf-l">Filter</span>${Object.entries(LABELS).map(([k, c]) => `<button class="bf-dot ${F.colors.includes(k) ? 'on' : ''}" data-bact="fcolor" data-c="${k}" style="--lc:${c}" aria-label="${k}"></button>`).join('')}
+      <button class="bf-dot none ${F.colors.includes('none') ? 'on' : ''}" data-bact="fcolor" data-c="none" aria-label="No color"></button>
+      <span class="bf-sep"></span>${[1, 2, 3].map(p => `<button class="bf-chip ${F.minP === p ? 'on' : ''}" data-bact="fprio" data-p="${p}">⚑ ${PRIO[p]}${p < 3 ? '+' : ''}</button>`).join('')}
+      <button class="bf-chip hi ${F.minP === 3 ? 'on' : ''}" data-bact="fhigh">‼︎ High only</button><span class="spacer"></span>
+      <button class="bf-chip ${F.hide ? 'on' : ''}" data-bact="fhide">${F.hide ? 'Hiding' : 'Dimming'}</button>${filterActive(F) ? '<button class="bf-chip" data-bact="fclear">✕ Clear</button>' : ''}</div>
     <div class="bcols">${cols.map((c, ci) => { const cc = colCards(pg, c.id); return `<section class="bcol ${ci === cols.length - 1 && cols.length > 1 ? 'is-last' : ''}" data-col="${c.id}" style="${colStyle(c.w)}"><div class="bcol-resize" aria-label="Drag to widen the column"><i></i></div>
       <header class="bcol-head"><span class="bcol-title" data-bact="rename">${esc(c.title || 'Untitled')}</span><span class="bcount">${cc.length}</span>
       <button class="bbtn icon" data-bact="add" aria-label="Add card">＋</button><button class="bbtn icon" data-bact="colmenu" aria-label="Column options">⋯</button></header>
-      <div class="blist"><div class="bpull"><span>↓ Pull to add a card</span></div>${cc.map(t => cardHTML(t, now)).join('')}<div class="bempty">${cc.length ? '' : 'Pull down or tap ＋ to add a card'}</div></div></section>`; }).join('')}</div>`;
+      <div class="blist"><div class="bpull"><span>↓ Pull to add a card</span></div>${cc.map(t => cardHTML(t, now, pg)).join('')}<div class="bempty">${cc.length ? '' : 'Pull down or tap ＋ to add a card'}</div></div></section>`; }).join('')}</div>`;
   b.querySelectorAll('.bcard-wrap').forEach(w => { const t = pg.tasks.find(x => x.id === w.dataset.id); if (t) layoutCard(w, t); });
   if (keep) { b.querySelector('.bcols').scrollLeft = keep.left || 0; b.querySelectorAll('.bcol').forEach(c => { const v = keep.tops && keep.tops[c.dataset.col]; if (v) c.querySelector('.blist').scrollTop = v; }); }
   BS.keep[pg.id] = null;
+  applyFilter(b, pg); updateWarnings(pi);
 }
 function rerenderBoards() { BS.dirty = false; const n = curNote(); if (!n) return; n.pages.forEach((pg, i) => { if (isBoardPage(pg)) renderBoard(i); }); }
 function afterChange(pi) { renderBoard(pi); renderSidebar(); renderPanel(); }
 
 /* ---------- card ink (re-uses the page ink engine: drawStroke / drawPenSeg, pressure, colours, highlighter, eraser) ---------- */
 // k = CSS px per ink unit (shared by a card's title and body so handwriting keeps one scale)
-const pxPerUnit = cv => { const card = cv.closest('.bcard'), body = card && card.querySelector('.bc-ink'); return ((body || cv).getBoundingClientRect().width || 200) / INK_W; };
+const pxPerUnit = cv => { const card = cv.closest('.bcard'), m = card && card.querySelector('.bc-main'); return ((m || cv).getBoundingClientRect().width || 200) / INK_W; };
 function drawInk(cv, strokes, k = pxPerUnit(cv)) {
   if (!cv) return null;
   const dpr = Math.min(window.devicePixelRatio || 1, 2.5), W = Math.round((cv.clientWidth || 200) * dpr), H = Math.round((cv.clientHeight || 60) * dpr);
@@ -99,12 +131,14 @@ function cardThumb(t, W = 128, H = 80) {
   for (const s of st) drawStroke(ctx, s);
   const u = c.toDataURL(); thumbCache.set(key, u); return u;
 }
+function inkGet(t, I) { if (I.item) { const it = (t.items || []).find(x => x.id === I.item); return it ? (it.strokes ||= []) : null; } return (t[I.key] ||= []); }
+function inkSet(t, I, arr) { if (I.item) { const it = (t.items || []).find(x => x.id === I.item); if (it) it.strokes = arr; } else t[I.key] = arr; }
 function inkPt(cv, e, k = pxPerUnit(cv)) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / k, (e.clientY - r.top) / k]; }
 function startInk(g, cv, e) {
   const t = findCard(g.pi, g.wrap.dataset.id); if (!t) return;
   const k = pxPerUnit(cv), p = inkPt(cv, e, k), pr = e.pointerType === 'pen' ? (e.pressure || 0.5) : 0.5;
   const tool = S.tool === 'eraser' ? 'eraser' : S.tool === 'highlighter' ? 'highlighter' : 'pen';
-  g.ink = { cv, id: t.id, tool, k, key: inkKey(cv.dataset.ink) };
+  g.ink = { cv, id: t.id, tool, k, key: inkKey(cv.dataset.ink), item: cv.dataset.item || null };
   if (tool === 'eraser') { g.ink.snap = snapshot(); g.ink.erased = false; inkErase(g, p); return; }
   const hl = tool === 'highlighter';
   g.ink.stroke = { id: uid('s'), tool, color: hl ? S.hlColor : S.penColor, width: hl ? S.hlWidth * 0.8 : S.penWidth, points: [[+p[0].toFixed(1), +p[1].toFixed(1), +pr.toFixed(2)]] };
@@ -122,36 +156,36 @@ function inkMove(g, e) {
     const pr = ev.pointerType === 'pen' ? (ev.pressure || 0.5) : 0.5;
     pts.push([+p[0].toFixed(1), +p[1].toFixed(1), +pr.toFixed(2)]);
     const c = I.ctx;
-    if (I.tool === 'highlighter') { const t = findCard(g.pi, I.id); drawInk(I.cv, t[I.key], I.k); c.setTransform(I.kk, 0, 0, I.kk, 0, 0); drawStroke(c, I.stroke); }
+    if (I.tool === 'highlighter') { const t = findCard(g.pi, I.id); drawInk(I.cv, inkGet(t, I), I.k); c.setTransform(I.kk, 0, 0, I.kk, 0, 0); drawStroke(c, I.stroke); }
     else { c.save(); c.lineCap = 'round'; c.strokeStyle = inkColor(I.stroke.color); drawPenSeg(c, I.stroke, pts.length - 1); c.restore(); }
   }
 }
 function inkErase(g, p) {
-  const t = findCard(g.pi, g.ink.id), key = g.ink.key; if (!t || !t[key]) return;
-  const R = 9, before = t[key].length;
-  t[key] = t[key].filter(st => {
+  const t = findCard(g.pi, g.ink.id), cur = t && inkGet(t, g.ink); if (!cur) return;
+  const R = 9, before = cur.length;
+  const next = cur.filter(st => {
     const pts = st.points, lim = R + st.width / 2;
     if (pts.length === 1) return Math.hypot(p[0] - pts[0][0], p[1] - pts[0][1]) > lim;
     for (let i = 1; i < pts.length; i++) if (segDist(p, pts[i - 1], pts[i]) <= lim) return false;
     return true;
   });
-  if (t[key].length !== before) { g.ink.erased = true; drawInk(g.ink.cv, t[key], g.ink.k); }
+  if (next.length !== before) { inkSet(t, g.ink, next); g.ink.erased = true; drawInk(g.ink.cv, next, g.ink.k); }
 }
 function inkEnd(g, discard) {
   const I = g.ink; g.ink = null; if (!I) return;
   const n = curNote(), t = findCard(g.pi, I.id); if (!t) return;
   if (I.tool === 'eraser') { if (I.erased) { S.undo.push(I.snap); S.redo = []; updateUndo(); saveNote(n, true); thumbCache.clear(); renderPanel(); } return; }
-  if (discard) { drawInk(I.cv, t[I.key], I.k); return; }
+  if (discard) { drawInk(I.cv, inkGet(t, I), I.k); return; }
   I.stroke.bb = bbox(I.stroke.points);
-  pushHistory(); (t[I.key] ||= []).push(I.stroke); saveNote(n, true); thumbCache.clear();
-  drawInk(I.cv, t[I.key], I.k); renderPanel(); renderSidebar();
+  pushHistory(); const arr = inkGet(t, I); if (!arr) return; arr.push(I.stroke); saveNote(n, true); thumbCache.clear();
+  drawInk(I.cv, arr, I.k); renderPanel(); renderSidebar(); if (typeof v7OverlayHook === 'function') refreshPlanChips();
 }
 
 /* ---------- gestures ---------- */
 const PAGES = $('#pages');
 PAGES.addEventListener('pointerdown', e => {
   const board = e.target.closest('.board'); if (!board) return;
-  if ((e.pointerType === 'mouse' && e.button !== 0) || BS.g || BS.editing && e.target.closest('input')) return;
+  if ((e.pointerType === 'mouse' && e.button !== 0) || BS.g || BS.pinch || BS.editing && e.target.closest('input')) return;
   if (e.target.closest('input')) return;
   const pi = +board.closest('.page').dataset.pi;
   if (e.pointerType === 'pen') notePen();
@@ -160,8 +194,14 @@ PAGES.addEventListener('pointerdown', e => {
   const rz = e.target.closest('.bc-resize'), crz = e.target.closest('.bcol-resize');
   if (rz && wrap) { e.preventDefault(); BS.g = g; resizeStart(g); return; }
   if (crz && col) { e.preventDefault(); BS.g = g; colResizeStart(g); return; }
+  const row = e.target.closest('.bc-item');
+  g.fromGrip = !!e.target.closest('.bc-grip');
   if (head && !btn) g.kind = 'colhold';
-  else if (wrap && !btn) {
+  else if (row && wrap && !btn) {
+    g.kind = 'item'; g.row = row;
+    const cv = e.target.closest('.bc-iink');
+    if (cv && (e.pointerType === 'pen' || e.pointerType === 'mouse' || (e.pointerType === 'touch' && fingerDrawOn()))) startInk(g, cv, e);
+  } else if (wrap && !btn) {
     g.kind = 'card';
     const cv = e.target.closest('.bc-ink, .bc-tink');
     if (cv && (e.pointerType === 'pen' || e.pointerType === 'mouse' || (e.pointerType === 'touch' && fingerDrawOn()))) startInk(g, cv, e);
@@ -175,17 +215,19 @@ PAGES.addEventListener('pointerdown', e => {
 function holdFire(g) {
   if (BS.g !== g || g.mode !== 'pending') return;
   if (g.ink) inkEnd(g, true);           // Pencil held still on the ink area: it's a lift, not a dot
-  if (g.kind === 'card') liftStart(g); else if (g.kind === 'colhold') colLiftStart(g);
+  if (g.kind === 'card') liftStart(g); else if (g.kind === 'colhold') colLiftStart(g); else if (g.kind === 'item') itemLiftStart(g);
 }
 window.addEventListener('pointermove', e => {
   const g = BS.g; if (!g || e.pointerId !== g.pid) return;
   g.x = e.clientX; g.y = e.clientY;
   const dx = g.x - g.x0, dy = g.y - g.y0;
+  g.maxD = Math.max(g.maxD || 0, Math.hypot(dx, dy));
   if (g.mode === 'pending') {
     if (g.ink) { if (Math.hypot(dx, dy) > B_SLOP) { clearTimeout(g.timer); g.mode = 'ink'; } inkMove(g, e); return; }
     if (Math.hypot(dx, dy) <= B_SLOP) return;
     clearTimeout(g.timer);
-    if (g.kind === 'card' && Math.abs(dx) > Math.abs(dy) * 1.2) swipeStart(g);
+    if (g.kind === 'item' && Math.abs(dx) > Math.abs(dy) * 1.2) itemSwipeStart(g);
+    else if (g.kind === 'card' && Math.abs(dx) > Math.abs(dy) * 1.2) swipeStart(g);
     else if (g.canPull && dy > 0 && dy > Math.abs(dx) * 1.2) pullStart(g);
     else { BS.g = null; return; }      // it's a scroll
   }
@@ -194,6 +236,8 @@ window.addEventListener('pointermove', e => {
   else if (g.mode === 'pull') pullMove(g);
   else if (g.mode === 'resize') resizeMove(g);
   else if (g.mode === 'colresize') colResizeMove(g);
+  else if (g.mode === 'itemdrag') itemDragMove(g);
+  else if (g.mode === 'iswipe') itemSwipeMove(g);
 }, { passive: true });
 function boardUp(e) {
   const g = BS.g; if (!g || e.pointerId !== g.pid) return;
@@ -206,6 +250,8 @@ function boardUp(e) {
   else if (g.mode === 'coldrag') colEnd(g, cancel);
   else if (g.mode === 'resize') resizeEnd(g, cancel);
   else if (g.mode === 'colresize') colResizeEnd(g, cancel);
+  else if (g.mode === 'itemdrag') itemDragEnd(g, cancel);
+  else if (g.mode === 'iswipe') itemSwipeEnd(g, cancel);
   if (BS.dirty && !boardBusy()) rerenderBoards();
 }
 window.addEventListener('pointerup', boardUp);
@@ -263,13 +309,15 @@ function deleteCard(pi, id) {
   pushHistory(); pg.tasks = pg.tasks.filter(x => x !== t); renumber(pg, t.col); saveNote(n, true); afterChange(pi);
   undoToast('Deleted “' + (t.text || ((t.strokes || []).length || (t.tstrokes || []).length ? 'handwritten card' : 'card')) + '”');
 }
-function undoToast(msg) {
+function actionToast(msg, label, fn, ms = 6000) {
   let u = document.getElementById('undoToast');
-  if (!u) { u = document.createElement('div'); u.id = 'undoToast'; u.innerHTML = '<span></span><button>Undo</button>'; document.body.append(u);
-    u.querySelector('button').onclick = () => { u.hidden = true; restore(S.undo, S.redo); toast('Undone', 1200); }; }
-  u.querySelector('span').textContent = msg; u.hidden = false; u.classList.remove('pop'); void u.offsetWidth; u.classList.add('pop');
-  clearTimeout(undoToast.t); undoToast.t = setTimeout(() => u.hidden = true, 5000);
+  if (!u) { u = document.createElement('div'); u.id = 'undoToast'; u.innerHTML = '<span></span><button></button>'; document.body.append(u);
+    u.querySelector('button').onclick = () => { u.hidden = true; const f = u._fn; u._fn = null; f && f(); }; }
+  u.querySelector('span').textContent = msg; u.querySelector('button').textContent = label; u._fn = fn;
+  u.hidden = false; u.classList.remove('pop'); void u.offsetWidth; u.classList.add('pop');
+  clearTimeout(actionToast.t); actionToast.t = setTimeout(() => u.hidden = true, ms);
 }
+function undoToast(msg) { actionToast(msg, 'Undo', () => { restore(S.undo, S.redo); toast('Undone', 1200); }, 5000); }
 
 /* pull down at the top of a column = new card at the top */
 function pullStart(g) { g.mode = 'pull'; g.ind = g.list.querySelector('.bpull span'); g.list.classList.add('pulling'); }
@@ -285,38 +333,73 @@ function pullEnd(g, cancel) {
   if (!cancel && g.armed) addCard(g.pi, g.col.dataset.col);
 }
 
-/* press & hold: lift a card; others slide apart live; drop in any column at any position */
+/* press & hold: lift a card; others slide apart live; drop in any column at any position — or on a planner slot / the 🗓 dock */
+function planDock() {
+  let d = document.getElementById('bDock');
+  if (!d) { d = document.createElement('div'); d.id = 'bDock'; d.innerHTML = '🗓 <b>Drop on Planner</b><small>pick a day & time</small>'; document.body.append(d); }
+  return d;
+}
 function liftStart(g) {
   g.mode = 'lift'; buzz();
   const wrap = g.wrap, card = wrap.querySelector('.bcard'), r = card.getBoundingClientRect();
   const ghost = card.cloneNode(true); ghost.classList.add('bghost'); ghost.removeAttribute('data-id');
+  if (g.board.classList.contains('compact')) ghost.classList.add('compact');
   const srcs = card.querySelectorAll('canvas'), dsts = ghost.querySelectorAll('canvas');
   srcs.forEach((src, i) => { const dst = dsts[i]; if (dst && src.width) { dst.width = src.width; dst.height = src.height; dst.getContext('2d').drawImage(src, 0, 0); } });
   ghost.style.setProperty('--cc', getComputedStyle(card).getPropertyValue('--cc'));
   Object.assign(ghost.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
   document.body.append(ghost); void ghost.offsetWidth; ghost.classList.add('up');
-  g.ghost = ghost; g.r0 = r; g.grab = [g.x0 - r.left, g.y0 - r.top];
+  g.ghost = ghost; g.r0 = r; g.grab = [g.x0 - r.left, g.y0 - r.top]; g.liftD = g.maxD || 0;
   const cs = getComputedStyle(wrap); g.H = wrap.offsetHeight + parseFloat(cs.marginBottom || 0);
   wrap.classList.add('bplaceholder'); g.board.classList.add('bdragging'); document.body.classList.add('bcarrying');
-  g.cols = [...g.board.querySelectorAll('.bcol')].map(c => ({ id: c.dataset.col, el: c, list: c.querySelector('.blist'), wraps: [...c.querySelectorAll('.bcard-wrap')], count: c.querySelector('.bcount'), n: c.querySelectorAll('.bcard-wrap').length }));
+  const vis = w => w.offsetParent !== null;     // filtered-out (hidden) cards don't take part
+  g.cols = [...g.board.querySelectorAll('.bcol')].map(c => ({ id: c.dataset.col, el: c, list: c.querySelector('.blist'), wraps: [...c.querySelectorAll('.bcard-wrap')].filter(vis), count: c.querySelector('.bcount'), n: c.querySelectorAll('.bcard-wrap').length }));
   g.src = g.cols.find(c => c.el === g.col); g.srcIdx = g.src.wraps.indexOf(wrap); g.tgt = null; g.k = -1;
   for (const c of g.cols) for (const w of c.wraps) if (w !== wrap) w.classList.add('bshift');
+  planDock().classList.add('show');
   const loop = () => { if (g.mode !== 'lift') return; liftFrame(g); g.raf = requestAnimationFrame(loop); };
   loop();
 }
 function autoScrollBoard(g, vertical) {
   const bc = g.board.querySelector('.bcols'), r = bc.getBoundingClientRect(), E = 60;
-  if (g.x < r.left + E) bc.scrollLeft -= Math.ceil((r.left + E - g.x) / 4);
-  else if (g.x > r.right - E) bc.scrollLeft += Math.ceil((g.x - r.right + E) / 4);
+  if (g.x < r.left + E && g.x > r.left - 30) bc.scrollLeft -= Math.ceil((r.left + E - g.x) / 4);
+  else if (g.x > r.right - E && g.x < r.right + 30) bc.scrollLeft += Math.ceil((g.x - r.right + E) / 4);
   const L = vertical && vertical.list; if (!L) return;
   const lr = L.getBoundingClientRect();
-  if (g.y < lr.top + 36) L.scrollTop -= Math.ceil((lr.top + 36 - g.y) / 4);
-  else if (g.y > lr.bottom - 36) L.scrollTop += Math.ceil((g.y - lr.bottom + 36) / 4);
+  if (g.y < lr.top + 36 && g.y > lr.top - 30) L.scrollTop -= Math.ceil((lr.top + 36 - g.y) / 4);
+  else if (g.y > lr.bottom - 36 && g.y < lr.bottom + 30) L.scrollTop += Math.ceil((g.y - lr.bottom + 36) / 4);
 }
+function clearPlanHL() { document.querySelectorAll('.slot-hl.bslot').forEach(e => e.remove()); }
 function liftFrame(g) {
-  autoScrollBoard(g, g.tgt);
+  const W = $('#pages'), wr = W.getBoundingClientRect(), dock = planDock(), dr = dock.getBoundingClientRect();
+  const overDock = g.x >= dr.left - 8 && g.x <= dr.right + 8 && g.y >= dr.top - 8 && g.y <= dr.bottom + 8;
+  if (!overDock) {   // page auto-scroll so a planner page further down the note can be reached
+    if (g.y > wr.bottom - 70 && g.y < wr.bottom + 40) W.scrollTop += Math.ceil((g.y - wr.bottom + 70) / 4);
+    else if (g.y < wr.top + 40 && g.y > wr.top - 40) W.scrollTop -= Math.ceil((wr.top + 40 - g.y) / 4);
+  }
   const gx = g.x - g.grab[0], gy = g.y - g.grab[1];
-  g.ghost.style.transform = `translate(${gx - g.r0.left}px, ${gy - g.r0.top}px) scale(1.05) rotate(-1.2deg)`;
+  g.ghost.style.transform = `translate(${gx - g.r0.left}px, ${gy - g.r0.top}px) scale(${overDock ? 0.8 : 1.05}) rotate(-1.2deg)`;
+  dock.classList.toggle('hot', overDock);
+  // over a Daily Planner page of this note?
+  let slot = null;
+  if (!overDock) {
+    const pageEl = document.elementsFromPoint(g.x, g.y).find(e => e.classList && e.classList.contains('page'));
+    const pg = pageEl && curNote().pages[+pageEl.dataset.pi];
+    if (pg && pg.bg && pg.bg.name === 'planner') { const r = pageEl.getBoundingClientRect(), sl = slotAtY(pg.bg, (g.y - r.top) / S.scale); if (sl) slot = { pi: +pageEl.dataset.pi, sl }; }
+  }
+  const key = overDock ? 'dock' : slot ? slot.pi + ':' + slot.sl.i : '';
+  if (key !== (g.hlKey || '')) {
+    g.hlKey = key; clearPlanHL();
+    if (slot) { const s = S.scale, d = document.createElement('div'); d.className = 'slot-hl bslot';
+      Object.assign(d.style, { left: TIME_COL * s + 'px', top: slot.sl.y0 * s + 'px', width: (960 - TIME_COL) * s + 'px', height: slot.sl.h * s + 'px' });
+      d.innerHTML = `<span>${fmt12(slot.sl.time)}</span>`; pageEls[slot.pi].ov.append(d); buzz(); }
+  }
+  g.drop = overDock ? { type: 'dock' } : slot ? { type: 'slot', ...slot } : null;
+  if (g.drop) {     // close the gap on the board while hovering the planner
+    if (g.tgt !== null) { g.tgt = null; g.k = -1; for (const c of g.cols) { c.el.classList.remove('bdrop'); c.count.textContent = c.n - (c === g.src ? 1 : 0); c.wraps.forEach((w, j) => { w.style.transform = c === g.src && j > g.srcIdx ? `translateY(${-g.H}px)` : ''; }); } }
+    return;
+  }
+  autoScrollBoard(g, g.tgt);
   let tc = null, best = Infinity;
   for (const c of g.cols) { const r = c.el.getBoundingClientRect(), d = g.x < r.left ? r.left - g.x : g.x > r.right ? g.x - r.right : 0; if (d < best) { best = d; tc = c; } }
   const lr = tc.list.getBoundingClientRect(), cy = gy + g.r0.height / 2;
@@ -338,14 +421,26 @@ function liftFrame(g) {
 }
 function liftEnd(g, cancel) {
   cancelAnimationFrame(g.raf); g.mode = 'dropped'; suppressClicks();
-  document.body.classList.remove('bcarrying');
+  document.body.classList.remove('bcarrying'); planDock().classList.remove('show', 'hot'); clearPlanHL();
   const n = curNote(), pg = n.pages[g.pi], id = g.wrap.dataset.id, t = findCard(g.pi, id);
+  const still = g.fromGrip && (g.maxD || 0) < 12;     // lifted from the grip and released in place → color & priority
   let flash = '';
-  if (!cancel && t && g.tgt) {
-    const from = t.col, others = colCards(pg, g.tgt.id).filter(x => x !== t), oldIdx = colCards(pg, from).indexOf(t);
-    if (g.tgt.id !== from || oldIdx !== g.k) {
+  if (!cancel && t && g.drop) {
+    g.ghost.remove(); renderBoard(g.pi);
+    if (g.drop.type === 'slot') linkCardToSlot(g.pi, id, n, g.drop.pi, g.drop.sl);
+    else cardPlannerPicker(g.pi, id);
+    return;
+  }
+  if (!cancel && t && g.tgt && !still) {
+    const from = t.col, before = colCards(pg, g.tgt.id).map(x => x.id).join(), others = colCards(pg, g.tgt.id).filter(x => x !== t);
+    const vis = g.tgt.wraps.filter(w => w !== g.wrap).map(w => w.dataset.id);
+    let at = others.length;
+    if (g.k < vis.length) at = others.findIndex(x => x.id === vis[g.k]); else if (vis.length) at = others.findIndex(x => x.id === vis[vis.length - 1]) + 1;
+    if (at < 0) at = others.length;
+    const order = others.slice(); order.splice(at, 0, t);
+    if (g.tgt.id !== from || order.map(x => x.id).join() !== before) {
       pushHistory();
-      others.splice(g.k, 0, t); t.col = g.tgt.id; others.forEach((x, i) => x.ord = i); if (from !== t.col) renumber(pg, from);
+      t.col = g.tgt.id; order.forEach((x, i) => x.ord = i); if (from !== t.col) renumber(pg, from);
       const cols = boardCols(pg), last = lastColId(pg);
       if (cols.length > 1 && t.col === last && !t.done) { t.done = true; t.doneAt = Date.now(); flash = 'flash-done'; }
       else if (cols.length > 1 && from === last && t.col !== last && t.done) { t.done = false; t.doneAt = null; }
@@ -361,6 +456,7 @@ function liftEnd(g, cancel) {
   ghost.classList.add('drop'); ghost.classList.remove('up');
   ghost.style.transform = `translate(${r.left - g.r0.left}px, ${r.top - g.r0.top}px) scale(1)`;
   setTimeout(() => { ghost.remove(); w.classList.remove('blanding'); w.classList.add('settle'); if (flash) w.classList.add(flash); setTimeout(() => w.classList.remove('settle', 'flash-done'), 650); }, 210);
+  if (still && !cancel && t) setTimeout(() => labelSheet(g.pi, id), 230);
 }
 
 /* press & hold a column header: reorder columns */
@@ -401,6 +497,13 @@ PAGES.addEventListener('click', e => {
   else if (act === 'rename') renameColumn(pi, colEl.dataset.col);
   else if (act === 'title') editCardTitle(pi, wrap.dataset.id);
   else if (act === 'kb') toggleTyped(pi, wrap.dataset.id);
+  else if (act === 'cmenu') cardMenu(pi, wrap.dataset.id);
+  else if (act === 'additem') addItem(pi, wrap.dataset.id);
+  else if (act === 'tick') tickItem(pi, wrap.dataset.id, a.closest('.bc-item').dataset.item);
+  else if (act === 'ikb') toggleItemTyped(pi, wrap.dataset.id, a.closest('.bc-item').dataset.item);
+  else if (act === 'itext') editItemText(pi, wrap.dataset.id, a.closest('.bc-item').dataset.item);
+  else if (act === 'compact') setCompact(pi, !curNote().pages[pi].board.compact);
+  else if (act === 'fcolor' || act === 'fprio' || act === 'fhigh' || act === 'fhide' || act === 'fclear') filterAction(pi, act, a.dataset);
   else if (act === 'due') { const t = findCard(pi, wrap.dataset.id); if (t) openEditor({ type: 'task', note: curNote(), obj: t, page: pi }); }
 });
 function inlineEdit(el, value, placeholder, done) {
@@ -570,3 +673,261 @@ function drawBoardExport(ctx, pg) {
   });
   ctx.restore();
 }
+
+/* ================= v13 ================= */
+const noteOfPage = pg => S.notes.find(n => n.pages.includes(pg));
+/* ---------- checklists ---------- */
+function addItem(pi, id) {
+  const t = findCard(pi, id); if (!t) return;
+  pushHistory(); (t.items ||= []).push({ id: uid('i'), done: false, strokes: [], text: '', typed: false });
+  saveNote(curNote(), true); afterChange(pi);
+  const w = cardWrap(pi, id), rows = w && w.querySelectorAll('.bc-item'); if (rows && rows.length) { const r = rows[rows.length - 1]; r.classList.add('appear'); setTimeout(() => r.classList.remove('appear'), 400); }
+}
+function tickItem(pi, id, itemId) {
+  const t = findCard(pi, id), it = t && (t.items || []).find(x => x.id === itemId); if (!it) return;
+  pushHistory(); it.done = !it.done; saveNote(curNote(), true); afterChange(pi); if (it.done) buzz();
+  const pg = curNote().pages[pi], all = t.items.length && t.items.every(x => x.done), inLast = boardCols(pg).length > 1 && t.col === lastColId(pg);
+  if (it.done && all && !inLast) actionToast(`All ${t.items.length} items ticked ✓`, 'Move to Done', () => { const c = findCard(pi, id); if (c && !(c.col === lastColId(curNote().pages[pi]))) completeCard(pi, id); }, 7000);
+}
+function toggleItemTyped(pi, id, itemId) {
+  const t = findCard(pi, id), it = t && (t.items || []).find(x => x.id === itemId); if (!it) return;
+  pushHistory(); it.typed = !it.typed; saveNote(curNote(), true); afterChange(pi);
+  if (it.typed) editItemText(pi, id, itemId);
+}
+function editItemText(pi, id, itemId) {
+  const w = cardWrap(pi, id), el = w && w.querySelector(`.bc-item[data-item="${itemId}"] .bc-itext`); if (!el) return;
+  const t0 = findCard(pi, id), it0 = t0.items.find(x => x.id === itemId);
+  inlineEdit(el, it0.text || '', 'Checklist item', v => {
+    const t = findCard(pi, id), it = t && (t.items || []).find(x => x.id === itemId);
+    if (it && v !== null && v !== (it.text || '')) { pushHistory(); it.text = v; saveNote(curNote(), true); }
+    afterChange(pi);
+  });
+}
+function itemLiftStart(g) {
+  g.mode = 'itemdrag'; buzz();
+  const box = g.row.parentElement; g.rows = [...box.children]; g.idx = g.rows.indexOf(g.row);
+  const gap = parseFloat(getComputedStyle(g.row).marginBottom) || 0; g.H = g.row.offsetHeight + gap;
+  g.mids = g.rows.map(r => r.offsetTop + r.offsetHeight / 2); g.newIdx = g.idx;
+  g.row.classList.add('ilifted'); g.rows.forEach(r => { if (r !== g.row) r.classList.add('bshift'); });
+  itemDragMove(g);
+}
+function itemDragMove(g) {
+  const dy = g.y - g.y0; g.row.style.transform = `translateY(${dy}px) scale(1.03)`;
+  const py = g.mids[g.idx] + dy; let ni = 0; g.mids.forEach((m, j) => { if (j !== g.idx && m < py) ni++; });
+  if (ni === g.newIdx) return; g.newIdx = ni; buzz();
+  g.rows.forEach((r, j) => { if (j === g.idx) return; let t = 0; if (g.idx < ni && j > g.idx && j <= ni) t = -g.H; else if (ni < g.idx && j >= ni && j < g.idx) t = g.H; r.style.transform = t ? `translateY(${t}px)` : ''; });
+}
+function itemDragEnd(g, cancel) {
+  suppressClicks();
+  const id = g.wrap.dataset.id, t = findCard(g.pi, id);
+  if (!cancel && t && g.newIdx !== g.idx) { pushHistory(); const [m] = t.items.splice(g.idx, 1); t.items.splice(g.newIdx, 0, m); saveNote(curNote(), true); }
+  renderBoard(g.pi);
+}
+function itemSwipeStart(g) { g.mode = 'iswipe'; g.row.classList.add('iswiping'); g.row.style.transition = 'none'; }
+function itemSwipeMove(g) {
+  const dx = Math.max(-g.row.offsetWidth, Math.min(g.row.offsetWidth * 0.5, g.x - g.x0)); g.dx = dx;
+  g.row.style.transform = `translateX(${dx}px)`; g.row.classList.toggle('del-armed', dx < -70); g.row.classList.toggle('tick-armed', dx > 70);
+}
+function itemSwipeEnd(g, cancel) {
+  suppressClicks(); g.row.style.transition = ''; const id = g.wrap.dataset.id, itemId = g.row.dataset.item;
+  if (!cancel && g.dx < -70) {
+    g.row.style.transform = 'translateX(-110%)'; g.row.style.opacity = '0';
+    setTimeout(() => { const t = findCard(g.pi, id); if (!t) return; pushHistory(); t.items = t.items.filter(x => x.id !== itemId); saveNote(curNote(), true); afterChange(g.pi); undoToast('Checklist item deleted'); }, 180);
+  } else if (!cancel && g.dx > 70) { g.row.style.transform = ''; tickItem(g.pi, id, itemId); }
+  else { g.row.style.transform = ''; g.row.classList.remove('iswiping', 'del-armed', 'tick-armed'); }
+}
+
+/* ---------- color labels & priority ---------- */
+async function labelSheet(pi, id) {
+  const t = findCard(pi, id); if (!t) return;
+  const items = [...Object.keys(LABELS).map(k => ({ label: (t.color === k ? '✓ ' : '') + k[0].toUpperCase() + k.slice(1), value: { c: k }, cls: 'lab lab-' + k })),
+    { label: (!t.color ? '✓ ' : '') + 'No color', value: { c: null }, cls: 'lab' },
+    ...[0, 1, 2, 3].map(p => ({ label: ((t.prio || 0) === p ? '✓ ' : '') + '⚑ ' + PRIO[p], value: { p }, cls: 'prio prio' + p }))];
+  const v = await pickSheet('Color & priority', items, { grid: true, sub: 'Color label and priority flag for this card' });
+  if (v) setLabel(pi, id, v);
+}
+function setLabel(pi, id, v) {
+  const t = findCard(pi, id); if (!t) return;
+  pushHistory(); if ('c' in v) { if (v.c) t.color = v.c; else delete t.color; } if ('p' in v) { if (v.p) t.prio = v.p; else delete t.prio; }
+  saveNote(curNote(), true); afterChange(pi);
+}
+function cardMenu(pi, id) {
+  const t = findCard(pi, id); if (!t) return;
+  actionSheet(t.text || cardFallback(t, curNote(), pi), [
+    { label: '🎨 Color & priority…', fn: () => labelSheet(pi, id) },
+    { label: '☑︎ Add checklist item', fn: () => addItem(pi, id) },
+    { label: '⏰ Reminder…', fn: () => openEditor({ type: 'task', note: curNote(), obj: findCard(pi, id), page: pi }) },
+    { label: '🗓 Put on planner…', fn: () => cardPlannerPicker(pi, id) },
+    { label: '🗑 Delete card', danger: true, fn: () => deleteCard(pi, id) }]);
+}
+
+/* ---------- filter bar ---------- */
+function boardFilter(pg) {
+  BS.filters ||= {};
+  if (!BS.filters[pg.id]) { let f = null; try { f = JSON.parse(localStorage.getItem('boardFilter:' + pg.id)); } catch (_) {} BS.filters[pg.id] = { colors: [], minP: 0, hide: false, ...(f || {}) }; }
+  return BS.filters[pg.id];
+}
+const filterActive = F => F.colors.length > 0 || F.minP > 0;
+const cardMatches = (t, F) => (!F.colors.length || F.colors.includes(t.color || 'none')) && (t.prio || 0) >= F.minP;
+function applyFilter(b, pg) {
+  const F = boardFilter(pg), on = filterActive(F);
+  b.classList.toggle('filtering', on);
+  b.querySelectorAll('.bcard-wrap').forEach(w => { const t = pg.tasks.find(x => x.id === w.dataset.id), m = !on || (t && cardMatches(t, F)); w.classList.toggle('fdim', !m && !F.hide); w.classList.toggle('fhide', !m && F.hide); });
+}
+function filterAction(pi, act, d) {
+  const pg = curNote().pages[pi], F = boardFilter(pg);
+  if (act === 'fcolor') F.colors = F.colors.includes(d.c) ? F.colors.filter(x => x !== d.c) : [...F.colors, d.c];
+  if (act === 'fprio') F.minP = F.minP === +d.p ? 0 : +d.p;
+  if (act === 'fhigh') F.minP = F.minP === 3 ? 0 : 3;
+  if (act === 'fhide') F.hide = !F.hide;
+  if (act === 'fclear') { F.colors = []; F.minP = 0; }
+  localStorage.setItem('boardFilter:' + pg.id, JSON.stringify(F));
+  renderBoard(pi);
+}
+
+/* ---------- due-date warnings (live, every minute) ---------- */
+function updateWarnings(pi) {
+  const n = curNote(), pg = n && n.pages[pi], rec = pageEls[pi], b = rec && rec.el.querySelector('.board'); if (!b || !isBoardPage(pg)) return;
+  const now = Date.now(); let od = 0, soon = 0;
+  b.querySelectorAll('.bcard').forEach(c => { const t = pg.tasks.find(x => x.id === c.dataset.id); if (!t) return; const w = warnOf(t, pg, now); c.classList.toggle('overdue', w === 'overdue'); c.classList.toggle('soon', w === 'soon'); if (w === 'overdue') od++; if (w === 'soon') soon++; });
+  const h = b.querySelector('.bwarn'); if (h) h.innerHTML = (od ? `<span class="w-od">${od} overdue</span>` : '') + (soon ? `<span class="w-soon">${soon} due soon</span>` : '');
+}
+function boardTick() { const n = curNote(); if (n) n.pages.forEach((pg, i) => { if (isBoardPage(pg)) updateWarnings(i); }); }
+setInterval(boardTick, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) boardTick(); });
+
+/* ---------- compact mode: pinch in = compact, pinch out = full (or the header button) ---------- */
+function setCompact(pi, on) {
+  const n = curNote(), pg = n.pages[pi]; if (!isBoardPage(pg) || !!pg.board.compact === !!on) return;
+  pg.board.compact = !!on; saveNote(n, true);   // a view setting: saved, not an undo step
+  renderBoard(pi); toast(on ? '▤ Compact cards — pinch out for full cards' : '▦ Full cards', 1400);
+}
+function cancelBoardGesture() { const g = BS.g; if (g) boardUp({ pointerId: g.pid, type: 'pointercancel' }); }
+const tDist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+PAGES.addEventListener('touchstart', e => {
+  const b = e.target.closest && e.target.closest('.board'); if (!b || e.touches.length !== 2) return;
+  if ([...e.touches].some(t => t.touchType === 'stylus')) return;
+  e.stopImmediatePropagation(); if (e.cancelable) e.preventDefault();
+  cancelBoardGesture();            // a pinch never starts a drag or leaves ink
+  BS.pinch = { d0: Math.max(20, tDist(e.touches[0], e.touches[1])), ratio: 1, pi: +b.closest('.page').dataset.pi, b };
+}, { capture: true, passive: false });
+PAGES.addEventListener('touchmove', e => {
+  const P = BS.pinch; if (!P) return; e.stopImmediatePropagation(); if (e.cancelable) e.preventDefault();
+  if (e.touches.length < 2) return;
+  P.ratio = tDist(e.touches[0], e.touches[1]) / P.d0;
+  P.b.querySelector('.bcols').style.transform = `scale(${Math.max(0.9, Math.min(1.06, 1 + (P.ratio - 1) * 0.25))})`;
+  P.b.classList.toggle('pinch-in', P.ratio < 0.8); P.b.classList.toggle('pinch-out', P.ratio > 1.25);
+}, { capture: true, passive: false });
+function pinchEnd(e) {
+  const P = BS.pinch; if (!P || (e.touches && e.touches.length >= 2)) return;
+  e.stopImmediatePropagation(); BS.pinch = null;
+  P.b.querySelector('.bcols').style.transform = ''; P.b.classList.remove('pinch-in', 'pinch-out');
+  suppressClicks();
+  if (P.ratio < 0.8) setCompact(P.pi, true); else if (P.ratio > 1.25) setCompact(P.pi, false);
+}
+PAGES.addEventListener('touchend', pinchEnd, { capture: true });
+PAGES.addEventListener('touchcancel', pinchEnd, { capture: true });
+
+/* ---------- cards on the Daily Planner ---------- */
+function linkCardToSlot(pi, id, plannerNote, plannerPi, sl, noHistory) {
+  const n = curNote(), t = findCard(pi, id), ppg = plannerNote.pages[plannerPi]; if (!t || !ppg || !ppg.bg || ppg.bg.name !== 'planner') return;
+  if (!noHistory) pushHistory();
+  t.due = slotDate(ppg.bg.date, sl.time).toISOString(); t.notified = false; t.plan = { noteId: plannerNote.id, pageId: ppg.id, time: sl.time };
+  saveNote(n, true); afterChange(pi); refreshPlanChips();
+  const w = cardWrap(pi, id); if (w) { w.classList.add('flash'); setTimeout(() => w.classList.remove('flash'), 1600); }
+  toast(`🗓 On the planner · ${fmtDue(t.due)}${plannerNote.id !== n.id ? ' · ' + plannerNote.title : ''}`, 2600);
+}
+async function cardPlannerPicker(pi, id) {
+  const list = [];
+  for (const n of S.notes) n.pages.forEach((pg, i) => { if (pg.bg && pg.bg.name === 'planner') list.push({ n, i, date: pg.bg.date }); });
+  list.sort((a, b) => a.date.localeCompare(b.date) || a.n.title.localeCompare(b.n.title));
+  const today = todayISO();
+  const items = list.map(x => ({ label: (x.date === today ? '☀️ Today · ' : '🗓 ') + longDate(x.date), sub: `${x.n.title} · page ${x.i + 1}`, value: x, cls: x.date === today ? 'today' : '' }));
+  items.push({ label: '＋ New planner page for today', sub: `Adds a page to “${curNote().title}”`, value: 'new' });
+  const ch = await pickSheet('Put this card on which planner?', items); if (!ch) return;
+  let dst = ch, hist = false;
+  if (ch === 'new') { const n = curNote(); pushHistory(); hist = true; n.pages.push(makeTemplatePage('planner', n, today)); saveNote(n, true); buildPages(); dst = { n, i: n.pages.length - 1 }; }
+  const pg = dst.n.pages[dst.i], slots = plannerSlots(pg.bg);
+  const sl = await pickSheet(longDate(pg.bg.date), slots.map(s => ({ label: fmt12(s.time), value: s })), { grid: true, sub: 'Pick a time slot. The card’s reminder is set to that time; the card stays on the board.' });
+  if (!sl) return;
+  linkCardToSlot(pi, id, dst.n, dst.i, sl, hist);
+}
+function planChipsFor(ppg) {    // every card (any note) linked to this planner page
+  const out = [];
+  for (const n of S.notes) n.pages.forEach((pg, pi) => { if (isBoardPage(pg)) for (const t of pg.tasks) if (isCard(t) && t.plan && t.plan.pageId === ppg.id && planOK(t)) out.push({ n, pi, t }); });
+  return out;
+}
+function renderPlanChips(pi) {
+  const n = curNote(), pg = n && n.pages[pi], rec = pageEls[pi]; if (!rec || !pg || !pg.bg || pg.bg.name !== 'planner') return;
+  rec.ov.querySelectorAll('.plan-card').forEach(e => e.remove());
+  const s = S.scale, slots = plannerSlots(pg.bg), per = new Map();
+  for (const { n: cn, t } of planChipsFor(pg)) {
+    const sl = slotForTime(slots, t.plan.time), k = per.get(sl.i) || 0; per.set(sl.i, k + 1);
+    const h = Math.min(sl.h - 6, 44), w = 230, x = 940 - w - k * (w + 8);
+    const d = document.createElement('button'); d.className = 'plan-card' + (t.done ? ' done' : ''); d.dataset.card = t.id;
+    Object.assign(d.style, { left: x * s + 'px', top: (sl.y0 + (sl.h - h) / 2) * s + 'px', width: w * s + 'px', height: h * s + 'px', fontSize: Math.max(10, 17 * s) + 'px' });
+    if (t.color) d.style.setProperty('--lc', LABELS[t.color]);
+    const th = !t.text ? cardThumb(t, 150, 30) : '';
+    d.innerHTML = `<span class="pc-ic">📋</span>${t.text ? `<span class="pc-t">${esc(t.text)}</span>` : th ? `<img src="${th}" alt="">` : `<span class="pc-t">${esc(cardFallback(t, cn, cn.pages.findIndex(q => q.tasks.includes(t))))}</span>`}`;
+    d.title = 'Open the card on its board';
+    d.addEventListener('pointerdown', e => e.stopPropagation());
+    d.onclick = e => { e.stopPropagation(); jumpTo(cn.id, t.id); };
+    rec.ov.append(d);
+  }
+}
+function refreshPlanChips() { const n = curNote(); if (n) n.pages.forEach((pg, i) => { if (pg.bg && pg.bg.name === 'planner') renderPlanChips(i); }); }
+const _v7OverlayHook = v7OverlayHook;
+v7OverlayHook = function (pi) { _v7OverlayHook(pi); renderPlanChips(pi); };
+
+/* ---------- lasso handwriting → a new card (drag onto a board page, or 📋 Send to board) ---------- */
+// Called by the lasso carry machine while a selection hovers a board page.
+function boardCarryTarget(c, pi, els) {
+  const P = c.payload, ids = P.G ? P.G.strokes : [];
+  document.querySelectorAll('.bcol.bdrop-ink').forEach(e => e.classList.remove('bdrop-ink'));
+  if (!ids || !ids.length) return null;
+  const col = els.find(e => e.classList && e.classList.contains('bcol')); if (!col) return null;
+  col.classList.add('bdrop-ink');
+  return { type: 'board', pi, col: col.dataset.col };
+}
+function clearBoardCarry() { document.querySelectorAll('.bcol.bdrop-ink').forEach(e => e.classList.remove('bdrop-ink')); }
+function cardFromInk(src, dstNote, dstPi, colId, fromCarry) {
+  const sn = src.note, spg = sn.pages[src.pi], ids = src.ids;
+  const strokes = spg.strokes.filter(s => ids.includes(s.id));
+  if (!strokes.length) { toast('Select some handwriting first'); return null; }
+  let bb = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const s of strokes) { const b = s.bb || bbox(s.points); bb = [Math.min(bb[0], b[0]), Math.min(bb[1], b[1]), Math.max(bb[2], b[2]), Math.max(bb[3], b[3])]; }
+  const bw = Math.max(4, bb[2] - bb[0]), bh = Math.max(4, bb[3] - bb[1]), TW = 210, sc = Math.min(1.6, (TW - 12) / bw, (TITLE_H - 12) / bh);
+  const ox = 6, oy = (TITLE_H - bh * sc) / 2;
+  const tstrokes = strokes.map(st => { const pts = st.points.map(p => [+(ox + (p[0] - bb[0]) * sc).toFixed(1), +(oy + (p[1] - bb[1]) * sc).toFixed(1), p[2]]); return { id: uid('s'), tool: st.tool, color: st.color, width: +Math.max(0.8, st.width * Math.max(sc, 0.45)).toFixed(2), points: pts, bb: bbox(pts) }; });
+  const dpg = dstNote.pages[dstPi]; if (!isBoardPage(dpg)) return null;
+  if (dstNote.id === S.cur) pushHistory(); else pushHistoryMulti([dstNote.id]);
+  const cols = boardCols(dpg), col = cols.find(c => c.id === colId) || cols[0];
+  const t = { id: uid('t'), kind: 'card', col: col.id, ord: -1, text: '', tstrokes, strokes: [], done: cols.length > 1 && col.id === lastColId(dpg), due: null, repeat: '', notified: false, createdAt: Date.now() };
+  if (t.done) t.doneAt = Date.now();
+  dpg.tasks.push(t); renumber(dpg, col.id);
+  saveNote(dstNote, true); if (dstNote !== sn) saveNote(sn, true);
+  hideLasso(); thumbCache.clear();
+  if (dstNote.id === S.cur) { afterChange(dstPi); const w = cardWrap(dstPi, t.id); if (w) { w.classList.add('appear', 'flash'); setTimeout(() => w.classList.remove('appear', 'flash'), 1600); } }
+  else { renderSidebar(); renderPanel(); }
+  const srcNoteId = sn.id, srcPageId = spg.id, keepIds = ids.slice();
+  actionToast(`📋 Card added to “${col.title}”${dstNote.id !== S.cur ? ' in ' + dstNote.title : ''} · original ink kept`, 'Remove original', () => {
+    const n2 = S.notes.find(x => x.id === srcNoteId), p2 = n2 && n2.pages.find(q => q.id === srcPageId); if (!p2 || n2.id !== S.cur) return;
+    pushHistory(); p2.strokes = p2.strokes.filter(s => !keepIds.includes(s.id)); p2.labels = (p2.labels || []).filter(l => !l.strokeIds.every(id => keepIds.includes(id)));
+    saveNote(n2, true); const i = n2.pages.indexOf(p2); renderPageInk(i); renderOverlay(i); toast('Original ink removed', 1400);
+  }, 8000);
+  return t;
+}
+async function sendInkToBoardPicker(src) {
+  const list = [];
+  for (const n of S.notes) n.pages.forEach((pg, i) => { if (isBoardPage(pg)) list.push({ n, i }); });
+  const items = list.map(x => ({ label: '📋 ' + x.n.title, sub: `${x.n.id === S.cur ? 'This note · ' : ''}page ${x.i + 1} · ${boardCols(x.n.pages[x.i]).map(c => c.title).join(' · ')}`, value: x }));
+  items.push({ label: '＋ New Project Board page', sub: `Adds a board page to “${curNote().title}”`, value: 'new' });
+  const ch = await pickSheet('Send handwriting to which board?', items); if (!ch) { if (selection) $('#lassoMenu').hidden = false; return; }
+  let dst = ch;
+  if (ch === 'new') { const n = curNote(); pushHistory(); n.pages.push(makeTemplatePage('board', n)); saveNote(n, true); buildPages(); dst = { n, i: n.pages.length - 1 }; }
+  const cols = boardCols(dst.n.pages[dst.i]);
+  const col = await pickSheet('Which column?', cols.map(c => ({ label: c.title, sub: colCards(dst.n.pages[dst.i], c.id).length + ' cards', value: c.id }))); if (!col) return;
+  const t = cardFromInk(src, dst.n, dst.i, col);
+  if (t && dst.n.id === S.cur) boardFlash(dst.i, t.id);
+}
+$('#lassoBoard').onclick = () => { const s = selection; if (!s) return; if (!s.ids.length) { toast('Select some handwriting first'); return; } $('#lassoMenu').hidden = true; sendInkToBoardPicker({ note: curNote(), pi: s.pi, ids: s.ids.slice() }); };

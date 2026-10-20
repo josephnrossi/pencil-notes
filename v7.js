@@ -403,7 +403,7 @@ function startCarry(x, y, pid, P) {
   setLiftHide(pi, P.G, extra);
   document.body.classList.add('carrying');
   requestAnimationFrame(() => g.classList.add('up'));
-  try { navigator.vibrate && navigator.vibrate(8); } catch (_) {}
+  try { navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive) && navigator.vibrate(8); } catch (_) {}
   carryMove(); carryLoop();
 }
 function carryLoop() {
@@ -424,7 +424,8 @@ function carryMove() {
   if (!st.hidden && els.includes(st)) target = { type: 'send' };
   else {
     const pageEl = els.find(e => e.classList && e.classList.contains('page'));
-    if (pageEl && !isBoardPage(curNote().pages[+pageEl.dataset.pi])) {   // ink can't be dropped under a Project Board
+    if (pageEl && isBoardPage(curNote().pages[+pageEl.dataset.pi])) target = boardCarryTarget(c, +pageEl.dataset.pi, els);   // v13: ink → new card
+    else if (pageEl) {
       const pi = +pageEl.dataset.pi, pg = curNote().pages[pi], r = pageEl.getBoundingClientRect(), p = [(c.x - r.left) / s, (c.y - r.top) / s];
       const G = P.G, plannable = P.kind === 'task' || (P.kind === 'sel' && G.strokes.length && !G.tasks.length && !G.texts.length && !G.images.length && !G.sections.length);
       if (plannable && pg.bg && pg.bg.name === 'planner') { const sl = slotAtY(pg.bg, p[1]); if (sl) target = { type: 'slot', pi, slot: sl }; }
@@ -482,9 +483,11 @@ function carryDrop(type) {
     }
   } else if (t && t.type === 'move') { const o = commitMove(P, t.pi, t.p); if (o) dst = [t.pi, o]; }
   if (c.list) clearTiles(c.list);
-  if (t && (t.type === 'send' || t.type === 'slot')) {
+  clearBoardCarry();
+  if (t && (t.type === 'send' || t.type === 'slot' || t.type === 'board')) {
     $('#dragGhost').hidden = true; $('#dragGhost').className = ''; liftHide = null;
     renderPageInk(P.pi); renderOverlay(P.pi);
+    if (t.type === 'board') { cardFromInk({ note: n, pi: P.pi, ids: P.G.strokes.slice() }, n, t.pi, t.col, true); return; }
     if (t.type === 'send') openPlannerPicker(P); else scheduleToSlot(P, curNote(), t.pi, t.slot);
     return;
   }

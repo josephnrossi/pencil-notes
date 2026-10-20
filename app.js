@@ -535,9 +535,17 @@ function placeAt(pi, p) {
 /* ---------- undo / redo ---------- */
 const snapshot = () => JSON.stringify(curNote().pages);
 function pushHistory() { const n = curNote(); if (!n) return; S.undo.push(snapshot()); if (S.undo.length > 100) S.undo.shift(); S.redo = []; updateUndo(); }
+// Multi-note undo step ('M:' prefix): the current note plus other notes changed by the same action (e.g. sending ink to a board in another note).
+function pushHistoryMulti(ids) { const n = curNote(); if (!n) return; S.undo.push(multiSnap(ids)); if (S.undo.length > 100) S.undo.shift(); S.redo = []; updateUndo(); }
+function multiSnap(ids) { return 'M:' + JSON.stringify({ cur: curNote().pages, others: Object.fromEntries(ids.map(id => [id, (S.notes.find(x => x.id === id) || {}).pages || null])) }); }
 function restore(from, to) {
   const n = curNote(); if (!from.length) return;
-  to.push(snapshot()); n.pages = JSON.parse(from.pop()); saveNote(n); buildPages(); renderPanel(); renderSidebar(); updateUndo();
+  const e = from.pop();
+  if (e.startsWith('M:')) {
+    const d = JSON.parse(e.slice(2)), ids = Object.keys(d.others); to.push(multiSnap(ids)); n.pages = d.cur;
+    for (const id of ids) { const o = S.notes.find(x => x.id === id); if (o && d.others[id]) { o.pages = d.others[id]; saveNote(o, true); } }
+  } else { to.push(snapshot()); n.pages = JSON.parse(e); }
+  saveNote(n); buildPages(); renderPanel(); renderSidebar(); updateUndo();
 }
 function updateUndo() { $('#undoBtn').disabled = $('#fUndo').disabled = !S.undo.length; $('#redoBtn').disabled = $('#fRedo').disabled = !S.redo.length; }
 $('#undoBtn').onclick = () => restore(S.undo, S.redo);
@@ -792,7 +800,7 @@ function showBanner(it) {
     b.remove();
   };
   $('#banners').append(b);
-  try { navigator.vibrate && navigator.vibrate(200); } catch (_) {}
+  try { navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive) && navigator.vibrate(200); } catch (_) {}
   setTimeout(() => b.remove(), 60000);
 }
 async function systemNotify(it) {
@@ -1020,7 +1028,7 @@ function lift() {
   p.el.classList.add('lifted'); LIST.classList.add('dragging');
   for (const c of sibs) if (c !== p.el) c.classList.add('shiftable');
   p.el.style.transform = 'scale(1.035)';
-  try { navigator.vibrate && navigator.vibrate(8); } catch (_) {}
+  try { navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive) && navigator.vibrate(8); } catch (_) {}
   autoScroll();
 }
 function autoScroll() {
