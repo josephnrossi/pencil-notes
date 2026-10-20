@@ -53,7 +53,7 @@ function drawPageBackground(ctx, note, pg) {
     if (im) ctx.drawImage(im, x, 0, w, h); else { ctx.fillStyle = '#888'; ctx.font = `24px ${FONT}`; ctx.fillText('Loading PDF page…', 40, 60); }
     return;
   }
-  if (bg && bg.type === 'template') { drawPaper(ctx, 'blank'); if (bg.name === 'meeting') drawMeeting(ctx, bg); else if (bg.name === 'planner') drawPlanner(ctx, bg); return; }
+  if (bg && bg.type === 'template') { drawPaper(ctx, 'blank'); if (bg.name === 'meeting') drawMeeting(ctx, bg); else if (bg.name === 'planner') drawPlanner(ctx, bg); else if (bg.name === 'assistant') drawAssistBg(ctx); return; }
   drawPaper(ctx, pg.paper || note.paper);
 }
 function drawPageImages(ctx, pg) {
@@ -147,13 +147,14 @@ function relayoutPlanner(pg) {
 }
 
 /* ---------- templates: choose when adding a page or creating a note ---------- */
-const TEMPLATES = [['lined', '📝 Lined'], ['grid', '▦ Grid'], ['blank', '⬜ Blank'], ['meeting', '👥 Meeting Notes'], ['planner', '🗓 Daily Planner'], ['board', '📋 Project Board']];
+const TEMPLATES = [['lined', '📝 Lined'], ['grid', '▦ Grid'], ['blank', '⬜ Blank'], ['meeting', '👥 Meeting Notes'], ['planner', '🗓 Daily Planner'], ['board', '📋 Project Board'], ['assistant', '🤖 Assistant']];
 function makeTemplatePage(kind, note, date) {
   const p = newPage();
   if (['blank', 'lined', 'grid'].includes(kind)) { p.paper = kind; return p; }
   p.paper = 'blank';
   if (kind === 'meeting') p.bg = { type: 'template', name: 'meeting', date: date || todayISO() };
   if (kind === 'board') { p.bg = { type: 'template', name: 'board' }; p.board = newBoard(); }
+  if (kind === 'assistant') { p.bg = { type: 'template', name: 'assistant' }; p.assist = { cards: [] }; }
   if (kind === 'planner') {
     const d = plannerDefaults(), last = note && [...note.pages].reverse().find(q => q.bg && q.bg.name === 'planner');
     p.bg = { type: 'template', name: 'planner', date: date || (last ? addDaysISO(last.bg.date, 1) : todayISO()), start: d.start, end: d.end, slot: +d.slot };
@@ -690,6 +691,7 @@ async function importPdf(file, nbId) {
 let renderLight = false;
 function drawOverlaysForExport(ctx, pg, note) {
   if (isBoardPage(pg)) { drawBoardExport(ctx, pg); return; }
+  if (pg.assist) drawAssistExport(ctx, pg);
   ctx.save(); ctx.textBaseline = 'alphabetic';
   for (const sc of pg.sections || []) {
     const label = secNumber(note, pg, sc) + (sc.style || '.'); ctx.font = `800 28px ${FONT}`; const w = Math.max(SEC_H, ctx.measureText(label).width + 18);

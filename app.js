@@ -829,13 +829,13 @@ function icsEscape(s) { return String(s || '').replace(/\\/g, '\\\\').replace(/\
 function icsDate(d) { return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''); }
 function fold(line) { const out = []; while (line.length > 74) { out.push(line.slice(0, 74)); line = ' ' + line.slice(74); } out.push(line); return out.join('\r\n'); }
 function buildIcs(it) {
-  const o = it.obj, start = new Date(o.due), end = new Date(start.getTime() + 15 * 6e4), title = itemTitle(it);
+  const o = it.obj, start = new Date(o.due), end = o.end ? new Date(o.end) : new Date(start.getTime() + (o.where !== undefined ? 60 : 15) * 6e4), title = itemTitle(it);
   const url = location.origin + location.pathname + '#note=' + it.note.id + (it.type === 'task' ? '&task=' + o.id : '');
   const rr = { daily: 'DAILY', weekly: 'WEEKLY', monthly: 'MONTHLY' }[o.repeat];
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Pencil Notes//Notes & Reminders//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'BEGIN:VEVENT',
     'UID:' + o.id + '@inkminder', 'DTSTAMP:' + icsDate(new Date()), 'DTSTART:' + icsDate(start), 'DTEND:' + icsDate(end),
     'SUMMARY:' + icsEscape(title), 'DESCRIPTION:' + icsEscape(`From note "${it.note.title}"${it.page >= 0 ? ' (page ' + (it.page + 1) + ')' : ''} in Pencil Notes.\n${url}`),
-    'URL:' + url, ...(rr ? ['RRULE:FREQ=' + rr] : []),
+    'URL:' + url, ...(o.where ? ['LOCATION:' + icsEscape(o.where)] : []), ...(rr ? ['RRULE:FREQ=' + rr] : []),
     'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + icsEscape(title), 'TRIGGER:-PT0M', 'END:VALARM',
     'END:VEVENT', 'END:VCALENDAR'];
   return lines.map(fold).join('\r\n') + '\r\n';
@@ -939,7 +939,7 @@ function createNote(nbId, kind) {
     n.pages = [makeTemplatePage(kind, n)];
     if (['lined', 'grid', 'blank'].includes(kind)) n.paper = kind;
     const md = new Date().toLocaleDateString([], { month: 'short', day: 'numeric' });
-    if (kind === 'meeting') n.title = 'Meeting — ' + md; if (kind === 'planner') n.title = 'Planner — ' + md; if (kind === 'board') n.title = 'Project Board';
+    if (kind === 'meeting') n.title = 'Meeting — ' + md; if (kind === 'planner') n.title = 'Planner — ' + md; if (kind === 'board') n.title = 'Project Board'; if (kind === 'assistant') n.title = 'Assistant';
   }
   n.order = -1; S.notes.push(n); saveNote(n, true); normalizeOrder(); openNote(n.id);
   if (isDrawer()) setSidebar(false);

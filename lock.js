@@ -411,6 +411,7 @@ function settingsMenu() {
   const cfg = lockCfg();
   actionSheet('Settings', [
     { label: cfg ? '🔒 Pencil Lock: set up again (new shape & PIN)…' : '🔒 Set up Pencil Lock…', fn: setupPencilLock },
+    ...(typeof assistSettingsItems === 'function' ? assistSettingsItems() : []),
     { label: '⏱ Auto-relock: ' + RELOCK_LABEL[relockPref()] + '…', fn: () => actionSheet('Auto-relock', Object.entries(RELOCK_LABEL).map(([k, l]) => ({ label: (relockPref() === k ? '✓ ' : '') + l, fn: () => localStorage.setItem('lockRelock', k) }))) },
     { label: 'Appearance: ' + { dark: 'Dark', light: 'Light', system: 'System' }[themePref()] + '…', fn: themeMenu }]);
 }
