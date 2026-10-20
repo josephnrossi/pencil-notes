@@ -5,7 +5,17 @@
    so reminders, Today, 📅 Add to Calendar, search, Export/Import and undo (pushHistory) all work unchanged.
    Gestures (Apple Pencil, finger and mouse alike): press & hold to lift a card or a column header,
    swipe a card right = done (moves to the last column), left = delete (Undo), pull down a column = new card. */
-const INK_W = 300, INK_H = 110, B_LIFT = 420, B_SLOP = 8;
+const INK_W = 300, INK_H = 240, TITLE_H = 58, H_MIN = 90, H_MAX = 760, B_LIFT = 420, B_SLOP = 8, CW_MIN = 0.75, CW_MAX = 3;
+/* v12: t.h = body ink height (ink units; 300 units = card width), t.tstrokes = handwritten title, t.typed = typed title on;
+   column.w = width factor (1 = a third of the board). */
+const cardH = t => Math.max(H_MIN, Math.min(H_MAX, +t.h || INK_H));
+const isTyped = t => t.typed ?? !!t.text;
+const inkKey = which => which === 'title' ? 'tstrokes' : 'strokes';
+const strokesBottom = st => (st || []).reduce((m, s) => Math.max(m, (s.bb || bbox(s.points))[3] + s.width), 0);
+function cardFallback(o, note, pi) {
+  const pg = note && note.pages[pi], c = pg && pg.board && pg.board.columns.find(x => x.id === o.col);
+  return (o.tstrokes || []).length || (o.strokes || []).length ? `Handwritten card in ${c ? c.title : (note ? note.title : 'board')}` : `Card in ${c ? c.title : (note ? note.title : 'board')}`;
+}
 const isBoardPage = pg => !!(pg && pg.bg && pg.bg.name === 'board');
 function newBoard() { return { columns: ['To Do', 'Doing', 'Done'].map(title => ({ id: uid('c'), title })) }; }
 function boardCols(pg) { if (!pg.board || !Array.isArray(pg.board.columns) || !pg.board.columns.length) pg.board = newBoard(); return pg.board.columns; }
@@ -25,9 +35,20 @@ function cardHTML(t, now) {
   const od = t.due && !t.done && new Date(t.due) < now;
   return `<div class="bcard-wrap" data-id="${t.id}"><div class="bsw bsw-done">✓ Done</div><div class="bsw bsw-del">Delete 🗑</div>
     <div class="bcard ${t.done ? 'done' : ''} ${od ? 'overdue' : ''}" data-id="${t.id}">
-      <div class="bc-top"><span class="bc-title ${t.text ? '' : 'ph'}" data-bact="title">${t.text ? esc(t.text) : 'Title'}</span>
-      <button class="bc-due ${t.due ? (od ? 'overdue' : '') : 'none'}" data-bact="due" aria-label="Reminder">${t.due ? '⏰ ' + esc(fmtDue(t.due)) + (t.repeat ? ' ↻' : '') : '⏰'}</button></div>
-      <canvas class="bc-ink" aria-label="Write here"></canvas></div></div>`;
+      <div class="bc-grip" aria-label="Hold to drag · swipe to finish or delete">⠿</div>
+      <div class="bc-main"><div class="bc-top">${isTyped(t) ? `<span class="bc-title ${t.text ? '' : 'ph'}" data-bact="title">${t.text ? esc(t.text) : 'Title'}</span>` : `<canvas class="bc-tink" data-ink="title" aria-label="Write the title"></canvas>`}
+      <button class="bc-kb ${isTyped(t) ? 'on' : ''}" data-bact="kb" aria-label="${isTyped(t) ? 'Handwrite the title' : 'Type the title'}">${isTyped(t) ? '✍︎' : '⌨︎'}</button>
+      ${t.due ? '' : `<button class="bc-due none" data-bact="due" aria-label="Reminder">⏰</button>`}</div>
+      ${t.due ? `<div class="bc-meta"><button class="bc-due ${od ? 'overdue' : ''}" data-bact="due" aria-label="Reminder">⏰ ${esc(fmtDue(t.due)) + (t.repeat ? ' ↻' : '')}</button></div>` : ''}
+      <canvas class="bc-ink" data-ink="body" aria-label="Write here"></canvas></div>
+      <div class="bc-resize" aria-label="Drag to resize the card"></div></div></div>`;
+}
+function colStyle(w) { w = Math.max(CW_MIN, Math.min(CW_MAX, +w || 1)); return w === 1 ? '' : `flex-basis: calc((100% - 24px) / 3 * ${w}); min-width: ${Math.round(228 * w)}px`; }
+function layoutCard(w, t) {
+  const body = w.querySelector('.bc-ink'), k = (body.clientWidth || 200) / INK_W;
+  body.style.height = Math.round(cardH(t) * k) + 'px';
+  const ti = w.querySelector('.bc-tink'); if (ti) ti.style.height = Math.round(TITLE_H * k) + 'px';
+  drawInk(body, t.strokes, k); if (ti) drawInk(ti, t.tstrokes, k);
 }
 function renderBoard(pi) {
   const note = curNote(), pg = note && note.pages[pi], rec = pageEls[pi]; if (!rec || !isBoardPage(pg)) return;
@@ -41,11 +62,11 @@ function renderBoard(pi) {
   const now = Date.now(), cards = pg.tasks.filter(isCard), open = cards.filter(t => !t.done).length;
   b.innerHTML = `<div class="bhead"><span class="btitle">📋 Project Board</span><span class="bsum">${open} open · ${cards.length - open} done</span><div class="spacer"></div>
     <button class="bbtn" data-bact="addcol">＋ Column</button></div>
-    <div class="bcols">${cols.map((c, ci) => { const cc = colCards(pg, c.id); return `<section class="bcol ${ci === cols.length - 1 && cols.length > 1 ? 'is-last' : ''}" data-col="${c.id}">
+    <div class="bcols">${cols.map((c, ci) => { const cc = colCards(pg, c.id); return `<section class="bcol ${ci === cols.length - 1 && cols.length > 1 ? 'is-last' : ''}" data-col="${c.id}" style="${colStyle(c.w)}"><div class="bcol-resize" aria-label="Drag to widen the column"><i></i></div>
       <header class="bcol-head"><span class="bcol-title" data-bact="rename">${esc(c.title || 'Untitled')}</span><span class="bcount">${cc.length}</span>
       <button class="bbtn icon" data-bact="add" aria-label="Add card">＋</button><button class="bbtn icon" data-bact="colmenu" aria-label="Column options">⋯</button></header>
       <div class="blist"><div class="bpull"><span>↓ Pull to add a card</span></div>${cc.map(t => cardHTML(t, now)).join('')}<div class="bempty">${cc.length ? '' : 'Pull down or tap ＋ to add a card'}</div></div></section>`; }).join('')}</div>`;
-  b.querySelectorAll('.bcard-wrap').forEach(w => { const t = pg.tasks.find(x => x.id === w.dataset.id); if (t) drawCardInk(w.querySelector('.bc-ink'), t); });
+  b.querySelectorAll('.bcard-wrap').forEach(w => { const t = pg.tasks.find(x => x.id === w.dataset.id); if (t) layoutCard(w, t); });
   if (keep) { b.querySelector('.bcols').scrollLeft = keep.left || 0; b.querySelectorAll('.bcol').forEach(c => { const v = keep.tops && keep.tops[c.dataset.col]; if (v) c.querySelector('.blist').scrollTop = v; }); }
   BS.keep[pg.id] = null;
 }
@@ -53,19 +74,21 @@ function rerenderBoards() { BS.dirty = false; const n = curNote(); if (!n) retur
 function afterChange(pi) { renderBoard(pi); renderSidebar(); renderPanel(); }
 
 /* ---------- card ink (re-uses the page ink engine: drawStroke / drawPenSeg, pressure, colours, highlighter, eraser) ---------- */
-function drawCardInk(cv, t) {
+// k = CSS px per ink unit (shared by a card's title and body so handwriting keeps one scale)
+const pxPerUnit = cv => { const card = cv.closest('.bcard'), body = card && card.querySelector('.bc-ink'); return ((body || cv).getBoundingClientRect().width || 200) / INK_W; };
+function drawInk(cv, strokes, k = pxPerUnit(cv)) {
   if (!cv) return null;
-  const w = cv.clientWidth || 200, dpr = Math.min(window.devicePixelRatio || 1, 2.5), W = Math.round(w * dpr), H = Math.round(w * INK_H / INK_W * dpr);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5), W = Math.round((cv.clientWidth || 200) * dpr), H = Math.round((cv.clientHeight || 60) * dpr);
   if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
   const ctx = cv.getContext('2d'); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, W, H);
-  const k = W / INK_W; ctx.setTransform(k, 0, 0, k, 0, 0);
-  const st = t.strokes || [];
+  ctx.setTransform(k * dpr, 0, 0, k * dpr, 0, 0);
+  const st = strokes || [];
   for (const s of st) if (s.tool === 'highlighter') drawStroke(ctx, s);
   for (const s of st) if (s.tool !== 'highlighter') drawStroke(ctx, s);
   return ctx;
 }
 function cardThumb(t, W = 128, H = 80) {
-  const st = t.strokes || []; if (!st.length) return '';
+  const st = (t.tstrokes || []).length ? t.tstrokes : (t.strokes || []); if (!st.length) return '';
   const key = ['card', t.id, st.length, st[st.length - 1].id, W, isDark()].join(':'); if (thumbCache.has(key)) return thumbCache.get(key);
   let bb = [Infinity, Infinity, -Infinity, -Infinity];
   for (const s of st) { const b = s.bb || bbox(s.points); bb = [Math.min(bb[0], b[0]), Math.min(bb[1], b[1]), Math.max(bb[2], b[2]), Math.max(bb[3], b[3])]; }
@@ -76,52 +99,52 @@ function cardThumb(t, W = 128, H = 80) {
   for (const s of st) drawStroke(ctx, s);
   const u = c.toDataURL(); thumbCache.set(key, u); return u;
 }
-function inkPt(cv, e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * INK_W / r.width, (e.clientY - r.top) * INK_W / r.width]; }
+function inkPt(cv, e, k = pxPerUnit(cv)) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / k, (e.clientY - r.top) / k]; }
 function startInk(g, cv, e) {
   const t = findCard(g.pi, g.wrap.dataset.id); if (!t) return;
-  const p = inkPt(cv, e), pr = e.pointerType === 'pen' ? (e.pressure || 0.5) : 0.5;
+  const k = pxPerUnit(cv), p = inkPt(cv, e, k), pr = e.pointerType === 'pen' ? (e.pressure || 0.5) : 0.5;
   const tool = S.tool === 'eraser' ? 'eraser' : S.tool === 'highlighter' ? 'highlighter' : 'pen';
-  g.ink = { cv, id: t.id, tool };
+  g.ink = { cv, id: t.id, tool, k, key: inkKey(cv.dataset.ink) };
   if (tool === 'eraser') { g.ink.snap = snapshot(); g.ink.erased = false; inkErase(g, p); return; }
   const hl = tool === 'highlighter';
   g.ink.stroke = { id: uid('s'), tool, color: hl ? S.hlColor : S.penColor, width: hl ? S.hlWidth * 0.8 : S.penWidth, points: [[+p[0].toFixed(1), +p[1].toFixed(1), +pr.toFixed(2)]] };
-  const ctx = cv.getContext('2d'), k = cv.width / INK_W; ctx.setTransform(k, 0, 0, k, 0, 0); g.ink.ctx = ctx;
+  const ctx = cv.getContext('2d'), kk = cv.width / (cv.clientWidth || 1) * k; ctx.setTransform(kk, 0, 0, kk, 0, 0); g.ink.ctx = ctx; g.ink.kk = kk;
   if (!hl) { ctx.save(); ctx.fillStyle = inkColor(g.ink.stroke.color); ctx.beginPath(); ctx.arc(p[0], p[1], g.ink.stroke.width * pf(pr) / 2, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
 }
 function inkMove(g, e) {
   const I = g.ink; if (!I) return;
   const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
   for (const ev of (evs.length ? evs : [e])) {
-    const p = inkPt(I.cv, ev);
+    const p = inkPt(I.cv, ev, I.k);
     if (I.tool === 'eraser') { inkErase(g, p); continue; }
     const pts = I.stroke.points, last = pts[pts.length - 1];
     if (Math.hypot(p[0] - last[0], p[1] - last[1]) < 0.6) continue;
     const pr = ev.pointerType === 'pen' ? (ev.pressure || 0.5) : 0.5;
     pts.push([+p[0].toFixed(1), +p[1].toFixed(1), +pr.toFixed(2)]);
     const c = I.ctx;
-    if (I.tool === 'highlighter') { const t = findCard(g.pi, I.id); drawCardInk(I.cv, t); const k = I.cv.width / INK_W; c.setTransform(k, 0, 0, k, 0, 0); drawStroke(c, I.stroke); }
+    if (I.tool === 'highlighter') { const t = findCard(g.pi, I.id); drawInk(I.cv, t[I.key], I.k); c.setTransform(I.kk, 0, 0, I.kk, 0, 0); drawStroke(c, I.stroke); }
     else { c.save(); c.lineCap = 'round'; c.strokeStyle = inkColor(I.stroke.color); drawPenSeg(c, I.stroke, pts.length - 1); c.restore(); }
   }
 }
 function inkErase(g, p) {
-  const t = findCard(g.pi, g.ink.id); if (!t || !t.strokes) return;
-  const R = 9, before = t.strokes.length;
-  t.strokes = t.strokes.filter(st => {
+  const t = findCard(g.pi, g.ink.id), key = g.ink.key; if (!t || !t[key]) return;
+  const R = 9, before = t[key].length;
+  t[key] = t[key].filter(st => {
     const pts = st.points, lim = R + st.width / 2;
     if (pts.length === 1) return Math.hypot(p[0] - pts[0][0], p[1] - pts[0][1]) > lim;
     for (let i = 1; i < pts.length; i++) if (segDist(p, pts[i - 1], pts[i]) <= lim) return false;
     return true;
   });
-  if (t.strokes.length !== before) { g.ink.erased = true; drawCardInk(g.ink.cv, t); }
+  if (t[key].length !== before) { g.ink.erased = true; drawInk(g.ink.cv, t[key], g.ink.k); }
 }
 function inkEnd(g, discard) {
   const I = g.ink; g.ink = null; if (!I) return;
   const n = curNote(), t = findCard(g.pi, I.id); if (!t) return;
   if (I.tool === 'eraser') { if (I.erased) { S.undo.push(I.snap); S.redo = []; updateUndo(); saveNote(n, true); thumbCache.clear(); renderPanel(); } return; }
-  if (discard) { drawCardInk(I.cv, t); return; }
+  if (discard) { drawInk(I.cv, t[I.key], I.k); return; }
   I.stroke.bb = bbox(I.stroke.points);
-  pushHistory(); (t.strokes ||= []).push(I.stroke); saveNote(n, true);
-  drawCardInk(I.cv, t); renderPanel();
+  pushHistory(); (t[I.key] ||= []).push(I.stroke); saveNote(n, true); thumbCache.clear();
+  drawInk(I.cv, t[I.key], I.k); renderPanel(); renderSidebar();
 }
 
 /* ---------- gestures ---------- */
@@ -134,10 +157,13 @@ PAGES.addEventListener('pointerdown', e => {
   if (e.pointerType === 'pen') notePen();
   const head = e.target.closest('.bcol-head'), wrap = e.target.closest('.bcard-wrap'), list = e.target.closest('.blist'), col = e.target.closest('.bcol'), btn = e.target.closest('button');
   const g = { pi, pid: e.pointerId, type: e.pointerType, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, mode: 'pending', board, col, list, wrap };
+  const rz = e.target.closest('.bc-resize'), crz = e.target.closest('.bcol-resize');
+  if (rz && wrap) { e.preventDefault(); BS.g = g; resizeStart(g); return; }
+  if (crz && col) { e.preventDefault(); BS.g = g; colResizeStart(g); return; }
   if (head && !btn) g.kind = 'colhold';
   else if (wrap && !btn) {
     g.kind = 'card';
-    const cv = e.target.closest('.bc-ink');
+    const cv = e.target.closest('.bc-ink, .bc-tink');
     if (cv && (e.pointerType === 'pen' || e.pointerType === 'mouse' || (e.pointerType === 'touch' && fingerDrawOn()))) startInk(g, cv, e);
   } else if (list) g.kind = 'list';
   else return;
@@ -166,6 +192,8 @@ window.addEventListener('pointermove', e => {
   if (g.mode === 'ink') inkMove(g, e);
   else if (g.mode === 'swipe') swipeMove(g);
   else if (g.mode === 'pull') pullMove(g);
+  else if (g.mode === 'resize') resizeMove(g);
+  else if (g.mode === 'colresize') colResizeMove(g);
 }, { passive: true });
 function boardUp(e) {
   const g = BS.g; if (!g || e.pointerId !== g.pid) return;
@@ -176,6 +204,8 @@ function boardUp(e) {
   else if (g.mode === 'pull') pullEnd(g, cancel);
   else if (g.mode === 'lift') liftEnd(g, cancel);
   else if (g.mode === 'coldrag') colEnd(g, cancel);
+  else if (g.mode === 'resize') resizeEnd(g, cancel);
+  else if (g.mode === 'colresize') colResizeEnd(g, cancel);
   if (BS.dirty && !boardBusy()) rerenderBoards();
 }
 window.addEventListener('pointerup', boardUp);
@@ -231,7 +261,7 @@ function completeCard(pi, id) {
 function deleteCard(pi, id) {
   const n = curNote(), pg = n.pages[pi], t = findCard(pi, id); if (!t) return;
   pushHistory(); pg.tasks = pg.tasks.filter(x => x !== t); renumber(pg, t.col); saveNote(n, true); afterChange(pi);
-  undoToast('Deleted “' + (t.text || ((t.strokes || []).length ? 'handwritten card' : 'card')) + '”');
+  undoToast('Deleted “' + (t.text || ((t.strokes || []).length || (t.tstrokes || []).length ? 'handwritten card' : 'card')) + '”');
 }
 function undoToast(msg) {
   let u = document.getElementById('undoToast');
@@ -260,8 +290,8 @@ function liftStart(g) {
   g.mode = 'lift'; buzz();
   const wrap = g.wrap, card = wrap.querySelector('.bcard'), r = card.getBoundingClientRect();
   const ghost = card.cloneNode(true); ghost.classList.add('bghost'); ghost.removeAttribute('data-id');
-  const src = card.querySelector('canvas'), dst = ghost.querySelector('canvas');
-  if (src && dst && src.width) { dst.width = src.width; dst.height = src.height; dst.getContext('2d').drawImage(src, 0, 0); }
+  const srcs = card.querySelectorAll('canvas'), dsts = ghost.querySelectorAll('canvas');
+  srcs.forEach((src, i) => { const dst = dsts[i]; if (dst && src.width) { dst.width = src.width; dst.height = src.height; dst.getContext('2d').drawImage(src, 0, 0); } });
   ghost.style.setProperty('--cc', getComputedStyle(card).getPropertyValue('--cc'));
   Object.assign(ghost.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
   document.body.append(ghost); void ghost.offsetWidth; ghost.classList.add('up');
@@ -370,6 +400,7 @@ PAGES.addEventListener('click', e => {
   else if (act === 'colmenu') colMenu(pi, colEl.dataset.col);
   else if (act === 'rename') renameColumn(pi, colEl.dataset.col);
   else if (act === 'title') editCardTitle(pi, wrap.dataset.id);
+  else if (act === 'kb') toggleTyped(pi, wrap.dataset.id);
   else if (act === 'due') { const t = findCard(pi, wrap.dataset.id); if (t) openEditor({ type: 'task', note: curNote(), obj: t, page: pi }); }
 });
 function inlineEdit(el, value, placeholder, done) {
@@ -400,7 +431,49 @@ function renameColumn(pi, colId, isNew) {
     renderBoard(pi);
   });
 }
-function addCard(pi, colId, edit = true) {
+function toggleTyped(pi, id) {
+  const t = findCard(pi, id); if (!t) return;
+  pushHistory(); const on = !isTyped(t); t.typed = on; saveNote(curNote(), true); afterChange(pi);
+  if (on) editCardTitle(pi, id); else hint('Write the title with your Pencil');
+}
+/* resize a card (bottom-right handle) — ink keeps its position; can't shrink past existing strokes */
+function resizeStart(g) {
+  const t = findCard(g.pi, g.wrap.dataset.id); if (!t) { BS.g = null; return; }
+  g.mode = 'resize'; g.id = t.id; g.h0 = cardH(t); g.h = g.h0; g.body = g.wrap.querySelector('.bc-ink'); g.k = pxPerUnit(g.body);
+  g.hmin = Math.max(H_MIN, Math.ceil(strokesBottom(t.strokes) + 6));
+  g.wrap.classList.add('resizing'); document.body.classList.add('bresizing'); buzz();
+}
+function resizeMove(g) {
+  const h = Math.round(Math.max(g.hmin, Math.min(H_MAX, g.h0 + (g.y - g.y0) / g.k)));
+  if (h === g.h) return; g.h = h;
+  const t = findCard(g.pi, g.id); g.body.style.height = Math.round(h * g.k) + 'px'; drawInk(g.body, t && t.strokes, g.k);
+  g.wrap.classList.toggle('at-min', h <= g.hmin); g.wrap.classList.toggle('at-max', h >= H_MAX);
+}
+function resizeEnd(g, cancel) {
+  suppressClicks(); g.wrap.classList.remove('resizing', 'at-min', 'at-max'); document.body.classList.remove('bresizing');
+  const t = findCard(g.pi, g.id);
+  if (!cancel && t && Math.abs(g.h - g.h0) >= 2) { pushHistory(); t.h = g.h; saveNote(curNote(), true); }
+  renderBoard(g.pi);
+}
+/* widen / narrow a column (handle on its right edge, or ⋯ → Column width) */
+function colResizeStart(g) {
+  g.mode = 'colresize'; g.cid = g.col.dataset.col; g.w0px = g.col.getBoundingClientRect().width;
+  const c = boardCols(curNote().pages[g.pi]).find(x => x.id === g.cid); g.f0 = +c.w || 1; g.f = g.f0;
+  g.col.classList.add('bcol-sizing'); document.body.classList.add('bcolsizing'); buzz();
+}
+function colResizeMove(g) {
+  const f = Math.max(CW_MIN, Math.min(CW_MAX, g.f0 * (g.w0px + g.x - g.x0) / g.w0px)); g.f = Math.round(f * 100) / 100;
+  g.col.setAttribute('style', colStyle(g.f) || ''); g.col.querySelectorAll('.bcard-wrap').forEach(w => { const t = findCard(g.pi, w.dataset.id); if (t) layoutCard(w, t); });
+}
+function colResizeEnd(g, cancel) {
+  suppressClicks(); g.col.classList.remove('bcol-sizing'); document.body.classList.remove('bcolsizing');
+  if (!cancel && Math.abs(g.f - g.f0) >= 0.03) setColWidth(g.pi, g.cid, g.f); else renderBoard(g.pi);
+}
+function setColWidth(pi, colId, f) {
+  const n = curNote(), c = boardCols(n.pages[pi]).find(x => x.id === colId); if (!c) return;
+  pushHistory(); c.w = Math.max(CW_MIN, Math.min(CW_MAX, f)); if (Math.abs(c.w - 1) < 0.03) delete c.w; saveNote(n, true); renderBoard(pi);
+}
+function addCard(pi, colId, edit = false) {
   const n = curNote(), pg = n.pages[pi], cols = boardCols(pg);
   pushHistory();
   const t = { id: uid('t'), kind: 'card', col: colId, ord: -1, text: '', strokes: [], done: cols.length > 1 && colId === lastColId(pg), due: null, repeat: '', notified: false, createdAt: Date.now() };
@@ -447,6 +520,9 @@ function colMenu(pi, colId) {
   actionSheet(c.title || 'Column', [
     { label: '✏️ Rename column', fn: () => renameColumn(pi, colId) },
     { label: '＋ Add card', fn: () => addCard(pi, colId) },
+    { label: '↔︎ Column width…', fn: () => setTimeout(() => { const w = +c.w || 1, m = v => Math.abs(w - v) < 0.05 ? '✓ ' : ''; actionSheet('Width of “' + c.title + '”', [
+      { label: m(0.75) + 'Narrow', fn: () => setColWidth(pi, colId, 0.75) }, { label: m(1) + 'Normal (3 across)', fn: () => setColWidth(pi, colId, 1) },
+      { label: m(1.5) + 'Wide', fn: () => setColWidth(pi, colId, 1.5) }, { label: m(2) + 'Extra wide', fn: () => setColWidth(pi, colId, 2) }]); }, 0) },
     ...(i > 0 ? [{ label: '← Move left', fn: () => moveColumn(pi, colId, -1) }] : []),
     ...(i < cols.length - 1 ? [{ label: 'Move right →', fn: () => moveColumn(pi, colId, 1) }] : []),
     ...(cols.length > 1 ? [{ label: '🗑 Delete column…', danger: true, fn: () => setTimeout(() => actionSheet(`Delete “${c.title}”?`, [
@@ -482,12 +558,13 @@ function drawBoardExport(ctx, pg) {
     ctx.fillStyle = c.ink; ctx.font = `700 ${n > 4 ? 18 : 22}px ${FONT}`; ctx.fillText(`${col.title} (${cards.length})`, x + 10, 142, W - 20);
     let y = 162;
     for (const t of cards) {
-      const iw = W - 20, ih = (t.strokes || []).length ? iw * INK_H / INK_W : 0, h = 46 + ih;
+      const iw = W - 20, u = iw / INK_W, th = (t.tstrokes || []).length && !isTyped(t) ? TITLE_H * u : 0, ih = (t.strokes || []).length ? Math.min(cardH(t), strokesBottom(t.strokes) + 8) * u : 0, h = 46 + th + ih;
       if (y + h > PAGE_H - 40) break;
       ctx.strokeStyle = c.strong; ctx.lineWidth = 1.5; ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x + 4, y, W - 8, h, 10) : ctx.rect(x + 4, y, W - 8, h); ctx.fill(); ctx.stroke();
       ctx.fillStyle = t.done ? '#22a55a' : c.ink; ctx.font = `600 19px ${FONT}`; ctx.fillText((t.done ? '✓ ' : '') + (t.text || ''), x + 14, y + 28, W - 30);
       if (t.due) { ctx.fillStyle = '#6e6e76'; ctx.font = `600 14px ${FONT}`; ctx.fillText('⏰ ' + fmtDue(t.due), x + 14, y + 44, W - 30); }
-      if (ih) { ctx.save(); ctx.translate(x + 10, y + 46); ctx.scale(iw / INK_W, iw / INK_W); for (const s of t.strokes) drawStroke(ctx, s); ctx.restore(); }
+      if (th) { ctx.save(); ctx.translate(x + 10, y + 8); ctx.scale(u, u); for (const s of t.tstrokes) drawStroke(ctx, s); ctx.restore(); }
+      if (ih) { ctx.save(); ctx.translate(x + 10, y + 46 + th); ctx.scale(u, u); for (const s of t.strokes) drawStroke(ctx, s); ctx.restore(); }
       y += h + 12;
     }
   });

@@ -680,7 +680,7 @@ function allItems() {
   }
   return out;
 }
-const itemTitle = it => it.type === 'note' ? (it.obj.title || it.note.title) : (it.obj.text || (it.obj.kind === 'ink' ? 'Handwritten task' : it.obj.kind === 'card' ? ((it.obj.strokes || []).length ? 'Handwritten card' : 'Untitled card') : 'Untitled task'));
+const itemTitle = it => it.type === 'note' ? (it.obj.title || it.note.title) : (it.obj.text || (it.obj.kind === 'ink' ? 'Handwritten task' : it.obj.kind === 'card' ? cardFallback(it.obj, it.note, it.page) : 'Untitled task'));
 function toggleDone(it) {
   const o = it.obj;
   if (!o.done && o.repeat && o.due) { let d = o.due; do d = advance(d, o.repeat); while (new Date(d) < Date.now()); o.due = d; o.notified = false; toast('Done — next: ' + fmtDue(d)); }
