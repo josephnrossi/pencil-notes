@@ -1176,7 +1176,8 @@ function deleteItem(it) {
 /* ---------- backup ---------- */
 $('#exportBtn').onclick = async () => {
   flushSaves();
-  const data = { app: 'inkminder', version: 2, exportedAt: new Date().toISOString(), notebooks: S.notebooks, notes: S.notes, assets: await exportAssets(S.notes) };
+  const notes = typeof sealedNotesForExport === 'function' ? await sealedNotesForExport() : S.notes;   // v14: locked notes stay encrypted
+  const data = { app: 'inkminder', version: 2, exportedAt: new Date().toISOString(), notebooks: S.notebooks, notes, assets: await exportAssets(notes) };
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
   a.download = 'pencil-notes-backup-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.append(a); a.click(); a.remove();
   toast('Backup downloaded');
