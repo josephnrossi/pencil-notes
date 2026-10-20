@@ -203,6 +203,7 @@ const AssistEngine = (() => {
   function cleanAction(s) {
     let t = s.replace(/^(also|and|so|then|but|ok(ay)?|oh|btw|one more thing|quick (ask|request)|reminder|just a (quick )?reminder|friendly reminder|action (required|needed|item)|important|urgent|asap|ps|p\.s\.)\s*[:,–-]*\s*/i, '');
     t = t.replace(/^@?[A-Z][a-z]+(\s[A-Z][a-z]+)?\s*[:–-]\s+/, '');
+    t = t.replace(/^(?:for|on|about|re|regarding|as for|with)\b[^,]{2,40},\s+(?=(?:can|could|would|will) (?:you|u)\b)/i, '');
     t = t.replace(/^(?:hey |hi )?(?:[A-Z][a-z]+,\s+)?(?:can|could|would|will) (?:you|u)(?: please)?(?: also)?\s+/i, '').replace(/^would you mind\s+/i, '').replace(/^(i|we)('d| would) (really )?(like|appreciate|love)( it)?( if)? (you|for you) (to )?(could )?/i, '').replace(/^i need you to\s+/i, '').replace(/^(you|u) (need|have|must|should|will need) to\s+/i, '')
       .replace(/^(please|pls|kindly)\s+/i, '').replace(/^(make sure|remember|don'?t forget) (to|that you)\s+/i, (m0, a) => /make sure/i.test(a) ? 'Make sure to ' : '').replace(/^(just|also)\s+/i, '').replace(/,?\s*(please|thanks|thank you|thx)[.!]*\s*$/i, '');
     t = t.replace(/\?+\s*$/, '').replace(/[.!]+$/, '').trim();
@@ -235,6 +236,8 @@ const AssistEngine = (() => {
     const subjW = new Set(content(subject)), freq = {};
     us.forEach(u => content(u.text).forEach(w => freq[w] = (freq[w] || 0) + 1));
     const KEY = /\b(deadline|due|decid|agreed|approv|launch|release|budget|priority|urgent|important|delay|blocked|risk|change|moved|postpon|cancel|confirmed|update|result|revenue|contract|invoice|offer|plan|proposal|schedule|meeting|issue|problem|fix|signed|hired|ship|goal|milestone|q[1-4]|\$\d|\d+%)/i;
+    const P = input.prefs || {}, low = x => String(x || '').toLowerCase().trim();
+    const notAct = (P.notAction || []).map(low).filter(Boolean), actPh = (P.actionPhrases || []).map(low).filter(Boolean), me = low(P.me);
     us.forEach((u, i) => {
       const w = content(u.text), n = words(u.text).length;
       let sc = 0;
@@ -249,6 +252,9 @@ const AssistEngine = (() => {
       if (PLEASANTRY.test(u.text) || NOT_ACTION.test(u.text) && n < 14) sc -= 4;
       if (/\?$/.test(u.text)) sc -= 0.5;
       u.score = sc; u.i = i; u.action = isAction(u); u.dates = parseDates(u.text, ref);
+      const lt = low(defill(u.text)).replace(/^[-•*]\s*/, '');
+      if (u.action && notAct.some(p => lt.startsWith(p))) { u.action = false; u.learned = 'not'; }
+      else if (!u.action && actPh.some(p => lt.includes(p))) { u.action = true; u.learned = 'act'; }
     });
     us.forEach((u, i) => {
       if (u.dates.length && u.dates.every(d => d.kind === 'time')) {
@@ -261,13 +267,16 @@ const AssistEngine = (() => {
       const near = us.filter(p => p !== u && Math.abs(p.para - u.para) <= 1 && Math.abs(p.i - i) <= 2 && !p.action && /\b(due|deadline|by|before|no later than)\b/i.test(p.text) && p.dates.length);
       if (near.length) u.dates = [{ ...near[0].dates[0], inherited: true }];
     });
+    // a learned default due time replaces the built-in 5 PM / 9 AM for date-only deadlines
+    function prefTime(d) { if (!P.dueTime || d.time || d.kind === 'time') return d.date; const x = new Date(d.date); if (x.getHours() === 17 || x.getHours() === 9) x.setHours(P.dueTime.h, P.dueTime.m || 0, 0, 0); return x; }
     // action items
     const actions = [];
     for (const u of us.filter(u => u.action)) {
       const d = u.dates.find(x => x.kind !== 'time' || u.dates.length === 1) || u.dates[0];
       const text = cleanAction(u.text); if (text.length < 3) continue;
       if (actions.some(a => a.text.toLowerCase() === text.toLowerCase())) continue;
-      actions.push({ text, owner: ownerOf(u, ctx), due: d ? d.date.toISOString() : null, dueText: d ? d.text : '', src: u.text });
+      let owner = ownerOf(u, ctx); if (me && low(owner) === me) owner = 'You';
+      actions.push({ text, owner, due: d ? prefTime(d).toISOString() : null, dueText: d ? d.text : '', src: u.text, ...(u.learned ? { learned: u.learned } : {}) });
     }
     // meetings
     const meetings = [];
@@ -287,7 +296,7 @@ const AssistEngine = (() => {
     for (const u of us) for (const d of u.dates) {
       if (meetings.some(m => m.text === u.text)) continue;
       if (!/\b(by|before|due|deadline|until|no later than|expires?|closes?|ends?|eod|cob|end of)\b/i.test(u.text)) continue;
-      const iso = d.date.toISOString(); if (deadlines.some(x => x.due === iso)) continue;
+      const iso = prefTime(d).toISOString(); if (deadlines.some(x => x.due === iso)) continue;
       deadlines.push({ text: cleanAction(u.text), due: iso, dueText: d.text });
     }
     // summary: top sentences in original order

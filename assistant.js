@@ -66,24 +66,24 @@ function freeSlot(pg) {
   return slots.find(([x, y]) => !cards.some(k => x < k.x + k.w && k.x < x + AS_W && y < k.y + k.h && k.y < y + AS_H)) || null;
 }
 function resultToCard(r) {
-  return { summary: r.summary || '', points: (r.points || []).slice(0, 6), actions: (r.actions || []).map(a => ({ id: uid('aa'), text: a.text, owner: a.owner || '', due: a.due || null, dueText: a.dueText || '' })),
+  return { summary: r.summary || '', points: (r.points || []).slice(0, 6), actions: (r.actions || []).map(a => ({ id: uid('aa'), text: a.text, owner: a.owner || '', due: a.due || null, dueText: a.dueText || '', ...(a.src ? { src: a.src } : {}), ...(a.learned ? { learned: a.learned } : {}) })),
     meetings: (r.meetings || []).map(m => ({ id: uid('am'), title: m.title, start: m.start, end: m.end || null, where: m.where || '' })), deadlines: (r.deadlines || []).map(d => ({ text: d.text, due: d.due })) };
 }
 async function addEmail(pi, email, opts = {}) {
   let n = curNote(), pg = n.pages[pi]; if (!isAssistPage(pg)) return null;
   const now = new Date(), ref = email.date && !isNaN(email.date) ? email.date : now;
-  const r = AssistEngine.extract({ ...email, date: ref });
+  const r = applyPrefsToResult(AssistEngine.extract({ ...email, date: ref, prefs: memPrefs() }));
   pushHistory();
   let slot = freeSlot(pg);
   if (!slot) { const np = makeTemplatePage('assistant', n); n.pages.splice(pi + 1, 0, np); pi = pi + 1; pg = np; slot = freeSlot(pg); }
-  const card = { id: uid('ac'), x: slot[0], y: slot[1], w: AS_W, h: AS_H, kind: opts.kind || 'email', from: r.from || email.from || '', to: email.to || '', subject: email.subject || autoTitle(email.text) || (opts.kind === 'text' ? 'Pasted text' : ''),
+  const card = { id: uid('ac'), x: slot[0], y: slot[1], w: AS_W, h: AS_H, kind: opts.kind || 'email', from: r.from || email.from || '', fromAddr: ((String(email.from || '').match(/[\w.+'-]+@[\w-]+(\.[\w-]+)+/) || [])[0] || '').toLowerCase(), to: email.to || '', subject: email.subject || autoTitle(email.text) || (opts.kind === 'text' ? 'Pasted text' : ''),
     date: email.date && !isNaN(email.date) ? new Date(email.date).toISOString() : null, ref: ref.toISOString(), ...resultToCard(r), raw: String(email.text || '').slice(0, 20000), engine: 'Built-in', via: opts.via || '', createdAt: Date.now(), ...(opts.ink ? { ink: opts.ink } : {}) };
   if (opts.ink && !String(email.text || '').trim()) { card.summary = 'Handwritten note — attached below. Handwriting can’t be read by the assistant; add typed text to get a summary.'; card.kind = 'ink'; card.subject = card.subject || 'Handwriting'; }
-  asCards(pg).push(card); saveNote(n, true);
+  asCards(pg).push(card); afterCardAdded(n, pg, card); saveNote(n, true);
   if (opts.rebuild !== false) buildPages(); else renderOverlay(pi);
   requestAnimationFrame(() => { const el = document.querySelector(`.as-card[data-card="${card.id}"]`); if (el) { el.classList.add('appear'); el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); setTimeout(() => el.classList.remove('appear'), 900); } });
-  toast(`🤖 ${r.actions.length} action item${r.actions.length === 1 ? '' : 's'} found`, 1800);
-  if (aiCfg().on && aiCfg().key && card.kind !== 'ink') smarten(n.id, pg.id, card.id, email, ref);
+  toast(`🤖 ${card.actions.length} action item${card.actions.length === 1 ? '' : 's'} found${card.followUp ? ' · follow-up to an earlier email' : ''}`, 1800);
+  if (aiReady() && card.kind !== 'ink') smarten(n.id, pg.id, card.id, email, ref);
   return card;
 }
 function findAsCard(id) { for (const n of S.notes) for (let i = 0; i < n.pages.length; i++) { const c = (n.pages[i].assist || { cards: [] }).cards.find(k => k.id === id); if (c) return { n, pi: i, pg: n.pages[i], c }; } return null; }
@@ -96,38 +96,53 @@ function inkThumbURL(ink, W = 360, H = 120) {
   for (const st of ink.strokes) drawStroke(x, st);
   return c.toDataURL();
 }
-function cardHTMLAs(c) {
-  const acts = c.actions || [], mt = c.meetings || [], dl = (c.deadlines || []).filter(d => !mt.some(m => m.start === d.due));
-  return `<div class="as-card ${c.kind}" data-card="${c.id}">
+function cardHTMLAs(c, ctx = {}) {
+  const acts = c.actions || [], mt = c.meetings || [], dl = openDeadlines(c).filter(d => !mt.some(m => m.start === d.due)), P = cardPrio(c), rel = ctx.rel || 0;
+  const cls = [c.kind, ctx.dim ? 'dim' : '', ctx.hl ? 'hl' : '', ctx.hlOther ? 'dimhl' : '', c.chatOpen ? 'chatting' : ''].join(' ');
+  return `<div class="as-card ${cls}" data-card="${c.id}">
     <div class="as-head" title="Hold to move"><div class="as-hl"><div class="as-from">${c.kind === 'email' ? '✉️ ' : c.kind === 'ink' ? '✍︎ ' : '📝 '}${esc(c.from || (c.kind === 'text' ? 'Text' : 'Unknown sender'))}</div>
       <div class="as-subj">${esc(c.subject || '(no subject)')}</div>
-      <div class="as-meta">${c.date ? esc(fmtWhen(c.date)) + ' · ' : ''}<span class="as-eng ${c.engine === 'Built-in' ? '' : 'ai'}" title="${esc(c.engineNote || '')}">${c.engine === 'Built-in' ? '⚙︎ Built-in' : '✨ ' + esc(c.engine)}${c.engineNote ? ' ⚠︎' : ''}</span>${c.pending ? ' <span class="as-spin">AI summarizing…</span>' : ''}</div></div>
-      <button class="as-more" data-aa="menu" aria-label="Card options">⋯</button></div>
+      <div class="as-meta">${c.date ? esc(fmtWhen(c.date)) + ' · ' : ''}<span class="as-eng ${c.engine === 'Built-in' ? '' : 'ai'}" title="${esc(c.engineNote || '')}">${c.engine === 'Built-in' ? '⚙︎ Built-in' : '✨ ' + esc(c.engine)}${c.engineNote ? ' ⚠︎' : ''}</span>${c.pending ? ' <span class="as-spin">AI summarizing…</span>' : ''}</div>
+      <div class="as-tags"><button class="as-prio p-${P.level}" data-aa="prio" title="Tap to change priority">${APRIO[P.level].icon} ${APRIO[P.level].label}</button><span class="as-why">${P.by === 'built-in' ? '⚙︎ ' : P.by === 'ai' ? '✨ ' : P.by === 'user' ? '✋ ' : ''}${esc(P.reason || '')}</span>${rel ? `<button class="as-rel" data-aa="related">🔗 Related (${rel})</button>` : ''}</div>
+      ${c.followUp ? `<div class="as-fu">↩︎ Follow-up to “${esc(c.followUp.subject || '')}” from ${esc(fmtWhen(c.followUp.date))}${c.followUp.done ? ` · ✓ ${c.followUp.done} item${c.followUp.done > 1 ? 's' : ''} done` : ''}${c.followUp.updated ? ` · ${c.followUp.updated} updated` : ''}${c.followUp.merged && !c.followUp.updated ? ` · ${c.followUp.merged} merged` : ''}</div>` : ''}</div>
+      <div class="as-hbtns"><button class="as-hb" data-aa="chat" aria-label="Ask about this email" title="Ask about this email">💬</button><button class="as-hb" data-aa="reply" aria-label="Draft reply" title="Draft reply">✉︎</button><button class="as-more" data-aa="menu" aria-label="Card options">⋯</button></div></div>
     <div class="as-body">
       <p class="as-sum">${esc(c.summary || '')}</p>
       ${(c.points || []).length ? `<h4>Key points</h4><ul class="as-pts">${c.points.map(p => `<li>${esc(p)}</li>`).join('')}</ul>` : ''}
-      <h4>Action items <span class="as-n">${acts.length}</span></h4>
-      ${acts.length ? `<ul class="as-acts">${acts.map(a => `<li class="as-act ${a.sent ? 'sent' : ''}" data-act="${a.id}"><span class="as-grip" aria-label="Drag to a board or planner">⠿</span><span class="as-at">${esc(a.text)}</span>
-        <span class="as-chips">${a.owner ? `<span class="as-own">👤 ${esc(a.owner)}</span>` : ''}${a.due ? `<span class="as-due">⏰ ${esc(fmtDueShort(a.due))}</span>` : ''}${a.sent ? `<span class="as-sent">${a.sent.to === 'board' ? '📋 on board' : '🗓 on planner'}</span>` : ''}</span></li>`).join('')}</ul>
-        <button class="as-btn" data-aa="sendall">📋 Send all to board…</button>` : '<p class="as-none">No action items found.</p>'}
+      <h4>Action items <span class="as-n">${acts.filter(a => !a.done).length}</span></h4>
+      ${acts.length ? `<ul class="as-acts">${acts.map(a => `<li class="as-act ${a.sent ? 'sent' : ''} ${a.done ? 'done' : ''}" data-act="${a.id}"><span class="as-grip" aria-label="Drag to a board or planner">⠿</span><span class="as-at" data-aa="editact" title="Tap to edit">${esc(a.text)}</span>
+        <span class="as-chips">${a.owner ? `<span class="as-own">👤 ${esc(a.owner)}</span>` : ''}${a.due ? `<span class="as-due">⏰ ${esc(fmtDueShort(a.due))}</span>` : ''}${a.sent ? `<span class="as-sent">${a.sent.to === 'board' ? '📋 on board' : '🗓 on planner'}</span>` : ''}${a.done ? `<span class="as-sent">✓ ${esc(a.doneNote || 'done')}</span>` : ''}${a.updNote ? `<span class="as-upd">↻ ${esc(a.updNote)}</span>` : ''}${a.learned ? '<span class="as-upd" title="Learned from your edits">🧠</span>' : ''}</span></li>`).join('')}</ul>` : '<p class="as-none">No action items found.</p>'}
+      <div class="as-arow">${acts.length ? '<button class="as-btn" data-aa="sendall">📋 Send all to board…</button>' : ''}<button class="as-btn" data-aa="addact">＋ Add</button></div>
       ${mt.length || dl.length ? `<h4>Deadlines &amp; meetings</h4><ul class="as-dl">${mt.map(m => `<li>📅 <b>${esc(m.title)}</b> · ${esc(fmtWhen(m.start))}${m.where ? ' · ' + esc(m.where) : ''} <button class="as-btn sm" data-aa="cal" data-m="${m.id}">📅 Add to Calendar</button></li>`).join('')}${dl.map(d => `<li>⏰ ${esc(fmtDueShort(d.due))} — ${esc(d.text)}</li>`).join('')}</ul>` : ''}
-      ${c.ink ? `<h4>Handwriting (attachment)</h4><img class="as-ink" alt="Handwriting attachment" src="${inkThumbURL(c.ink)}">` : ''}
+      ${c.ink ? `<h4>Handwriting (attachment)</h4><img class="as-ink" alt="Handwriting attachment" src="${inkThumbURL(c.ink)}">
+        ${c.transcript ? `<p class="as-tr">🔎 “${esc(c.transcript.text)}” <span class="as-eng ai">✨ ${esc(c.transcript.engine)}</span></p>` : ''}
+        <div class="as-arow">${AS.reading.has(c.id) ? '<span class="as-spin">🔎 Reading handwriting…</span>' : aiReady() ? `<button class="as-btn" data-aa="read">🔎 ${c.transcript ? 'Read again' : 'Read handwriting'}</button>` : '<button class="as-btn disabled" data-aa="read" aria-disabled="true">🔎 Read handwriting · Needs AI connected</button>'}</div>` : ''}
       ${c.raw && c.raw.trim() ? `<details class="as-raw" ${c.open ? 'open' : ''}><summary>Original text</summary><pre>${esc(c.raw)}</pre></details>` : ''}
-    </div><div class="as-resize" aria-label="Resize"></div></div>`;
+    </div>${c.chatOpen ? chatHTML(c) : ''}<div class="as-resize" aria-label="Resize"></div></div>`;
 }
 function renderAssist(pi) {
   const n = curNote(), pg = n && n.pages[pi], rec = pageEls[pi]; if (!rec || !isAssistPage(pg)) return;
+  const keep = new Map([...rec.ov.querySelectorAll('.as-card')].map(el => [el.dataset.card, [el.querySelector('.as-body') && el.querySelector('.as-body').scrollTop, el.querySelector('.as-q') && el.querySelector('.as-q').value, document.activeElement && el.contains(document.activeElement) && document.activeElement.classList.contains('as-q')]]));
   rec.ov.querySelectorAll('.as-layer').forEach(e => e.remove());
   const s = S.scale, L = document.createElement('div'); L.className = 'as-layer'; L.style.fontSize = (20 * s) + 'px';
-  L.innerHTML = `<div class="as-drop" style="left:${24 * s}px;top:${24 * s}px;width:${(PAGE_W - 48) * s}px;height:${190 * s}px">
+  const M = relatedMap(n), cards = asCards(pg), urgentN = cards.filter(c => cardPrio(c).level === 'urgent').length, filt = pg.assist.filter === 'urgent';
+  L.innerHTML = linksSVG(pg, M, s) + `<div class="as-drop" style="left:${24 * s}px;top:${24 * s}px;width:${(PAGE_W - 48) * s}px;height:${190 * s}px">
       <div class="as-dt">🤖 <b>Drop an email or text here</b></div><div class="as-ds">Drag a message from Mail (select its text first for best results) · or copy it and tap Paste</div>
-      <div class="as-dbtns"><button class="as-btn" data-aa="paste">📋 Paste</button><button class="as-btn" data-aa="lasso">✍︎ Lasso into assistant</button><span class="as-msg" hidden></span></div>
+      <div class="as-dbtns"><button class="as-btn" data-aa="paste">📋 Paste</button><button class="as-btn" data-aa="lasso">✍︎ Lasso into assistant</button>
+        <button class="as-btn ${pg.assist.sort ? 'on' : ''}" data-aa="sort" aria-pressed="${!!pg.assist.sort}">⇅ Sort by priority</button><button class="as-btn ${filt ? 'on' : ''}" data-aa="urgent" aria-pressed="${filt}">🔴 Urgent${urgentN ? ' (' + urgentN + ')' : ''}</button><span class="as-msg" hidden></span></div>
       <details class="as-dbg"><summary>What did Mail send?</summary><pre>${esc(dbgText())}</pre></details>
       <div class="as-catch" contenteditable="true" aria-label="Paste target"></div></div>`
-    + asCards(pg).map(cardHTMLAs).join('');
+    + cards.map(c => cardHTMLAs(c, { rel: relatedGroup(M, c.id).size - 1, dim: filt && cardPrio(c).level !== 'urgent', hl: AS.hl && AS.hl.has(c.id), hlOther: AS.hl && !AS.hl.has(c.id) })).join('');
   rec.ov.append(L);
-  for (const c of asCards(pg)) { const el = L.querySelector(`.as-card[data-card="${c.id}"]`); Object.assign(el.style, { left: c.x * s + 'px', top: c.y * s + 'px', width: c.w * s + 'px', height: c.h * s + 'px' }); }
+  const flip = AS.flip; AS.flip = null;
+  for (const c of cards) {
+    const el = L.querySelector(`.as-card[data-card="${c.id}"]`); Object.assign(el.style, { left: c.x * s + 'px', top: c.y * s + 'px', width: c.w * s + 'px', height: c.h * s + 'px' });
+    const k = keep.get(c.id); if (k) { const b = el.querySelector('.as-body'); if (b && k[0]) b.scrollTop = k[0]; const q = el.querySelector('.as-q'); if (q && k[1]) q.value = k[1]; if (q && k[2]) q.focus({ preventScroll: true }); }
+    const o = flip && flip.get(c.id); if (o && (o[0] !== c.x || o[1] !== c.y)) { el.style.transform = `translate(${(o[0] - c.x) * s}px, ${(o[1] - c.y) * s}px)`; el.classList.add('flipping'); }
+  }
+  if (flip) { L.querySelector('.as-links').style.opacity = 0; void L.offsetWidth; requestAnimationFrame(() => { L.querySelectorAll('.as-card.flipping').forEach(el => { el.style.transition = 'transform .5s cubic-bezier(.2,.8,.2,1)'; el.style.transform = ''; setTimeout(() => { el.style.transition = ''; el.classList.remove('flipping'); }, 560); }); const lk = L.querySelector('.as-links'); lk.style.transition = 'opacity .4s .45s'; lk.style.opacity = ''; }); }
   L.querySelectorAll('.as-raw').forEach(d => d.addEventListener('toggle', () => { const f = findAsCard(d.closest('.as-card').dataset.card); if (f && f.c.open !== d.open) { f.c.open = d.open; saveNote(f.n); } }));
+  wireChat(L, pg);
 }
 const _asOverlayHook = v7OverlayHook;
 v7OverlayHook = function (pi) { _asOverlayHook(pi); const n = curNote(); if (n && isAssistPage(n.pages[pi])) renderAssist(pi); };
@@ -181,6 +196,7 @@ PAGES.addEventListener('pointerdown', e => {
   const card = e.target.closest('.as-card'); if (!card || AS.g || (e.pointerType === 'mouse' && e.button !== 0)) return;
   const f = findAsCard(card.dataset.card); if (!f) return;
   const g = { pid: e.pointerId, type: e.pointerType, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, card, f, mode: 'pending' };
+  if (e.target.closest('.as-chat, input, textarea, canvas')) return;
   const act = e.target.closest('.as-act'), btn = e.target.closest('button, summary, a, pre, .as-catch');
   if (e.target.closest('.as-resize')) { e.preventDefault(); e.stopPropagation(); g.mode = 'resize'; g.w0 = f.c.w; g.h0 = f.c.h; card.classList.add('sizing'); AS.g = g; return; }
   if (act) { g.act = act; g.fromGrip = !!e.target.closest('.as-grip'); if (g.fromGrip) { e.preventDefault(); e.stopPropagation(); } }
@@ -322,12 +338,26 @@ PAGES.addEventListener('click', e => {
   const a = b.dataset.aa;
   if (a === 'paste') pasteButton(pi);
   else if (a === 'lasso') { selectTool('lasso'); hint('Circle handwriting or text on any page, then tap 🤖 To assistant'); }
-  else if (a === 'sendall' && f) pickBoardFor(f, f.c.actions.map(x => x.id));
+  else if (a === 'sendall' && f) pickBoardFor(f, f.c.actions.filter(x => !x.done).map(x => x.id));
+  else if (a === 'chat' && f) { f.c.chatOpen = !f.c.chatOpen; saveNote(f.n); renderAssist(pi); if (f.c.chatOpen) requestAnimationFrame(() => { const el = document.querySelector(`.as-card[data-card="${f.c.id}"] .as-chat`); if (el) { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); if (askMode() === 'kb') el.querySelector('.as-q').focus({ preventScroll: true }); } }); }
+  else if (a === 'ask' && f) askCard(f);
+  else if (a === 'askmode' && f) { localStorage.setItem('assistAskMode', askMode() === 'kb' ? 'ink' : 'kb'); rerenderAssist(); if (askMode() === 'kb') requestAnimationFrame(() => { const q = document.querySelector(`.as-card[data-card="${f.c.id}"] .as-q`); if (q) q.focus({ preventScroll: true }); }); }
+  else if (a === 'askclr' && f) { AS.drafts.delete(f.c.id); renderAssist(pi); }
+  else if (a === 'reply' && f) openReply(f);
+  else if (a === 'prio' && f) prioMenu(f);
+  else if (a === 'related' && f) showRelated(f);
+  else if (a === 'editact' && f) editAction(f, b.closest('.as-act').dataset.act);
+  else if (a === 'addact' && f) addActionManually(f);
+  else if (a === 'read' && f) readCardInk(f);
+  else if (a === 'sort') { const pg = curNote().pages[pi]; pushHistory(); pg.assist.sort = !pg.assist.sort; if (pg.assist.sort) arrangeByPrio(pg, true); saveNote(curNote(), true); renderAssist(pi); toast(pg.assist.sort ? '⇅ Sorted by priority — new cards slot in automatically' : 'Free arrangement', 1600); }
+  else if (a === 'urgent') { const pg = curNote().pages[pi]; pg.assist.filter = pg.assist.filter === 'urgent' ? '' : 'urgent'; saveNote(curNote()); renderAssist(pi); }
   else if (a === 'cal' && f) { const m = f.c.meetings.find(x => x.id === b.dataset.m); if (m) downloadIcs({ type: 'task', note: f.n, page: f.pi, obj: { id: m.id, text: m.title, due: m.start, end: m.end, where: m.where, repeat: '' } }); }
   else if (a === 'menu' && f) actionSheet(f.c.subject || 'Assistant card', [
-    ...(f.c.actions.length ? [{ label: '📋 Send all action items to a board…', fn: () => pickBoardFor(f, f.c.actions.map(x => x.id)) }] : []),
+    ...(f.c.actions.length ? [{ label: '📋 Send all action items to a board…', fn: () => pickBoardFor(f, f.c.actions.filter(x => !x.done).map(x => x.id)) }] : []),
+    { label: '✉︎ Draft reply…', fn: () => openReply(f) }, { label: '🚦 Priority…', fn: () => prioMenu(f) },
+    ...(relatedGroup(relatedMap(f.n), f.c.id).size > 1 ? [{ label: '🗂 Stack related', fn: () => stackGroup(f) }] : []),
     ...(aiCfg().key && f.c.raw ? [{ label: '✨ Re-summarize with ' + aiCfg().model, fn: () => smarten(f.n.id, f.pg.id, f.c.id, { from: f.c.from, to: f.c.to, subject: f.c.subject, text: f.c.raw }, new Date(f.c.ref || Date.now())) }] : []),
-    ...(f.c.raw ? [{ label: '⚙︎ Re-summarize with the built-in engine', fn: () => { pushHistory(); Object.assign(f.c, resultToCard(AssistEngine.extract({ from: f.c.from, subject: f.c.subject, date: new Date(f.c.ref || Date.now()), text: f.c.raw })), { engine: 'Built-in', engineNote: '' }); saveNote(f.n, true); renderAssist(f.pi); } }] : []),
+    ...(f.c.raw ? [{ label: '⚙︎ Re-summarize with the built-in engine', fn: () => { pushHistory(); Object.assign(f.c, resultToCard(applyPrefsToResult(AssistEngine.extract({ from: f.c.from, subject: f.c.subject, date: new Date(f.c.ref || Date.now()), text: f.c.raw, prefs: memPrefs() }))), { engine: 'Built-in', engineNote: '' }); if (f.c.prio && f.c.prio.by === 'ai') delete f.c.prio; saveNote(f.n, true); renderAssist(f.pi); } }] : []),
     { label: '🗑 Delete card', danger: true, fn: () => { pushHistory(); f.pg.assist.cards = f.pg.assist.cards.filter(x => x !== f.c); saveNote(f.n, true); renderAssist(f.pi); undoToast('Assistant card deleted'); } }]);
 });
 
@@ -338,7 +368,7 @@ async function lassoToAssistant() {
   const texts = (sel.texts || []).map(id => pg.texts.find(t => t.id === id)).filter(Boolean).sort((a, b) => a.y - b.y || a.x - b.x).map(t => t.text);
   const tasks = (sel.tasks || []).map(id => pg.tasks.find(t => t.id === id)).filter(t => t && t.text).map(t => '- ' + t.text);
   const strokes = pg.strokes.filter(s => sel.ids.includes(s.id));
-  const text = [...texts, ...tasks].join('\n').trim();
+  const text = (AS.readText || [...texts, ...tasks].join('\n')).trim();
   if (!text && !strokes.length) { toast('Select some text or handwriting first'); return; }
   let ink = null;
   if (strokes.length) { let bb = [Infinity, Infinity, -Infinity, -Infinity]; for (const s of strokes) { const b = s.bb || bbox(s.points); bb = [Math.min(bb[0], b[0]), Math.min(bb[1], b[1]), Math.max(bb[2], b[2]), Math.max(bb[3], b[3])]; } ink = { strokes: JSON.parse(JSON.stringify(strokes)), bb }; }
@@ -361,46 +391,47 @@ $('#lassoAssist').onclick = lassoToAssistant;
 const AI_PRESETS = { xai: { label: 'xAI Grok', base: 'https://api.x.ai/v1', model: 'grok-4.7' }, openai: { label: 'OpenAI', base: 'https://api.openai.com/v1', model: 'gpt-6-luna' }, custom: { label: 'Custom (OpenAI-compatible)', base: '', model: '' } };
 const AI_URL_OK = /^(https:\/\/|http:\/\/(localhost|127\.0\.0\.1|\[::1\]|[\w-]+\.local)(:\d+)?(\/|$))/i;
 function aiCfg() { try { return { on: false, provider: 'xai', base: AI_PRESETS.xai.base, model: AI_PRESETS.xai.model, key: '', ...JSON.parse(localStorage.getItem('assistAI') || '{}') }; } catch (_) { return { on: false }; } }
-const AI_SYS = `You are a personal assistant that reads one email (or note) and returns ONLY a JSON object, no prose, matching:
-{"summary": string (2-3 sentences, plain), "key_points": string[] (max 5, short facts, not actions), "action_items": [{"text": string (imperative, what to do), "owner": string ("You" for the reader, else a first name or "Team"), "due": string|null (ISO 8601 local "YYYY-MM-DDTHH:mm" or null)}], "meetings": [{"title": string, "start": string (ISO 8601 local), "end": string|null, "where": string|null}]}
+const AI_SYS = `TASK: summarize
+You are a personal assistant that reads one email (or note) and returns ONLY a JSON object, no prose, matching:
+{"summary": string (2-3 sentences, plain), "key_points": string[] (max 5, short facts, not actions), "action_items": [{"text": string (imperative, what to do), "owner": string ("You" for the reader, else a first name or "Team"), "due": string|null (ISO 8601 local "YYYY-MM-DDTHH:mm" or null)}], "meetings": [{"title": string, "start": string (ISO 8601 local), "end": string|null, "where": string|null}],
+ "priority": {"level": "urgent"|"high"|"normal"|"low", "reason": string (one short line)}, "related_ids": string[] (ids of EARLIER emails below on the same topic/project/thread), "follow_up_of": string|null (id of the earlier email this one follows up), "completed_action_ids": string[] (ids of earlier action items this email says are done)}
 Ignore quoted replies, signatures and disclaimers. Resolve relative dates ("Friday", "EOD", "next Tue") against the email date. Use 17:00 for date-only deadlines. Never invent facts.`;
-async function aiSummarize(email, ref) {
-  const c = aiCfg(); if (!c.key || !c.base || !c.model) throw new Error('not configured'); if (!AI_URL_OK.test(c.base)) throw new Error('base URL must be https');
-  if (navigator.onLine === false) throw new Error('offline');
+function aiContext(cardId) {
+  const n = curNote(); if (!n) return [];
+  return n.pages.flatMap(pg => isAssistPage(pg) ? asCards(pg) : []).filter(c => c.id !== cardId).slice(-10).map(c => ({ id: c.id, subject: c.subject, from: c.from, date: c.date, summary: String(c.summary || '').slice(0, 200), open_actions: (c.actions || []).filter(a => !a.done).map(a => ({ id: a.id, text: a.text })) }));
+}
+async function aiSummarize(email, ref, ctx = []) {
   const body = String(email.text || '').slice(0, 14000);
-  const user = `Email date: ${ref.toString()}\nFrom: ${email.from || ''}\nSubject: ${email.subject || ''}\n\n${body}`;
-  const call = async rf => {
-    const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 30000);
-    try {
-      const res = await fetch(c.base.replace(/\/+$/, '') + '/chat/completions', { method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + c.key },
-        body: JSON.stringify({ model: c.model, messages: [{ role: 'system', content: AI_SYS }, { role: 'user', content: user }], ...(rf ? { response_format: { type: 'json_object' } } : {}) }) });
-      if (!res.ok) { const e = new Error('HTTP ' + res.status); e.status = res.status; throw e; }
-      return res.json();
-    } finally { clearTimeout(to); }
-  };
-  let j; try { j = await call(true); } catch (e) { if (e.status === 400) j = await call(false); else throw e; }
-  let txt = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content; if (Array.isArray(txt)) txt = txt.map(p => p.text || '').join('');
-  txt = String(txt || '').replace(/^```(?:json)?\s*|\s*```$/g, '').trim(); const m = txt.match(/\{[\s\S]*\}/); const o = JSON.parse(m ? m[0] : txt);
+  const user = `Email date: ${ref.toString()}\nFrom: ${email.from || ''}\nSubject: ${email.subject || ''}\n\n${body}${ctx.length ? '\n\n---\nEarlier emails on this whiteboard (for related_ids / follow_up_of / completed_action_ids):\n' + JSON.stringify(ctx) : ''}`;
+  const o = await aiJSON([{ role: 'system', content: AI_SYS + prefsBlock() }, { role: 'user', content: user }]);
   const isoOk = s => { if (!s) return null; const d = new Date(s); if (!isNaN(d)) return d.toISOString(); const p = AssistEngine.parseDates(String(s), ref)[0]; return p ? p.date.toISOString() : null; };
   if (typeof o.summary !== 'string' || !Array.isArray(o.action_items)) throw new Error('bad JSON shape');
+  const ids = new Set(ctx.map(c => c.id)), aids = new Set(ctx.flatMap(c => c.open_actions.map(a => a.id))), lv = o.priority && String(o.priority.level || '').toLowerCase();
   return { summary: o.summary.trim(), points: (o.key_points || []).filter(x => typeof x === 'string').slice(0, 6),
     actions: o.action_items.filter(a => a && a.text).map(a => ({ text: String(a.text).trim(), owner: a.owner ? String(a.owner) : 'You', due: isoOk(a.due), dueText: a.due ? String(a.due) : '' })),
-    meetings: (o.meetings || []).filter(m => m && m.title && isoOk(m.start)).map(m => ({ title: String(m.title), start: isoOk(m.start), end: isoOk(m.end), where: m.where ? String(m.where) : '' })), deadlines: [] };
+    meetings: (o.meetings || []).filter(m => m && m.title && isoOk(m.start)).map(m => ({ title: String(m.title), start: isoOk(m.start), end: isoOk(m.end), where: m.where ? String(m.where) : '' })), deadlines: [],
+    prio: APRIO[lv] ? { level: lv, reason: String(o.priority.reason || '').slice(0, 120), by: 'ai' } : null,
+    related: (o.related_ids || []).filter(x => ids.has(x)), followUpOf: ids.has(o.follow_up_of) ? o.follow_up_of : null, done: (o.completed_action_ids || []).filter(x => aids.has(x)) };
 }
 async function smarten(noteId, pageId, cardId, email, ref) {
   const find = () => { const f = findAsCard(cardId); return f && f.n.id === noteId ? f : null; };
   let f = find(); if (!f) return; f.c.pending = true; if (f.n.id === S.cur) renderAssist(f.pi);
   try {
-    const r = await aiSummarize(email, ref); f = find(); if (!f) return;
+    const r = await aiSummarize(email, ref, f.n.id === S.cur ? aiContext(cardId) : []); f = find(); if (!f) return;
     const sentById = new Map(f.c.actions.filter(a => a.sent).map(a => [a.text.toLowerCase(), a.sent]));
-    Object.assign(f.c, resultToCard(r), { engine: aiCfg().model || 'AI', engineNote: '' });
+    Object.assign(f.c, resultToCard(r), { engine: aiModel(), engineNote: '' });
     f.c.actions.forEach(a => { const s = sentById.get(a.text.toLowerCase()); if (s) a.sent = s; });
+    if (r.prio && !(f.c.prio && f.c.prio.by === 'user') && !memPrefs().senderPrio[senderKey(f.c)]) f.c.prio = r.prio;
+    f.c.aiRelated = r.related;
+    const prevId = (f.c.followUp && f.c.followUp.id) || r.followUpOf, prev = prevId && findAsCard(prevId);
+    if (prev && prev.n.id === f.n.id) applyFollowUp(f.n, f.c, prev.c, r.done);
+    if (f.pg.assist.sort) arrangeByPrio(f.pg, true);
   } catch (err) {
     f = find(); if (!f) return;
     f.c.engineNote = 'AI unavailable (' + (err.name === 'AbortError' ? 'timed out' : err.message) + ') — built-in summary shown';
     toast('✨ AI summary failed — kept the built-in one', 2600);
   }
-  delete f.c.pending; saveNote(f.n, true); if (f.n.id === S.cur) renderAssist(f.pi);
+  delete f.c.pending; saveNote(f.n, true); if (f.n.id === S.cur) rerenderAssist();
 }
 function aiSettings() {
   const c = aiCfg(), w = modalWrap('aiWrap');
@@ -419,8 +450,8 @@ function aiSettings() {
   w.onclick = async e => {
     const a = e.target.closest('[data-ai]'); if (!a) return; const res = $w('.ai-res');
     if (a.dataset.ai === 'x') w.hidden = true;
-    if (a.dataset.ai === 'clear') { localStorage.removeItem('assistAI'); w.hidden = true; toast('AI key removed — using the built-in assistant'); }
-    if (a.dataset.ai === 'save') { const v = read(); if (v.on && (!v.key || !AI_URL_OK.test(v.base) || !v.model)) { res.hidden = false; res.textContent = 'Add an https base URL (http only for localhost / .local), a model and your key (or turn AI off).'; return; } localStorage.setItem('assistAI', JSON.stringify(v)); w.hidden = true; toast(v.on ? '✨ AI summaries on (' + v.model + ')' : 'AI summaries off'); }
+    if (a.dataset.ai === 'clear') { localStorage.removeItem('assistAI'); w.hidden = true; syncReadBtn(); rerenderAssist(); toast('AI key removed — using the built-in assistant'); }
+    if (a.dataset.ai === 'save') { const v = read(); if (v.on && (!v.key || !AI_URL_OK.test(v.base) || !v.model)) { res.hidden = false; res.textContent = 'Add an https base URL (http only for localhost / .local), a model and your key (or turn AI off).'; return; } localStorage.setItem('assistAI', JSON.stringify(v)); w.hidden = true; syncReadBtn(); rerenderAssist(); toast(v.on ? '✨ AI summaries on (' + v.model + ')' : 'AI summaries off'); }
     if (a.dataset.ai === 'test') { const prev = localStorage.getItem('assistAI'); localStorage.setItem('assistAI', JSON.stringify(read())); res.hidden = false; res.textContent = 'Testing…';
       try { const r = await aiSummarize({ from: 'Test', subject: 'Test', text: 'Hi, can you send me the report by Friday? Thanks.' }, new Date()); res.textContent = '✓ Works — ' + r.actions.length + ' action item(s) found.'; }
       catch (err) { res.textContent = '✗ ' + (err.name === 'AbortError' ? 'Timed out' : err.message) + (err.message === 'Failed to fetch' ? ' (network or the provider blocks browser requests)' : ''); }
@@ -439,7 +470,7 @@ function drawAssistExport(ctx, pg) {
     ctx.fillStyle = '#f5f5fa'; ctx.strokeStyle = '#c7c7d9'; ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(c.x, c.y, c.w, c.h, 14) : ctx.rect(c.x, c.y, c.w, c.h); ctx.fill(); ctx.stroke();
     ctx.save(); ctx.beginPath(); ctx.rect(c.x, c.y, c.w, c.h); ctx.clip();
     let y = c.y + 14; const x = c.x + 16, w = c.w - 32;
-    y = wrap(c.from || '', x, y, w, 20, `600 15px ${FONT}`, '#555', 1); y = wrap(c.subject || '', x, y, w, 24, `800 19px ${FONT}`, '#111', 2); y += 6;
+    y = wrap((typeof cardPrio === 'function' ? APRIO[cardPrio(c).level].label + ' priority · ' : '') + (c.from || ''), x, y, w, 20, `600 15px ${FONT}`, '#555', 1); y = wrap(c.subject || '', x, y, w, 24, `800 19px ${FONT}`, '#111', 2); y += 6;
     y = wrap(c.summary || '', x, y, w, 21, `16px ${FONT}`, '#222', 6); y += 8;
     for (const p of c.points || []) y = wrap('• ' + p, x, y, w, 20, `15px ${FONT}`, '#333', 2);
     if ((c.actions || []).length) { y += 6; y = wrap('Action items', x, y, w, 22, `800 15px ${FONT}`, '#4f46e5', 1); for (const a of c.actions) y = wrap('☐ ' + a.text + (a.owner ? ' — ' + a.owner : '') + (a.due ? ' · ' + fmtWhen(a.due) : ''), x, y, w, 20, `15px ${FONT}`, '#111', 2); }
