@@ -230,6 +230,7 @@ $('#pages').addEventListener('click', e => {
 
 function renderOverlay(pi) {
   const note = curNote(), rec = pageEls[pi]; if (!rec) return;
+  if (isBoardPage(note.pages[pi])) { rec.ov.innerHTML = ''; renderBoard(pi); return; }   // v11 Project Board page
   const pdfPg = note.pages[pi] && note.pages[pi].bg && note.pages[pi].bg.type === 'pdf';
   rec.el.classList.toggle('pdf-page', !!pdfPg);
   if (pdfPg && !renderLight) { renderLight = true; try { return renderOverlay(pi); } finally { renderLight = false; } }
@@ -620,6 +621,7 @@ function openEditor(item, isNew) {
   $('#fIcs').style.display = o.due ? '' : 'none';
   const th = $('#sheetThumb'); th.innerHTML = '';
   if (o.kind === 'ink') { const u = inkThumb(item.note, item.page, o, 400, 160); if (u) th.innerHTML = `<img src="${u}" alt="">`; }
+  if (o.kind === 'card') { $('#sheetTitle').textContent = 'Card'; $('#fTitle').placeholder = 'Card title (optional)'; const u = cardThumb(o, 400, 146); if (u) th.innerHTML = `<img src="${u}" alt="">`; }
   $('#sheetWrap').hidden = false;
   if (!(o.kind === 'ink') && isNew) setTimeout(() => $('#fTitle').focus(), 50);
 }
@@ -678,7 +680,7 @@ function allItems() {
   }
   return out;
 }
-const itemTitle = it => it.type === 'note' ? (it.obj.title || it.note.title) : (it.obj.text || (it.obj.kind === 'ink' ? 'Handwritten task' : 'Untitled task'));
+const itemTitle = it => it.type === 'note' ? (it.obj.title || it.note.title) : (it.obj.text || (it.obj.kind === 'ink' ? 'Handwritten task' : it.obj.kind === 'card' ? ((it.obj.strokes || []).length ? 'Handwritten card' : 'Untitled card') : 'Untitled task'));
 function toggleDone(it) {
   const o = it.obj;
   if (!o.done && o.repeat && o.due) { let d = o.due; do d = advance(d, o.repeat); while (new Date(d) < Date.now()); o.due = d; o.notified = false; toast('Done — next: ' + fmtDue(d)); }
@@ -738,7 +740,7 @@ function renderPanel() {
 }
 function rowHTML(it) {
   const o = it.obj, od = o.due && !o.done && new Date(o.due) < Date.now();
-  const thumb = o.kind === 'ink' ? inkThumb(it.note, it.page, o) : '';
+  const thumb = o.kind === 'ink' ? inkThumb(it.note, it.page, o) : o.kind === 'card' ? cardThumb(o) : '';
   return `<div class="rwrap" data-id="${o.id}"><div class="rbg-done">${o.done ? '↺ Not done' : '✓ Done'}</div>
     <div class="ractions"><button data-sa="1h">⏰ 1 hour</button><button data-sa="tomorrow">🌅 Tmrw 9am</button><button data-sa="delete" class="del">🗑 Delete</button></div>
     <div class="ritem ${o.done ? 'done' : ''}" data-id="${o.id}" role="button">
@@ -758,6 +760,7 @@ function jumpTo(noteId, taskId) {
   const n = curNote(); let pi = -1, t;
   n.pages.forEach((pg, i) => { const f = pg.tasks.find(x => x.id === taskId); if (f) { pi = i; t = f; } });
   if (pi < 0) return;
+  if (t.kind === 'card') { boardFlash(pi, taskId); return; }
   requestAnimationFrame(() => {
     const rec = pageEls[pi], w = $('#pages');
     w.scrollTo({ top: rec.el.offsetTop + t.y * S.scale - w.clientHeight / 3, behavior: 'smooth' });
@@ -928,7 +931,7 @@ function createNote(nbId, kind) {
     n.pages = [makeTemplatePage(kind, n)];
     if (['lined', 'grid', 'blank'].includes(kind)) n.paper = kind;
     const md = new Date().toLocaleDateString([], { month: 'short', day: 'numeric' });
-    if (kind === 'meeting') n.title = 'Meeting — ' + md; if (kind === 'planner') n.title = 'Planner — ' + md;
+    if (kind === 'meeting') n.title = 'Meeting — ' + md; if (kind === 'planner') n.title = 'Planner — ' + md; if (kind === 'board') n.title = 'Project Board';
   }
   n.order = -1; S.notes.push(n); saveNote(n, true); normalizeOrder(); openNote(n.id);
   if (isDrawer()) setSidebar(false);

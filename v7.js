@@ -147,12 +147,13 @@ function relayoutPlanner(pg) {
 }
 
 /* ---------- templates: choose when adding a page or creating a note ---------- */
-const TEMPLATES = [['lined', '📝 Lined'], ['grid', '▦ Grid'], ['blank', '⬜ Blank'], ['meeting', '👥 Meeting Notes'], ['planner', '🗓 Daily Planner']];
+const TEMPLATES = [['lined', '📝 Lined'], ['grid', '▦ Grid'], ['blank', '⬜ Blank'], ['meeting', '👥 Meeting Notes'], ['planner', '🗓 Daily Planner'], ['board', '📋 Project Board']];
 function makeTemplatePage(kind, note, date) {
   const p = newPage();
   if (['blank', 'lined', 'grid'].includes(kind)) { p.paper = kind; return p; }
   p.paper = 'blank';
   if (kind === 'meeting') p.bg = { type: 'template', name: 'meeting', date: date || todayISO() };
+  if (kind === 'board') { p.bg = { type: 'template', name: 'board' }; p.board = newBoard(); }
   if (kind === 'planner') {
     const d = plannerDefaults(), last = note && [...note.pages].reverse().find(q => q.bg && q.bg.name === 'planner');
     p.bg = { type: 'template', name: 'planner', date: date || (last ? addDaysISO(last.bg.date, 1) : todayISO()), start: d.start, end: d.end, slot: +d.slot };
@@ -423,7 +424,7 @@ function carryMove() {
   if (!st.hidden && els.includes(st)) target = { type: 'send' };
   else {
     const pageEl = els.find(e => e.classList && e.classList.contains('page'));
-    if (pageEl) {
+    if (pageEl && !isBoardPage(curNote().pages[+pageEl.dataset.pi])) {   // ink can't be dropped under a Project Board
       const pi = +pageEl.dataset.pi, pg = curNote().pages[pi], r = pageEl.getBoundingClientRect(), p = [(c.x - r.left) / s, (c.y - r.top) / s];
       const G = P.G, plannable = P.kind === 'task' || (P.kind === 'sel' && G.strokes.length && !G.tasks.length && !G.texts.length && !G.images.length && !G.sections.length);
       if (plannable && pg.bg && pg.bg.name === 'planner') { const sl = slotAtY(pg.bg, p[1]); if (sl) target = { type: 'slot', pi, slot: sl }; }
@@ -685,6 +686,7 @@ async function importPdf(file, nbId) {
 /* ---------- PDF export (renders each page; tiny built-in PDF writer) ---------- */
 let renderLight = false;
 function drawOverlaysForExport(ctx, pg, note) {
+  if (isBoardPage(pg)) { drawBoardExport(ctx, pg); return; }
   ctx.save(); ctx.textBaseline = 'alphabetic';
   for (const sc of pg.sections || []) {
     const label = secNumber(note, pg, sc) + (sc.style || '.'); ctx.font = `800 28px ${FONT}`; const w = Math.max(SEC_H, ctx.measureText(label).width + 18);
