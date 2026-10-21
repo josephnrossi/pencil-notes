@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
+  <script src="authcap.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Pencil Notes</title>
@@ -51,6 +52,7 @@
       <button class="icon-btn" id="todayBtn" aria-label="Today" title="Today">☀️</button>
       <button class="icon-btn" id="focusBtn" aria-label="Full screen" title="Full screen writing">⤢</button>
       <button class="icon-btn" id="noteMenuBtn" aria-label="Note options" title="Note options">⋯</button>
+      <button class="icon-btn" id="quotesBtn" aria-label="Quote Board" title="Quote Board">💲</button>
       <button class="icon-btn" id="togglePanel" aria-label="Reminders" title="Reminders &amp; tasks">🔔<span id="dueBadge" class="badge" hidden></span></button>
     </header>
 
@@ -106,6 +108,25 @@
     </div>
   </main>
 
+
+  <aside id="qbDrawer" aria-label="Quote Board" hidden>
+    <div id="qbResize" role="separator" aria-label="Drag to resize the Quote Board" title="Drag to resize · double-tap to switch half / full"><i></i></div>
+    <header id="qbHead">
+      <div class="qb-title"><b>💲 Quote Board</b><small id="qbSync">Email sync off</small></div>
+      <div class="spacer"></div>
+      <button class="qb-btn qb-refresh" id="qbRefresh" aria-label="Refresh — check email for new RFQs"><i>⟳</i><span>Refresh</span></button>
+      <button class="qb-btn" id="qbAdd" aria-label="Add a quote"><i>＋</i><span>Quote</span></button>
+      <button class="qb-btn icon" id="qbUndo" aria-label="Undo on the Quote Board" disabled>↶</button>
+      <button class="qb-btn icon" id="qbRedo" aria-label="Redo on the Quote Board" disabled>↷</button>
+      <button class="qb-btn icon" id="qbLock" aria-label="Lock the Quote Board">🔒</button>
+      <button class="qb-btn icon" id="qbMore" aria-label="Quote Board options">⋯</button>
+      <button class="qb-btn icon" id="qbClose" aria-label="Close the Quote Board">✕</button>
+      <div id="qbPull" aria-hidden="true"><span>↓ Pull to check email</span></div>
+    </header>
+    <div id="qbHost" data-pi="-1"></div>
+  </aside>
+  <button id="qbTab" aria-label="Open the Quote Board" title="Quote Board — tap or swipe in from the right edge"><span>💲</span><b>Quotes</b><em id="qbTabBadge" hidden></em></button>
+
   <aside id="panel" aria-label="Reminders and tasks">
     <div class="panel-head">
       <h2>Reminders &amp; Tasks</h2>
@@ -160,5 +181,7 @@
   <script src="lock.js"></script>
   <script src="record.js"></script>
   <script src="audit.js"></script>
+  <script src="quotes.js"></script>
+  <script src="graph.js"></script>
 </body>
 </html>

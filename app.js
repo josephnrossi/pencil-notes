@@ -79,13 +79,13 @@ async function load() {
     } else {
       const nb = { id: uid('b'), name: 'Notes', createdAt: Date.now() };
       S.notebooks.push(nb); await saveNotebook(nb);
-      for (const n of S.notes) if (!n.notebookId || !S.notebooks.find(b => b.id === n.notebookId)) { n.notebookId = nb.id; await DB.put('notes', n); }
+      for (const n of S.notes) if (n.id !== 'quoteboard' && (!n.notebookId || !S.notebooks.find(b => b.id === n.notebookId))) { n.notebookId = nb.id; await DB.put('notes', n); }
     }
   }
   localStorage.setItem('seeded', '1');
   for (const n of S.notes) { n.reminders = n.reminders || []; n.v = 2; for (const p of n.pages) { p.strokes ||= []; p.texts ||= []; p.tasks ||= []; p.images ||= []; p.labels ||= []; p.sections ||= []; if (!('bg' in p)) p.bg = null; if (!('paper' in p)) p.paper = null; } }
   normalizeOrder();
-  if (!S.notes.length) { const n = makeNote(S.notebooks[0].id); S.notes.push(n); await DB.put('notes', n); }
+  if (!S.notes.some(n => n.id !== 'quoteboard')) { const n = makeNote(S.notebooks[0].id); S.notes.push(n); await DB.put('notes', n); }
 }
 
 /* ---------- utilities ---------- */
