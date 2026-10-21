@@ -2,7 +2,7 @@
    One ＋ Insert menu, one grouped Settings screen, a Gestures sheet, a short first-run tour,
    Undo for every delete, a safe importer, storage-full handling and lock hardening.
    Nothing is removed — features are only reached through fewer, more consistent doors. */
-const APP_VERSION = 'v19';
+const APP_VERSION = 'v20';
 
 /* ---------- import sanitizer: hostile backups must not inject markup ----------
    Rendering escapes free text, but ids/enums/colors are interpolated into attributes, so they are
@@ -156,7 +156,7 @@ setTimeout(() => { if (!localStorage.getItem('persistAsked') && S.notes.length) 
 /* ======================= UI: one ＋ Insert menu ======================= */
 const INSERT_ITEMS = [
   { tool: 'task', ic: '☑️', l: 'Task', s: 'Tap the page to drop a checkbox' },
-  { tool: 'section', ic: '§', l: 'Section number', s: 'Tap the start of a line' },
+  { tool: 'section', ic: '1.', l: 'Number', s: 'Numbered section — tap the start of a line; drag the number to move the section' },
   { id: 'photoBtn', ic: '🖼', l: 'Photo', s: 'From Photos or the camera' },
   { id: 'stickerBtn', ic: '⭐', l: 'Sticker', s: 'Stars, arrows, tabs…' },
   { id: 'remindNoteBtn', ic: '⏰', l: 'Reminder', s: 'Remind me about this note' },
@@ -166,7 +166,7 @@ const INSERT_ITEMS = [
 ];
 function buildInsert() {
   const misc = $('#toolbar .group.misc');
-  $('#toolbar .group.tools [data-tool="task"]')?.remove(); $('#toolbar .group.tools [data-tool="section"]')?.remove();
+  $('#toolbar .group.tools [data-tool="task"]')?.remove();   // v20: the 1. Number tool stays visible in the toolbar (and is in ＋ Insert too)
   const btn = document.createElement('button');
   Object.assign(btn, { id: 'insertBtn', className: 'ins-btn', title: 'Insert a task, section number, photo, sticker, reminder, recording, page or PDF' });
   btn.setAttribute('aria-haspopup', 'menu'); btn.setAttribute('aria-expanded', 'false'); btn.innerHTML = '<b>＋</b><span>Insert</span>';
@@ -194,7 +194,7 @@ function buildInsert() {
 buildInsert();
 { const _rt = renderToolbar; renderToolbar = function () {
     _rt(); const b = $('#insertBtn'); if (!b) return;
-    const sub = INSERT_ITEMS.find(i => i.tool && i.tool === S.tool);
+    const sub = INSERT_ITEMS.find(i => i.tool && i.tool === S.tool && !document.querySelector(`#toolbar .group.tools [data-tool="${i.tool}"]`));
     b.classList.toggle('on', !!sub); b.innerHTML = sub ? `<b>${sub.ic}</b><span>${sub.l.split(' ')[0]} ▾</span>` : '<b>＋</b><span>Insert</span>';
   }; renderToolbar(); }
 
