@@ -31,7 +31,7 @@ const Assets = {
   },
   async ready(id) { const v = this.bitmap(id); if (v !== undefined) return v; await this.loading.get(id); return this.bitmaps.get(id); },
 };
-const pageAssetIds = pg => [pg.bg && pg.bg.asset, ...(pg.images || []).map(i => i.asset)].filter(Boolean);
+const pageAssetIds = pg => [pg.bg && pg.bg.asset, ...(pg.images || []).map(i => i.asset), ...((pg.rec && pg.rec.segs) || []).map(g => g.asset)].filter(Boolean);
 function onAssetLoaded(id) {
   const n = curNote(); if (!n) return;
   n.pages.forEach((pg, i) => { if (pageAssetIds(pg).includes(id)) renderPageInk(i); });
@@ -53,7 +53,7 @@ function drawPageBackground(ctx, note, pg) {
     if (im) ctx.drawImage(im, x, 0, w, h); else { ctx.fillStyle = '#888'; ctx.font = `24px ${FONT}`; ctx.fillText('Loading PDF page…', 40, 60); }
     return;
   }
-  if (bg && bg.type === 'template') { drawPaper(ctx, 'blank'); if (bg.name === 'meeting') drawMeeting(ctx, bg); else if (bg.name === 'planner') drawPlanner(ctx, bg); else if (bg.name === 'assistant') drawAssistBg(ctx); return; }
+  if (bg && bg.type === 'template') { drawPaper(ctx, bg.name === 'recording' ? 'lined' : 'blank'); if (bg.name === 'meeting') drawMeeting(ctx, bg); else if (bg.name === 'planner') drawPlanner(ctx, bg); else if (bg.name === 'assistant') drawAssistBg(ctx); return; }
   drawPaper(ctx, pg.paper || note.paper);
 }
 function drawPageImages(ctx, pg) {
@@ -147,12 +147,13 @@ function relayoutPlanner(pg) {
 }
 
 /* ---------- templates: choose when adding a page or creating a note ---------- */
-const TEMPLATES = [['lined', '📝 Lined'], ['grid', '▦ Grid'], ['blank', '⬜ Blank'], ['meeting', '👥 Meeting Notes'], ['planner', '🗓 Daily Planner'], ['board', '📋 Project Board'], ['assistant', '🤖 Assistant']];
+const TEMPLATES = [['lined', '📝 Lined'], ['grid', '▦ Grid'], ['blank', '⬜ Blank'], ['meeting', '👥 Meeting Notes'], ['planner', '🗓 Daily Planner'], ['board', '📋 Project Board'], ['assistant', '🤖 Assistant'], ['recording', '🎙 Meeting Recording']];
 function makeTemplatePage(kind, note, date) {
   const p = newPage();
   if (['blank', 'lined', 'grid'].includes(kind)) { p.paper = kind; return p; }
   p.paper = 'blank';
-  if (kind === 'meeting') p.bg = { type: 'template', name: 'meeting', date: date || todayISO() };
+  if (kind === 'meeting') { p.bg = { type: 'template', name: 'meeting', date: date || todayISO() }; if (typeof newRec === 'function') p.rec = newRec(); }
+  if (kind === 'recording') { p.bg = { type: 'template', name: 'recording', date: date || todayISO() }; p.rec = newRec(); }
   if (kind === 'board') { p.bg = { type: 'template', name: 'board' }; p.board = newBoard(); }
   if (kind === 'assistant') { p.bg = { type: 'template', name: 'assistant' }; p.assist = { cards: [] }; }
   if (kind === 'planner') {
@@ -692,6 +693,7 @@ let renderLight = false;
 function drawOverlaysForExport(ctx, pg, note) {
   if (isBoardPage(pg)) { drawBoardExport(ctx, pg); return; }
   if (pg.assist) drawAssistExport(ctx, pg);
+  if (pg.rec && typeof drawRecExport === 'function') drawRecExport(ctx, pg);
   ctx.save(); ctx.textBaseline = 'alphabetic';
   for (const sc of pg.sections || []) {
     const label = secNumber(note, pg, sc) + (sc.style || '.'); ctx.font = `800 28px ${FONT}`; const w = Math.max(SEC_H, ctx.measureText(label).width + 18);

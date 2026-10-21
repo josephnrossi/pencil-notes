@@ -96,7 +96,13 @@ function inkThumbURL(ink, W = 360, H = 120) {
   for (const st of ink.strokes) drawStroke(x, st);
   return c.toDataURL();
 }
+function actsHTML(c) {
+  const acts = c.actions || [];
+  return acts.length ? `<ul class="as-acts">${acts.map(a => `<li class="as-act ${a.sent ? 'sent' : ''} ${a.done ? 'done' : ''}" data-act="${a.id}"><span class="as-grip" aria-label="Drag to a board or planner">⠿</span><span class="as-at" data-aa="editact" title="Tap to edit">${esc(a.text)}</span>
+        <span class="as-chips">${a.prio && a.prio !== 'normal' && typeof APRIO !== 'undefined' && APRIO[a.prio] ? `<span class="as-aprio p-${a.prio}">${APRIO[a.prio].icon} ${APRIO[a.prio].label}</span>` : ''}${a.owner ? `<span class="as-own">👤 ${esc(a.owner)}</span>` : ''}${a.due ? `<span class="as-due">⏰ ${esc(fmtDueShort(a.due))}</span>` : ''}${a.sent ? `<span class="as-sent">${a.sent.to === 'board' ? '📋 on board' : '🗓 on planner'}</span>` : ''}${a.done ? `<span class="as-sent">✓ ${esc(a.doneNote || 'done')}</span>` : ''}${a.updNote ? `<span class="as-upd">↻ ${esc(a.updNote)}</span>` : ''}${a.learned ? '<span class="as-upd" title="Learned from your edits">🧠</span>' : ''}</span></li>`).join('')}</ul>` : '<p class="as-none">No action items found.</p>';
+}
 function cardHTMLAs(c, ctx = {}) {
+  if (c.kind === 'brief' && typeof briefCardHTML === 'function') return briefCardHTML(c, ctx);
   const acts = c.actions || [], mt = c.meetings || [], dl = openDeadlines(c).filter(d => !mt.some(m => m.start === d.due)), P = cardPrio(c), rel = ctx.rel || 0;
   const cls = [c.kind, ctx.dim ? 'dim' : '', ctx.hl ? 'hl' : '', ctx.hlOther ? 'dimhl' : '', c.chatOpen ? 'chatting' : ''].join(' ');
   return `<div class="as-card ${cls}" data-card="${c.id}">
@@ -110,8 +116,7 @@ function cardHTMLAs(c, ctx = {}) {
       <p class="as-sum">${esc(c.summary || '')}</p>
       ${(c.points || []).length ? `<h4>Key points</h4><ul class="as-pts">${c.points.map(p => `<li>${esc(p)}</li>`).join('')}</ul>` : ''}
       <h4>Action items <span class="as-n">${acts.filter(a => !a.done).length}</span></h4>
-      ${acts.length ? `<ul class="as-acts">${acts.map(a => `<li class="as-act ${a.sent ? 'sent' : ''} ${a.done ? 'done' : ''}" data-act="${a.id}"><span class="as-grip" aria-label="Drag to a board or planner">⠿</span><span class="as-at" data-aa="editact" title="Tap to edit">${esc(a.text)}</span>
-        <span class="as-chips">${a.owner ? `<span class="as-own">👤 ${esc(a.owner)}</span>` : ''}${a.due ? `<span class="as-due">⏰ ${esc(fmtDueShort(a.due))}</span>` : ''}${a.sent ? `<span class="as-sent">${a.sent.to === 'board' ? '📋 on board' : '🗓 on planner'}</span>` : ''}${a.done ? `<span class="as-sent">✓ ${esc(a.doneNote || 'done')}</span>` : ''}${a.updNote ? `<span class="as-upd">↻ ${esc(a.updNote)}</span>` : ''}${a.learned ? '<span class="as-upd" title="Learned from your edits">🧠</span>' : ''}</span></li>`).join('')}</ul>` : '<p class="as-none">No action items found.</p>'}
+      ${actsHTML(c)}
       <div class="as-arow">${acts.length ? '<button class="as-btn" data-aa="sendall">📋 Send all to board…</button>' : ''}<button class="as-btn" data-aa="addact">＋ Add</button></div>
       ${mt.length || dl.length ? `<h4>Deadlines &amp; meetings</h4><ul class="as-dl">${mt.map(m => `<li>📅 <b>${esc(m.title)}</b> · ${esc(fmtWhen(m.start))}${m.where ? ' · ' + esc(m.where) : ''} <button class="as-btn sm" data-aa="cal" data-m="${m.id}">📅 Add to Calendar</button></li>`).join('')}${dl.map(d => `<li>⏰ ${esc(fmtDueShort(d.due))} — ${esc(d.text)}</li>`).join('')}</ul>` : ''}
       ${c.ink ? `<h4>Handwriting (attachment)</h4><img class="as-ink" alt="Handwriting attachment" src="${inkThumbURL(c.ink)}">
@@ -126,12 +131,12 @@ function renderAssist(pi) {
   rec.ov.querySelectorAll('.as-layer').forEach(e => e.remove());
   const s = S.scale, L = document.createElement('div'); L.className = 'as-layer'; L.style.fontSize = (20 * s) + 'px';
   const M = relatedMap(n), cards = asCards(pg), urgentN = cards.filter(c => cardPrio(c).level === 'urgent').length, filt = pg.assist.filter === 'urgent';
-  L.innerHTML = linksSVG(pg, M, s) + `<div class="as-drop" style="left:${24 * s}px;top:${24 * s}px;width:${(PAGE_W - 48) * s}px;height:${190 * s}px">
+  L.innerHTML = linksSVG(pg, M, s) + (pg.assist.brief && typeof briefHeadHTML === 'function' ? briefHeadHTML(pg, s) : `<div class="as-drop" style="left:${24 * s}px;top:${24 * s}px;width:${(PAGE_W - 48) * s}px;height:${190 * s}px">
       <div class="as-dt">🤖 <b>Drop an email or text here</b></div><div class="as-ds">Drag a message from Mail (select its text first for best results) · or copy it and tap Paste</div>
       <div class="as-dbtns"><button class="as-btn" data-aa="paste">📋 Paste</button><button class="as-btn" data-aa="lasso">✍︎ Lasso into assistant</button>
         <button class="as-btn ${pg.assist.sort ? 'on' : ''}" data-aa="sort" aria-pressed="${!!pg.assist.sort}">⇅ Sort by priority</button><button class="as-btn ${filt ? 'on' : ''}" data-aa="urgent" aria-pressed="${filt}">🔴 Urgent${urgentN ? ' (' + urgentN + ')' : ''}</button><span class="as-msg" hidden></span></div>
       <details class="as-dbg"><summary>What did Mail send?</summary><pre>${esc(dbgText())}</pre></details>
-      <div class="as-catch" contenteditable="true" aria-label="Paste target"></div></div>`
+      <div class="as-catch" contenteditable="true" aria-label="Paste target"></div></div>`)
     + cards.map(c => cardHTMLAs(c, { rel: relatedGroup(M, c.id).size - 1, dim: filt && cardPrio(c).level !== 'urgent', hl: AS.hl && AS.hl.has(c.id), hlOther: AS.hl && !AS.hl.has(c.id) })).join('');
   rec.ov.append(L);
   const flip = AS.flip; AS.flip = null;

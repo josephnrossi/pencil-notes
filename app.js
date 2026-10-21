@@ -326,6 +326,7 @@ function onDown(e, pi) {
   if (S.tool === 'pen' || S.tool === 'highlighter') {
     const hl = S.tool === 'highlighter';
     drawing.stroke = { id: uid('s'), tool: S.tool, color: hl ? S.hlColor : S.penColor, width: hl ? S.hlWidth : S.penWidth, points: [[+p[0].toFixed(1), +p[1].toFixed(1), +pr.toFixed(2)]] };
+    if (typeof recStamp === 'function') { const t = recStamp(); if (t != null) drawing.stroke.t = t; }   // v17: ink timestamped to the recording
   } else if (S.tool === 'eraser') {
     drawing.snap = snapshot(); drawing.erased = false; eraseAt(pi, p);
   } else if (S.tool === 'lasso') {
@@ -1176,12 +1177,21 @@ function deleteItem(it) {
 /* ---------- backup ---------- */
 $('#exportBtn').onclick = async () => {
   flushSaves();
+  const audio = typeof recAudioStats === 'function' ? recAudioStats() : { n: 0 };
+  if (audio.n) actionSheet(`Export backup — includes ${audio.n} recording${audio.n > 1 ? 's' : ''} (≈ ${audio.mb} MB of audio)`, [
+    { label: `⬇︎ With audio (≈ ${audio.mb} MB)`, primary: true, fn: () => exportBackup(true) },
+    { label: '⬇︎ Without audio (transcripts, notes & summaries only)', fn: () => exportBackup(false, audio.ids) }]);
+  else exportBackup(true);
+};
+async function exportBackup(withAudio, audioIds = []) {
+  flushSaves();
   const notes = typeof sealedNotesForExport === 'function' ? await sealedNotesForExport() : S.notes;   // v14: locked notes stay encrypted
-  const data = { app: 'inkminder', version: 2, exportedAt: new Date().toISOString(), notebooks: S.notebooks, notes, assets: await exportAssets(notes) };
+  let assets = await exportAssets(notes); if (!withAudio) assets = assets.filter(a => !audioIds.includes(a.id));
+  const data = { app: 'inkminder', version: 2, exportedAt: new Date().toISOString(), notebooks: S.notebooks, notes, assets };
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
   a.download = 'pencil-notes-backup-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.append(a); a.click(); a.remove();
-  toast('Backup downloaded');
-};
+  toast(withAudio ? 'Backup downloaded' : 'Backup downloaded (without audio)');
+}
 $('#importBtn').onclick = () => $('#importFile').click();
 $('#importFile').onchange = async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;

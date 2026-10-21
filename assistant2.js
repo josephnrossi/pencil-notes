@@ -25,7 +25,7 @@ async function aiRequest(messages, { json = true, timeout = 30000 } = {}) {
 async function aiJSON(messages) { const t = (await aiRequest(messages, { json: true })).replace(/^```(?:json)?\s*|\s*```$/g, '').trim(); const m = t.match(/\{[\s\S]*\}/); return JSON.parse(m ? m[0] : t); }
 const isVisionErr = e => e && ((e.status && [400, 404, 415, 422].includes(e.status) && /image|vision|multi-?modal|modalit|content type|image_url|not support/i.test(e.detail || e.message)) || /image|vision/i.test(e.detail || ''));
 const prefsBlock = () => { const r = memRules(); return r.length ? '\nUser preferences (learned from their edits — follow them):\n' + r.map(x => '- ' + x.text).join('\n') : ''; };
-const emailBlock = c => `From: ${c.from || ''}${c.fromAddr ? ' <' + c.fromAddr + '>' : ''}\nSubject: ${c.subject || ''}\nDate: ${c.date ? new Date(c.date).toString() : 'unknown'}\n\n${String(c.raw || '').slice(0, 12000)}`;
+const emailBlock = c => c.kind === 'brief' && typeof briefBlock === 'function' ? briefBlock(c) : `From: ${c.from || ''}${c.fromAddr ? ' <' + c.fromAddr + '>' : ''}\nSubject: ${c.subject || ''}\nDate: ${c.date ? new Date(c.date).toString() : 'unknown'}\n\n${String(c.raw || '').slice(0, 12000)}`;
 
 /* ---------- 🧠 memory: learned preferences ---------- */
 const MEM_KEY = 'assistMemory';
@@ -171,7 +171,7 @@ function entities(c) {
   entCache.set(c, E); return E;
 }
 function relatedMap(n) {
-  const all = n.pages.flatMap((pg, pi) => isAssistPage(pg) ? asCards(pg).map(c => ({ c, pi })) : []), M = new Map(all.map(x => [x.c.id, []]));
+  const all = n.pages.flatMap((pg, pi) => isAssistPage(pg) ? asCards(pg).filter(c => c.kind !== 'brief').map(c => ({ c, pi })) : []), M = new Map(all.map(x => [x.c.id, []]));
   const link = (a, b, why) => { const la = M.get(a.id), lb = M.get(b.id); if (!la || !lb) return; const ea = la.find(x => x.id === b.id); if (ea) { if (!ea.why.includes(why)) ea.why.push(why); } else la.push({ id: b.id, why: [why] }); const eb = lb.find(x => x.id === a.id); if (eb) { if (!eb.why.includes(why)) eb.why.push(why); } else lb.push({ id: a.id, why: [why] }); };
   for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
     const a = all[i].c, b = all[j].c, sa = normSubj(a.subject), sb = normSubj(b.subject);
@@ -192,7 +192,7 @@ function overlap(a, b) { const A = new Set(cw(a).map(stem)), B = new Set(cw(b).m
 function findThreadParent(n, card) {
   const s = normSubj(card.subject); if (s.length < 4) return null;
   const t = c => +new Date(c.date || c.createdAt);
-  const cands = n.pages.flatMap(pg => isAssistPage(pg) ? asCards(pg) : []).filter(c => c !== card && normSubj(c.subject) === s && t(c) <= t(card));
+  const cands = n.pages.flatMap(pg => isAssistPage(pg) ? asCards(pg) : []).filter(c => c !== card && c.kind !== 'brief' && normSubj(c.subject) === s && t(c) <= t(card));
   return cands.sort((a, b) => t(b) - t(a))[0] || null;
 }
 function applyFollowUp(n, card, prev, aiDone = []) {
@@ -252,7 +252,7 @@ function chatHTML(c) {
     ? `<div class="as-msg-u">${m.ink ? `<img class="as-qink" alt="Handwritten question" src="${inkThumbURL(m.ink, 300, 70)}">${m.read ? `<small>“${esc(m.read)}”</small>` : ''}` : esc(m.text)}</div>`
     : `<div class="as-msg-a"><div>${esc(m.text).replace(/\n/g, '<br>')}</div><small class="as-eng ${m.engine && m.engine !== 'Built-in' ? 'ai' : ''}">${m.engine === 'Built-in' ? '⚙︎ Built-in' : m.engine === 'note' ? 'ℹ︎' : '✨ ' + esc(m.engine)}</small></div>`).join('');
   const kb = askMode() === 'kb';
-  return `<div class="as-chat"><div class="as-chat-h">💬 Ask about this email <button class="as-x" data-aa="chat" aria-label="Close chat">✕</button></div>
+  return `<div class="as-chat"><div class="as-chat-h">💬 ${c.kind === 'brief' ? 'Ask about this section' : 'Ask about this email'} <button class="as-x" data-aa="chat" aria-label="Close chat">✕</button></div>
     <div class="as-msgs">${msgs || `<div class="as-hintmsg">${kb ? 'Type' : 'Write'} a question — “what’s due?”, “who needs to act?”, “when is the meeting?”${aiReady() ? '' : '<br>⚙︎ Built-in answers simple lookups · connect AI in Settings for open questions.'}</div>`}${AS.chatBusy.has(c.id) ? '<div class="as-msg-a busy"><span class="as-spin">Thinking…</span></div>' : ''}</div>
     <div class="as-ask ${kb ? 'kb' : 'ink'}"><canvas class="as-strip" aria-label="Write your question with Apple Pencil"></canvas><input class="as-q" type="text" placeholder="Ask about this email…" enterkeyhint="send">
       <button class="as-tog" data-aa="askmode" title="${kb ? 'Write with Pencil' : 'Type instead'}">${kb ? '✍︎' : '⌨︎'}</button>${kb ? '' : '<button class="as-tog" data-aa="askclr" title="Clear ink">⌫</button>'}<button class="as-btn" data-aa="ask">Ask</button></div></div>`;
