@@ -43,11 +43,11 @@ const saveTimers = new Map();
 function saveNote(note, immediate) {
   note.updatedAt = Date.now();
   clearTimeout(saveTimers.get(note.id));
-  const run = () => { saveTimers.delete(note.id); DB.put('notes', note).catch(err => toast('Save failed: ' + err.message)); };
+  const run = () => { saveTimers.delete(note.id); DB.put('notes', note).then(() => window.saveOk && saveOk(note), err => window.saveFailed ? saveFailed(err, note) : toast('Save failed: ' + err.message)); };
   if (immediate) run(); else saveTimers.set(note.id, setTimeout(run, 250));
   if (window.onNoteSaved) window.onNoteSaved(note);
 }
-function flushSaves() { for (const [id, t] of saveTimers) { clearTimeout(t); const n = S.notes.find(x => x.id === id); if (n) DB.put('notes', n); } saveTimers.clear(); }
+function flushSaves() { for (const [id, t] of saveTimers) { clearTimeout(t); const n = S.notes.find(x => x.id === id); if (n) DB.put('notes', n).catch(err => window.saveFailed ? saveFailed(err, n) : toast('Save failed: ' + err.message)); } saveTimers.clear(); }
 const saveNotebook = nb => DB.put('notebooks', nb);
 
 // Page model v2. bg = per-page background (null | {type:'template'|'pdf', ...}); images = photos/stickers;
@@ -120,7 +120,7 @@ function drawPenSeg(ctx, st, i) {
   ctx.beginPath(); ctx.moveTo(start[0], start[1]); ctx.quadraticCurveTo(a[0], a[1], end[0], end[1]); ctx.stroke();
 }
 function drawStroke(ctx, st) {
-  const pts = st.points; if (!pts.length) return;
+  const pts = st && st.points; if (!pts || !pts.length) return;
   ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   const col = inkColor(st.color); ctx.strokeStyle = col; ctx.fillStyle = col;
   if (st.tool === 'highlighter') {
@@ -826,7 +826,7 @@ async function maybeAskNotif() { if (localStorage.getItem('askedNotif')) return;
 $('#notifBtn').onclick = async () => { try { const p = await Notification.requestPermission(); toast(p === 'granted' ? 'Notifications enabled' : 'Notifications not allowed'); } catch (e) { toast('Notifications unavailable here'); } renderNotifUI(); };
 
 /* ---------- calendar (.ics) ---------- */
-function icsEscape(s) { return String(s || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;'); }
+function icsEscape(s) { return String(s || '').replace(/\\/g, '\\\\').replace(/\r\n|\r|\n|\u2028|\u2029/g, '\\n').replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '').replace(/,/g, '\\,').replace(/;/g, '\\;'); }
 function icsDate(d) { return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''); }
 function fold(line) { const out = []; while (line.length > 74) { out.push(line.slice(0, 74)); line = ' ' + line.slice(74); } out.push(line); return out.join('\r\n'); }
 function buildIcs(it) {
@@ -958,12 +958,13 @@ $('#noteMenuBtn').onclick = () => {
   const setPaper = p => () => { n.paper = p; saveNote(n); for (let i = 0; i < pageEls.length; i++) renderPageInk(i); };
   actionSheet('Note options', [
     { label: mark('lined') + 'Lined paper', fn: setPaper('lined') }, { label: mark('grid') + 'Grid paper', fn: setPaper('grid') }, { label: mark('blank') + 'Blank paper', fn: setPaper('blank') },
-    { label: '＋ Add page…', fn: addPage }, { label: '🗓 Planner settings…', fn: plannerSettings },
+    { label: '＋ Add page…', fn: () => addPage() }, { label: '🗓 Planner settings…', fn: plannerSettings },
     { label: '📄 Import PDF…', fn: () => { pdfTargetNb = n.notebookId; $('#pdfFile').click(); } }, { label: '⬇︎ Export note as PDF', fn: () => exportNotePdf(n) },
     ...(clip ? [{ label: '📋 Paste', fn: pasteClip }] : []),
     { label: (localStorage.getItem('autoNumber') === '0' ? 'Turn on' : 'Turn off') + ' handwritten 1. 2. 3. detection', fn: () => { const on = localStorage.getItem('autoNumber') === '0'; localStorage.setItem('autoNumber', on ? '1' : '0'); toast(on ? 'Handwritten numbers become section badges' : 'Handwritten numbers stay as ink'); } },
     { label: 'Rename / move / delete…', fn: () => noteMenu(n) },
-    { label: 'Appearance: ' + { dark: 'Dark', light: 'Light', system: 'System' }[themePref()] + '…', fn: themeMenu }]);
+    { label: 'Appearance: ' + { dark: 'Dark', light: 'Light', system: 'Match iPad' }[themePref()] + '…', fn: themeMenu },
+    { label: '✋ Gestures…', fn: () => gesturesSheet() }, { label: '⚙︎ Settings…', fn: () => openSettings() }]);
 };
 function themeMenu() {
   const m = t => (themePref() === t ? '✓ ' : '');

@@ -1,5 +1,5 @@
-const CACHE = 'pencil-notes-v17';
-const ASSETS = ['./', 'index.html', 'styles.css', 'db.js', 'app.js', 'v7.js', 'board.js', 'assist-engine.js', 'assistant.js', 'assistant2.js', 'lock.js', 'record.js', 'vendor/pdfjs/pdf.min.mjs', 'vendor/pdfjs/pdf.worker.min.mjs', 'manifest.json',
+const CACHE = 'pencil-notes-v18';
+const ASSETS = ['./', 'index.html', 'styles.css', 'db.js', 'app.js', 'v7.js', 'board.js', 'assist-engine.js', 'assistant.js', 'assistant2.js', 'lock.js', 'record.js', 'audit.js', 'vendor/pdfjs/pdf.min.mjs', 'vendor/pdfjs/pdf.worker.min.mjs', 'manifest.json',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/favicon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
@@ -17,6 +17,8 @@ self.addEventListener('fetch', e => {
     // Serve a calendar event as a real .ics file so iPad shows Apple's "Add to Calendar" screen.
     let ics = '';
     try { const b = u.searchParams.get('e').replace(/-/g, '+').replace(/_/g, '/'); ics = decodeURIComponent(escape(atob(b))); } catch (err) { ics = ''; }
+    // only well-formed single calendars are served; anything else is refused (no arbitrary content from a link)
+    if (ics.length > 20000 || !/^BEGIN:VCALENDAR\r?\n/.test(ics) || !/END:VCALENDAR\s*$/.test(ics) || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(ics) || (ics.match(/BEGIN:VCALENDAR/g) || []).length !== 1) { e.respondWith(new Response('Not a valid calendar event', { status: 400, headers: { 'Content-Type': 'text/plain' } })); return; }
     const name = (u.searchParams.get('n') || 'reminder').replace(/[^\w\- ]+/g, '') + '.ics';
     e.respondWith(new Response(ics, { headers: { 'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': 'inline; filename="' + name + '"', 'Cache-Control': 'no-store' } }));
     return;

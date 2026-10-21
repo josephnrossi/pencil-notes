@@ -162,7 +162,7 @@ exportAssets = async function (notes) {   // locked notes' files are exported as
 const _importAssets = importAssets;
 importAssets = async function (list) {
   const plain = [];
-  for (const a of list || []) { if (!a.enc) { plain.push(a); continue; } const data = await (await (await fetch(a.data)).blob()).arrayBuffer(); await rawPut('assets', { id: a.id, data, type: 'application/octet-stream', size: data.byteLength, createdAt: Date.now(), enc: a.enc }); Assets.bitmaps.delete(a.id); }
+  for (const a of list || []) { if (!/^data:/.test(a.data || '')) continue; if (!a.enc) { plain.push(a); continue; } const data = await (await (await fetch(a.data)).blob()).arrayBuffer(); await rawPut('assets', { id: a.id, data, type: 'application/octet-stream', size: data.byteLength, createdAt: Date.now(), enc: a.enc }); Assets.bitmaps.delete(a.id); }
   return _importAssets(plain);
 };
 

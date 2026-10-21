@@ -753,3 +753,68 @@ body.rc-replaying .page canvas { cursor: pointer; }
 .as-aprio { font-size: .78em; border-radius: .4em; padding: .05em .4em; background: rgba(148,163,184,.18); }
 .as-aprio.p-urgent { background: rgba(239,68,68,.25); color: #fecaca; } .as-aprio.p-high { background: rgba(245,158,11,.22); color: #fde68a; }
 .spk-pad { width: 100%; height: 140px; border-radius: 12px; background: rgba(148,163,184,.12); touch-action: none; display: block; margin: 6px 0 4px; }
+
+/* ===== v18: streamline & harden ===== */
+/* 44pt touch targets for every chrome control (visuals stay compact; the hit box grows) */
+.btn.small, .chip-btn { min-height: 44px; height: auto; }
+.swatch { width: 44px; height: 44px; padding: 7px; border: 0; box-shadow: none; background-clip: content-box !important; position: relative; }
+.swatch::after { content: ''; position: absolute; inset: 5px; border-radius: 50%; box-shadow: 0 0 0 1px var(--line); pointer-events: none; }
+.swatch.on::after { box-shadow: 0 0 0 3px var(--accent); }
+.wbtn { width: 44px; height: 44px; }
+@media (max-width: 760px) { .swatch { width: 44px; height: 44px; padding: 8px; } .wbtn { width: 44px; height: 44px; } .tool { width: 48px; height: 48px; } }
+#focusBar .icon-btn, #focusBar .tool { min-width: 44px; min-height: 44px; }
+.ractions button { min-height: 44px; }
+.rc-btn, .rc-panel button, #recMini button { min-height: 44px; min-width: 44px; }
+
+/* ＋ Insert */
+.ins-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 58px; height: 50px; border: 0; border-radius: 12px; background: var(--surface2); color: inherit; font: inherit; }
+.ins-btn b { font-size: 20px; line-height: 1; } .ins-btn span { font-size: 10.5px; font-weight: 600; margin-top: 2px; }
+.ins-btn.on { background: var(--accent); color: #fff; }
+#insertMenu { position: fixed; z-index: 90; width: min(420px, calc(100vw - 16px)); display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); }
+#insertMenu[hidden] { display: none; }
+.ins-item { display: grid; grid-template-columns: 34px 1fr; grid-template-rows: auto auto; align-items: center; column-gap: 8px; text-align: left; min-height: 56px; width: auto; height: auto; padding: 8px 10px; border: 0; border-radius: 12px; background: var(--surface2); color: inherit; font: inherit; }
+.ins-item i { grid-row: 1 / 3; font-style: normal; font-size: 22px; text-align: center; }
+.ins-item span { font-weight: 650; font-size: 15px; } .ins-item small { color: var(--muted); font-size: 12px; line-height: 1.25; }
+.ins-item.on { background: var(--accent); color: #fff; } .ins-item.on small { color: rgba(255,255,255,.85); }
+
+/* Settings */
+.set-sheet { width: min(560px, 100%); max-height: 88vh; padding: 0; gap: 0; }
+.set-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 8px 20px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.set-head h3 { margin: 0; }
+.set-body { padding: 4px 16px 18px; }
+.set-sec h4 { margin: 18px 4px 6px; font-size: 12.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.set-sec .fine { margin: 2px 4px 6px; }
+.set-row { display: flex; width: 100%; align-items: center; gap: 10px; min-height: 52px; padding: 8px 14px; border: 0; background: var(--surface2); color: inherit; font: inherit; text-align: left; border-radius: 0; }
+.set-sec .set-row:first-of-type { border-top-left-radius: 14px; border-top-right-radius: 14px; }
+.set-sec .set-row:last-of-type { border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; }
+.set-row + .set-row { border-top: 1px solid var(--line); }
+.set-row span { flex: 1; font-weight: 550; } .set-row small { display: block; color: var(--muted); font-weight: 400; font-size: 12.5px; margin-top: 2px; }
+.set-row b { color: var(--muted); font-size: 20px; }
+.set-about { text-align: center; margin-top: 18px; }
+
+/* Gestures */
+.gest-sheet { width: min(620px, 100%); gap: 4px; }
+.gest-sheet .set-head { padding: 0 0 8px; position: static; }
+.gest-sheet h4 { margin: 10px 0 4px; font-size: 12.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.g-grid { display: grid; gap: 2px; border-radius: 12px; overflow: hidden; }
+.g-row { display: grid; grid-template-columns: 40px minmax(130px, 38%) 1fr; align-items: center; gap: 8px; padding: 7px 10px; background: var(--surface2); font-size: 14px; }
+.g-row i { font-style: normal; font-size: 20px; text-align: center; } .g-row span { color: var(--muted); }
+
+/* tour */
+.tour-wrap { background: transparent !important; display: block !important; z-index: 120; }
+.tour-wrap[hidden] { display: none !important; }
+.tour-hole { position: fixed; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0,0,0,.55); pointer-events: none; transition: all .25s; }
+.tour-card { position: fixed; width: 340px; background: var(--surface); border-radius: 18px; padding: 16px; box-shadow: var(--shadow); }
+.tour-card h3 { margin: 4px 0 6px; } .tour-card p { margin: 0 0 12px; color: var(--muted); line-height: 1.4; } .tour-card small { color: var(--muted); }
+
+/* save warning & full-swipe delete */
+#saveWarn { position: fixed; left: 50%; top: calc(10px + var(--sat, 0px)); transform: translateX(-50%); z-index: 130; display: flex; gap: 8px; align-items: center; max-width: calc(100% - 20px); padding: 8px 10px 8px 14px; border-radius: 14px; background: #7f1d1d; color: #fff; box-shadow: var(--shadow); font-size: 14px; }
+#saveWarn[hidden] { display: none; } #saveWarn .btn { color: inherit; background: rgba(255,255,255,.15); border-color: transparent; }
+.rwrap.armed-del .ractions button:not(.del) { width: 0; padding: 0; overflow: hidden; }
+.rwrap.armed-del .ractions button.del { width: 234px; }
+#widths:not(.open) .wbtn:not(.on) { display: none; }
+#widths.open { position: fixed; z-index: 90; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 4px; gap: 4px; }
+.chip-btn.tb-col { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 58px; height: 50px; padding: 0; border-radius: 12px; border: 0; }
+.chip-btn.tb-col b { font-size: 19px; line-height: 1; } .chip-btn.tb-col span { font-size: 10.5px; margin-top: 2px; }
+.nb-head { min-height: 44px; } .nb-head button { width: 44px; height: 44px; }
+#notebookList .more, #notebookList button.more { min-width: 44px; min-height: 44px; }

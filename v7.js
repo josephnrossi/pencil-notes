@@ -841,7 +841,7 @@ async function exportAssets(notes) {
   return out;
 }
 async function importAssets(list) {
-  for (const a of list || []) { const blob = await (await fetch(a.data)).blob(); await Assets.put(new Blob([blob], { type: a.type }), a.id); Assets.bitmaps.delete(a.id); }
+  for (const a of list || []) { if (!/^data:/.test(a.data || '')) continue; const blob = await (await fetch(a.data)).blob(); await Assets.put(new Blob([blob], { type: a.type }), a.id); Assets.bitmaps.delete(a.id); }
 }
 
 /* ---------- lasso selection: box with resize (aspect kept) + rotate handles; cut/copy/paste/duplicate/delete ---------- */
