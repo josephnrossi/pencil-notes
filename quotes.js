@@ -6,7 +6,7 @@ const QB_COLS = ['New RFQ', 'Reviewing', 'Quoting', 'Sent', 'Won', 'Lost'];
 const isQuoteNote = n => !!(n && n.id === QUOTE_ID);
 function makeQuoteNote() {
   const n = makeNote(S.notebooks[0] ? S.notebooks[0].id : '__quotes', 'Quote Board');
-  n.id = QUOTE_ID; n.notebookId = '__quotes'; n.system = 'quotes';
+  n.id = QUOTE_ID; n.notebookId = '__quotes'; n.system = 'quotes'; n.order = 0;
   const pg = makeTemplatePage('board', n), cols = QB_COLS.map(title => ({ id: uid('c'), title }));
   pg.board = { title: '💲 Quote Board', quote: true, columns: cols, doneCols: [cols[4].id, cols[5].id] };
   n.pages = [pg]; return n;
@@ -239,70 +239,151 @@ function cardExtra(t, pg) {
   return `<div class="qb-det">${rows.join('')}${fu}<div class="qd-acts"><button class="qb-mini" data-qact="edit">✏️ Details</button>${link ? `<a class="qb-mini" href="${link}" target="_blank" rel="noopener noreferrer" data-qact="open">↗︎ Open in Outlook</a>` : ''}${q.email ? `<button class="qb-mini" data-qact="reply">✉︎ Reply</button>` : ''}</div></div>`;
 }
 function cardMenuExtra(pi, id) {
-  if (pi !== QPI) return [{ label: '💲 Move to Quote Board', fn: () => { const qn = ensureQuoteNote(); if (qbSealed()) return toast('🔒 Unlock the Quote Board first'); qbOpen(true); moveCardAcross(pi, id, QPI, boardCols(qn.pages[0])[0].id); } }];
-  const t = findCard(QPI, id); if (!t) return [];
-  return [{ label: '✏️ Quote details…', fn: () => qbEdit(t) }, ...(safeHref(t.q && t.q.webLink) ? [{ label: '↗︎ Open in Outlook', fn: () => window.open(t.q.webLink, '_blank', 'noopener') }] : [])];
+  const toQuotes = { label: '💲 Move to Quote Board', fn: () => { const qn = ensureQuoteNote(); if (qbSealed()) return toast('🔒 Unlock the Quote Board first'); qbOpen(true, { mode: 'quotes' }); moveCardAcross(pi, id, QPI, boardCols(qn.pages[0])[0].id); } };
+  const toIdeas = { label: '💡 Move to Idea Board', fn: () => { const n = ensureIdeaNote(); if (ibSealed()) return toast('🔒 Unlock the Idea Board first'); qbOpen(true, { mode: 'ideas' }); moveCardAcross(pi, id, IPI, boardCols(n.pages[0])[0].id); } };
+  if (pi === IPI) return [toQuotes];
+  if (pi !== QPI) return [toIdeas, toQuotes];
+  const t = findCard(QPI, id); if (!t) return [toIdeas];
+  return [{ label: '✏️ Quote details…', fn: () => qbEdit(t) }, toIdeas, ...(safeHref(t.q && t.q.webLink) ? [{ label: '↗︎ Open in Outlook', fn: () => window.open(t.q.webLink, '_blank', 'noopener') }] : [])];
 }
 
 /* ======================= the drawer ======================= */
-const QD = $('#qbDrawer'), QHOST = $('#qbHost');
-QB.host = { el: QHOST, ov: QHOST };
+/* ======================= v21: the 💡 Idea Board (the former Project Board), a second board in the same drawer ======================= */
+const IDEA_COLS = ['To Do', 'Doing', 'Done'];
+function makeIdeaNote() {
+  const n = makeNote(S.notebooks[0] ? S.notebooks[0].id : '__ideas', 'Idea Board');
+  n.id = IDEA_ID; n.notebookId = '__ideas'; n.system = 'ideas'; n.order = 0;
+  const pg = makeTemplatePage('board', n), cols = IDEA_COLS.map(title => ({ id: uid('c'), title }));
+  pg.board = { title: '💡 Idea Board', idea: true, columns: cols };
+  n.pages = [pg]; return n;
+}
+function ensureIdeaNote() {
+  let n = ideaNote(); if (n) return n;
+  if (!window.__ready) throw new Error('Idea Board used before notes finished loading');
+  n = makeIdeaNote(); S.notes.push(n); saveNote(n, true); return n;
+}
+const isIdeaNote = n => !!(n && n.id === IDEA_ID);
+const ibSealed = () => { const n = ideaNote(); return !!(n && typeof isSealed === 'function' && isSealed(n)); };
+const ideaCards = () => { const n = ideaNote(); return n && !ibSealed() ? n.pages[0].tasks.filter(isCard) : []; };
+const BOARDS = {
+  quotes: { pi: QPI, ic: '💲', name: 'Quote Board', short: 'Quotes', note: () => quoteNote(), ensure: () => ensureQuoteNote(), sealed: () => qbSealed(), wkey: 'qbW', wdef: 0.5,
+    sub: () => { const c = quoteCards(), o = c.filter(t => !t.done).length, u = c.filter(t => t.q.unread).length; return qbSealed() ? 'Locked' : `RFQs from email · ${o} open${u ? ` · ${u} new` : ''}`; } },
+  ideas: { pi: IPI, ic: '💡', name: 'Idea Board', short: 'Ideas', note: () => ideaNote(), ensure: () => ensureIdeaNote(), sealed: () => ibSealed(), wkey: 'ibW', wdef: 0.66,
+    sub: () => { if (ibSealed()) return 'Locked'; const n = ideaNote(), pg = n && n.pages[0]; if (!pg) return 'Projects, tasks & ideas'; const c = pg.tasks.filter(isCard); return `${boardCols(pg).map(x => x.title).join(' · ')} · ${c.filter(t => !t.done).length} open`; } },
+};
+/* v21b: the 📥 Inbox — the third option in the dropdown (rendered by inbox.js, not board.js) */
+BOARDS.inbox = { pi: null, ic: '📥', name: 'Inbox', short: 'Inbox', note: () => inboxNote(), ensure: () => ensureInboxNote(), sealed: () => typeof inSealed === 'function' && inSealed(), wkey: 'inW', wdef: 0.5,
+  sub: () => typeof inSub === 'function' ? inSub() : 'Emails & meeting briefs' };
+BOARDS.quotes.badge = () => qbSealed() ? 0 : quoteCards().filter(t => t.q.unread).length;
+BOARDS.ideas.badge = () => 0;
+BOARDS.inbox.badge = () => typeof inUnread === 'function' ? inUnread() : 0;
+const curB = () => BOARDS[QB.mode];
+QB.mode = ['ideas', 'inbox'].includes(localStorage.getItem('drawerBoard')) ? localStorage.getItem('drawerBoard') : 'quotes';     // remember the last-selected board
+
+const QD = $('#qbDrawer'), QHOST = $('#qbHost'), IHOST = $('#ibHost'), INHOST = $('#inHost');
+QB.host = { el: QHOST, ov: QHOST }; IB.host = { el: IHOST, ov: IHOST };
 QD.hidden = false;
-const qbW = () => { const v = +localStorage.getItem('qbW'); return v >= 0.3 && v <= 1 ? v : 0.5; };
+const qbW = () => { const B = curB(), v = +localStorage.getItem(B.wkey); return v >= 0.3 && v <= 1 ? v : B.wdef; };
 function qbApplyW(f = qbW()) { QD.style.width = f >= 0.99 ? '100vw' : `max(340px, ${Math.round(f * 1000) / 10}vw)`; QD.classList.toggle('full', f >= 0.99); }
-function qbOpen(on = true, { quiet = false } = {}) {
+function setDrawerBoard(mode, { render = true } = {}) {
+  if (!BOARDS[mode]) return; const was = QB.mode; if (was !== mode) cancelBoardGesture();
+  QB.mode = mode; localStorage.setItem('drawerBoard', mode);
+  QD.dataset.board = mode; QHOST.hidden = mode !== 'quotes'; IHOST.hidden = mode !== 'ideas'; INHOST.hidden = mode !== 'inbox';
+  const B = curB(); $('#dbName').innerHTML = `<i>${B.ic}</i>${B.name}`; QD.setAttribute('aria-label', B.name);
+  $('#qbTab').querySelector('span').textContent = B.ic; $('#qbTab').querySelector('b').textContent = B.short; $('#qbTab').setAttribute('aria-label', 'Open the ' + B.name);
+  $('#qbAdd').querySelector('span').textContent = { quotes: 'Quote', ideas: 'Card', inbox: 'Email' }[mode]; $('#qbAdd').setAttribute('aria-label', { quotes: 'Add a quote', ideas: 'Add a card', inbox: 'Add an email' }[mode]);
+  $('#qbLock').setAttribute('aria-label', 'Lock the ' + B.name); $('#qbMore').setAttribute('aria-label', B.name + ' options');
+  qbApplyW(); qbSyncStatus(); qbBadge();
+  if (render && QB.open) { B.ensure(); qbRender(); }
+}
+function qbOpen(on = true, { quiet = false, mode = null } = {}) {
+  if (mode) setDrawerBoard(mode, { render: false });
   const was = QB.open; QB.open = !!on; QD.classList.toggle('open', QB.open); document.body.classList.toggle('qb-open', QB.open);
   QD.setAttribute('aria-hidden', QB.open ? 'false' : 'true'); $('#qbTab').classList.toggle('hide', QB.open);
   localStorage.setItem('qbOpen', QB.open ? '1' : '0');
-  if (QB.open) { ensureQuoteNote(); qbApplyW(); qbRender(); if (!was && !quiet) qbSyncStatus(); }
-  else if (was) { cancelBoardGesture(); const n = quoteNote(); if (n && isLockedOpen(n) && relockPref() === 'leave') lockNote(n, { animate: false }); }
+  if (QB.open) { ensureQuoteNote(); ensureIdeaNote(); if (typeof ensureInboxNote === 'function') ensureInboxNote(); qbApplyW(); qbRender(); if (!was && !quiet) qbSyncStatus(); }
+  else if (was) { cancelBoardGesture(); dbMenu(false); for (const n of [quoteNote(), ideaNote(), inboxNote()]) if (n && isLockedOpen(n) && relockPref() === 'leave') lockNote(n, { animate: false }); }
 }
 function qbRender() {
-  qbSyncUndo(); qbBadge();
-  const n = quoteNote(); $('#qbLock').textContent = n && (qbSealed() || isLockedOpen(n)) ? (qbSealed() ? '🔒' : '🔓') : '🔒';
-  QD.classList.toggle('locked', qbSealed());
+  qbSyncUndo(); qbBadge(); if (QB.mode !== 'quotes') qbSyncStatus();
+  const B = curB(), n = B.note(), sealed = B.sealed(); $('#qbLock').textContent = n && (sealed || isLockedOpen(n)) ? (sealed ? '🔒' : '🔓') : '🔒';
+  QD.classList.toggle('locked', sealed);
   if (!QB.open) return;
-  if (qbSealed()) {
-    QHOST.innerHTML = `<div class="qb-locked"><div class="qb-lk-i">🔒</div><h3>The Quote Board is locked</h3><p class="fine">Quotes, contacts and prices are encrypted with Pencil Lock. Email sync waits until you unlock.</p><button class="btn primary" data-qact="unlock">Unlock with PIN</button></div>`;
+  const host = QB.mode === 'ideas' ? IHOST : QB.mode === 'inbox' ? INHOST : QHOST;
+  if (sealed) {
+    host.innerHTML = QB.mode === 'inbox'
+      ? `<div class="qb-locked"><div class="qb-lk-i">🔒</div><h3>The Inbox is locked</h3><p class="fine">Email summaries, action items and meeting briefs are encrypted with Pencil Lock.</p><button class="btn primary" data-qact="unlock">Unlock with PIN</button></div>`
+      : QB.mode === 'ideas'
+      ? `<div class="qb-locked"><div class="qb-lk-i">🔒</div><h3>The Idea Board is locked</h3><p class="fine">Cards, checklists and handwriting are encrypted with Pencil Lock.</p><button class="btn primary" data-qact="unlock">Unlock with PIN</button></div>`
+      : `<div class="qb-locked"><div class="qb-lk-i">🔒</div><h3>The Quote Board is locked</h3><p class="fine">Quotes, contacts and prices are encrypted with Pencil Lock. Email sync waits until you unlock.</p><button class="btn primary" data-qact="unlock">Unlock with PIN</button></div>`;
     return;
   }
-  if (QHOST.querySelector('.qb-locked')) QHOST.innerHTML = '';
-  renderBoard(QPI);
+  if (host.querySelector('.qb-locked')) host.innerHTML = '';
+  if (QB.mode === 'inbox') return inRender();
+  renderBoard(B.pi);
 }
 function qbRefreshBoard() { if (QB.open && !boardBusy()) qbRender(); else { BS.dirty = BS.dirty || QB.open; qbBadge(); } }
-function qbBadge() { const u = quoteCards().filter(t => t.q.unread).length, b = $('#qbTabBadge'); b.hidden = !u; b.textContent = u; $('#quotesBtn').classList.toggle('dot', !!u); }
-function qbSyncUndo() { $('#qbUndo').disabled = !QB.undo.length || qbSealed(); $('#qbRedo').disabled = !QB.redo.length || qbSealed(); }
-$('#qbUndo').onclick = () => { if (qbRestore(QB.undo, QB.redo)) toast('Undone', 1000); };
-$('#qbRedo').onclick = () => { if (qbRestore(QB.redo, QB.undo)) toast('Redone', 1000); };
+/* v21b: the tab badge shows the CURRENT board's count — 💲 unread quotes on the Quote Board, 📥 unread emails on the Inbox, nothing on the Idea Board.
+   The ▾ dot means another board has something new; the 📋 top-bar dot means any board does. */
+function qbBadge() {
+  const cnt = Object.fromEntries(Object.entries(BOARDS).map(([k, B]) => [k, B.badge ? B.badge() : 0])), u = cnt[QB.mode] || 0, b = $('#qbTabBadge');
+  b.hidden = !u; b.textContent = u; b.classList.toggle('inb', QB.mode === 'inbox'); b.title = u ? (QB.mode === 'inbox' ? u + ' unread in the Inbox' : u + ' new quote' + (u > 1 ? 's' : '')) : '';
+  $('#quotesBtn').classList.toggle('dot', Object.values(cnt).some(Boolean));
+  const d = document.getElementById('dbDot'); if (d) d.hidden = !Object.entries(cnt).some(([k, v]) => v && k !== QB.mode);
+}
+function qbSyncUndo() { const st = QB.mode === 'inbox' ? INB : sysSt(curB().pi), sealed = curB().sealed(); $('#qbUndo').disabled = !st.undo.length || sealed; $('#qbRedo').disabled = !st.redo.length || sealed; }
+$('#qbUndo').onclick = () => { if (QB.mode === 'inbox') { if (inRestore(INB.undo, INB.redo)) toast('Undone', 1000); return; } const pi = curB().pi, st = sysSt(pi); if (qbRestore(st.undo, st.redo, pi)) toast('Undone', 1000); };
+$('#qbRedo').onclick = () => { if (QB.mode === 'inbox') { if (inRestore(INB.redo, INB.undo)) toast('Redone', 1000); return; } const pi = curB().pi, st = sysSt(pi); if (qbRestore(st.redo, st.undo, pi)) toast('Redone', 1000); };
 $('#qbClose').onclick = () => qbOpen(false);
 $('#qbTab').onclick = () => qbOpen(true);
 $('#quotesBtn').onclick = () => qbOpen(!QB.open);
 $('#qbLock').onclick = async () => {
-  const n = ensureQuoteNote();
-  if (qbSealed()) { await pinUnlockFlow(n); qbRender(); return; }
-  if (!lockCfg()) { toast('Set up Pencil Lock first — then the Quote Board can be locked'); setupPencilLock(); return; }
-  await lockNote(n, { animate: false }); qbRender(); toast('🔒 Quote Board locked');
+  const B = curB(), n = B.ensure();
+  if (B.sealed()) { await pinUnlockFlow(n); qbRender(); return; }
+  if (!lockCfg()) { toast(`Set up Pencil Lock first — then the ${B.name} can be locked`); setupPencilLock(); return; }
+  await lockNote(n, { animate: false }); qbRender(); toast('🔒 ' + B.name + ' locked');
 };
-$('#qbMore').onclick = () => actionSheet('Quote Board', [
+const widthRow = () => ({ label: qbW() >= 0.99 ? '◧ Half width' : '⬜ Full width', sub: 'Or drag the left edge · double-tap it to switch', fn: () => { const B = curB(); localStorage.setItem(B.wkey, qbW() >= 0.99 ? String(B.wdef) : '1'); qbApplyW(); qbRender(); } });
+$('#qbMore').onclick = () => QB.mode === 'inbox' ? inMoreMenu() : QB.mode === 'ideas' ? actionSheet('Idea Board', [
+  widthRow(),
+  { label: (() => { const n = ideaNote(); return n && n.pages[0].board.compact; })() ? '▦ Full cards' : '▤ Compact cards', fn: () => setCompact(IPI, !ideaNote().pages[0].board.compact) },
+  { label: '＋ Add a column', fn: () => { const b = IHOST.querySelector('[data-bact="addcol"]'); if (b) b.click(); } },
+  ...(typeof legacyBoardPages === 'function' && legacyBoardPages().length ? [{ label: `📥 Bring in old Project Board pages (${legacyBoardPages().length})…`, fn: () => importLegacyBoards() }] : []),
+  { label: '⚙︎ Settings…', fn: () => openSettings('quotes') }]) : actionSheet('Quote Board', [
   { label: '📧 Email sync…', sub: syncProviderLabel(), fn: () => qbEmailSettings() },
-  { label: qbW() >= 0.99 ? '◧ Half width' : '⬜ Full width', fn: () => { localStorage.setItem('qbW', qbW() >= 0.99 ? '0.5' : '1'); qbApplyW(); qbRender(); } },
+  widthRow(),
   { label: '📋 Paste an email', fn: () => qbPasteClipboard() },
   { label: `🙈 Skipped emails (${qbSkipped().length})…`, fn: () => qbSkippedSheet() },
   { label: '⚙︎ Settings…', fn: () => openSettings('quotes') }]);
-$('#qbAdd').onclick = () => actionSheet('Add a quote', [
+function ideaAddCard() {
+  const n = ensureIdeaNote(); if (ibSealed()) return toast('🔒 Unlock the Idea Board first');
+  const b = IHOST.querySelector('.bcol [data-bact="add"]'); if (b) b.click();
+}
+/* the board dropdown at the top of the drawer */
+function dbMenu(on) {
+  const m = $('#dbMenu'), btn = $('#dbSwitch'); if (!m) return;
+  if (on === undefined) on = m.hidden;
+  if (!on) { m.hidden = true; btn.setAttribute('aria-expanded', 'false'); return; }
+  m.innerHTML = Object.entries(BOARDS).map(([k, B]) => { const c = B.badge ? B.badge() : 0; return `<button role="option" class="db-opt ${QB.mode === k ? 'on' : ''}" data-board="${k}" aria-selected="${QB.mode === k}"><i>${B.ic}</i><span><b>${B.name}</b><small>${esc(B.sub())}</small></span>${c ? `<mark class="db-n ${k}" aria-label="${c} new">${c}</mark>` : ''}${QB.mode === k ? '<em>✓</em>' : ''}</button>`; }).join('');
+  m.hidden = false; btn.setAttribute('aria-expanded', 'true');
+}
+$('#dbSwitch').onclick = e => { e.stopPropagation(); dbMenu(); };
+$('#dbMenu').addEventListener('click', e => { const o = e.target.closest('[data-board]'); if (!o) return; dbMenu(false); setDrawerBoard(o.dataset.board); });
+document.addEventListener('pointerdown', e => { const m = $('#dbMenu'); if (m && !m.hidden && !m.contains(e.target) && !$('#dbSwitch').contains(e.target)) dbMenu(false); }, true);
+$('#qbAdd').onclick = () => QB.mode === 'inbox' ? inAddMenu() : QB.mode === 'ideas' ? ideaAddCard() : actionSheet('Add a quote', [
   { label: '✍︎ New quote…', sub: 'Customer, RFQ #, items, due date, value', primary: true, fn: () => qbEdit(null) },
   { label: '📋 Paste an email', sub: 'Copy the RFQ in Mail first', fn: () => qbPasteClipboard() },
   { label: '✏️ Blank card to handwrite', fn: () => { const t = addManualQuote(); if (t) boardFlash(QPI, t.id); } }]);
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && QB.open && !document.querySelector('.modal-wrap:not([hidden])')) qbOpen(false); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && QB.open && !document.querySelector('.modal-wrap:not([hidden])')) { if (!$('#dbMenu').hidden) dbMenu(false); else qbOpen(false); } });
 
 /* resize: drag the left edge; snaps to half / full; double-tap toggles */
 { const h = $('#qbResize'); let rz = null, lastTap = 0;
   h.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); rz = { pid: e.pointerId, x0: e.clientX, moved: false }; try { h.setPointerCapture(e.pointerId); } catch (_) {} QD.classList.add('resizing'); });
   window.addEventListener('pointermove', e => { if (!rz || e.pointerId !== rz.pid) return; if (Math.abs(e.clientX - rz.x0) > 4) rz.moved = true; if (!rz.moved) return; const f = Math.max(0.3, Math.min(1, (innerWidth - e.clientX) / innerWidth)); rz.f = f; qbApplyW(f); });
   const end = e => { if (!rz || e.pointerId !== rz.pid) return; QD.classList.remove('resizing'); const r = rz; rz = null;
-    if (!r.moved) { const now = Date.now(); if (now - lastTap < 350) { localStorage.setItem('qbW', qbW() >= 0.99 ? '0.5' : '1'); qbApplyW(); qbRender(); } lastTap = now; return; }
+    if (!r.moved) { const now = Date.now(); if (now - lastTap < 350) { localStorage.setItem(curB().wkey, qbW() >= 0.99 ? String(curB().wdef) : '1'); qbApplyW(); qbRender(); } lastTap = now; return; }
     let f = r.f || qbW(); if (f > 0.86) f = 1; else if (Math.abs(f - 0.5) < 0.07) f = 0.5; else if (f < 0.34) { qbApplyW(); qbOpen(false); return; }
-    localStorage.setItem('qbW', String(Math.round(f * 1000) / 1000)); qbApplyW(f); qbRender(); };
+    localStorage.setItem(curB().wkey, String(Math.round(f * 1000) / 1000)); qbApplyW(f); qbRender(); };
   window.addEventListener('pointerup', end, true); window.addEventListener('pointercancel', end, true); }
 
 /* open by swiping in from the right edge (finger or Pencil); close by swiping the header right; pull the header down to check email */
@@ -315,7 +396,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && QB.open &&
   head.addEventListener('pointerdown', e => { if (e.target.closest('button, a, input') || (e.pointerType === 'mouse' && e.button)) return; hg = { pid: e.pointerId, x0: e.clientX, y0: e.clientY, mode: '' }; try { head.setPointerCapture(e.pointerId); } catch (_) {} });
   window.addEventListener('pointermove', e => {
     if (!hg || e.pointerId !== hg.pid) return; const dx = e.clientX - hg.x0, dy = e.clientY - hg.y0;
-    if (!hg.mode) { if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) hg.mode = 'x'; else if (dy > 8 && dy > Math.abs(dx)) hg.mode = 'pull'; else return; }
+    if (!hg.mode) { if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) hg.mode = 'x'; else if (dy > 8 && dy > Math.abs(dx) && QB.mode === 'quotes') hg.mode = 'pull'; else return; }
     if (hg.mode === 'pull') { const off = Math.min(90, dy * 0.55); hg.armed = off > 44; QD.style.setProperty('--qpull', off + 'px'); QD.classList.add('pulling'); QD.classList.toggle('pull-armed', hg.armed); pull.firstElementChild.textContent = hg.armed ? '↑ Release to check email' : '↓ Pull to check email'; }
     else { QD.style.transform = dx > 0 ? `translateX(${dx}px)` : ''; hg.close = dx > 90; }
   });
@@ -326,7 +407,8 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && QB.open &&
 /* drawer taps */
 QD.addEventListener('click', e => {
   const a = e.target.closest('[data-qact]'); if (!a) return;
-  if (a.dataset.qact === 'unlock') { pinUnlockFlow(quoteNote()).then(qbRender); return; }
+  if (a.dataset.qact === 'unlock') { pinUnlockFlow(curB().note()).then(qbRender); return; }
+  if (a.closest('#ibHost')) return;
   const w = a.closest('.bcard-wrap'), t = w && findCard(QPI, w.dataset.id); if (!t) return;
   if (a.dataset.qact === 'edit') { e.preventDefault(); qbEdit(t); }
   if (a.dataset.qact === 'reply') { e.preventDefault(); const q = t.q; location.href = `mailto:${encodeURIComponent(q.email)}?subject=${encodeURIComponent(('Re: ' + (q.subject || 'Your RFQ' + (q.rfq ? ' ' + q.rfq : ''))).replace(/[\r\n]+/g, ' '))}`; }
@@ -413,13 +495,17 @@ async function intakeSnapToQuotes(snap, via) {
   }
   return intakeToQuotes(emailFromSnap(snap), via);
 }
-QD.addEventListener('dragover', e => { if (qbSealed()) return; e.preventDefault(); e.stopPropagation(); QD.classList.add('dropping'); });
+QD.addEventListener('dragover', e => { if (QB.mode === 'ideas' || curB().sealed()) return; e.preventDefault(); e.stopPropagation(); QD.classList.add('dropping'); });
 QD.addEventListener('dragleave', e => { if (!QD.contains(e.relatedTarget)) QD.classList.remove('dropping'); });
-QD.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); QD.classList.remove('dropping'); if (qbSealed()) return toast('🔒 Unlock the Quote Board first'); intakeSnapToQuotes(snapTransfer(e.dataTransfer), 'drop'); });
+QD.addEventListener('drop', e => { if (QB.mode === 'ideas') return; e.preventDefault(); e.stopPropagation(); QD.classList.remove('dropping');
+  if (QB.mode === 'inbox') { if (inSealed()) return toast('🔒 Unlock the Inbox first'); return inIntake(snapTransfer(e.dataTransfer), 'drop'); }
+  if (qbSealed()) return toast('🔒 Unlock the Quote Board first'); intakeSnapToQuotes(snapTransfer(e.dataTransfer), 'drop'); });
 let qbTouchAt = 0; QD.addEventListener('pointerdown', () => { qbTouchAt = Date.now(); }, true);
 document.addEventListener('paste', e => {
-  if (!QB.open || Date.now() - qbTouchAt > 120000 || e.target.closest && e.target.closest('input, textarea, [contenteditable]')) return;
-  e.preventDefault(); e.stopImmediatePropagation(); intakeSnapToQuotes(snapTransfer(e.clipboardData), 'paste');
+  if (!QB.open || QB.mode === 'ideas' || Date.now() - qbTouchAt > 120000 || e.target.closest && e.target.closest('input, textarea, [contenteditable]')) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (QB.mode === 'inbox') { if (inSealed()) return toast('🔒 Unlock the Inbox first'); return inIntake(snapTransfer(e.clipboardData), 'paste'); }
+  intakeSnapToQuotes(snapTransfer(e.clipboardData), 'paste');
 }, true);
 async function qbPasteClipboard() {
   try {
@@ -433,17 +519,18 @@ async function qbPasteClipboard() {
   b.onclick = () => { const s = selection; if (!s) return; if (!s.ids.length) { toast('Select some handwriting first'); return; } $('#lassoMenu').hidden = true;
     const qn = ensureQuoteNote(); if (qbSealed()) return toast('🔒 Unlock the Quote Board first');
     const t = cardFromInk({ note: curNote(), pi: s.pi, ids: s.ids.slice() }, qn, QPI, boardCols(qn.pages[0])[0].id);
-    if (t) { t.q = { customer: '', contact: '', email: '', rfq: '', items: [], specs: [], due: null, delivery: null, deliveryText: '', subject: '', date: null, source: 'ink', msgIds: [], keys: [], convId: '', webLink: '', attachments: [], value: null, notes: '', followups: [] }; saveNote(qn, true); qbOpen(true, { quiet: true }); boardFlash(QPI, t.id); } }; }
+    if (t) { t.q = { customer: '', contact: '', email: '', rfq: '', items: [], specs: [], due: null, delivery: null, deliveryText: '', subject: '', date: null, source: 'ink', msgIds: [], keys: [], convId: '', webLink: '', attachments: [], value: null, notes: '', followups: [] }; saveNote(qn, true); qbOpen(true, { quiet: true, mode: 'quotes' }); boardFlash(QPI, t.id); } }; }
 
 /* ======================= integration: lock, notes, search, deep links, settings ======================= */
-{ const _ln = lockNote; lockNote = async function (n, ...a) { const r = await _ln.call(this, n, ...a); if (isQuoteNote(n)) { QB.undo = []; QB.redo = []; qbRender(); } return r; }; if (window.PencilLock) PencilLock.lockNote = lockNote;
-  for (const nm of ['unlockWithPin', 'unlockWith']) { const f = window[nm]; if (typeof f !== 'function') continue; const w = async function (n, ...a) { const r = await f.call(this, n, ...a); if (isQuoteNote(n)) qbRender(); return r; }; window[nm] = w; if (window.PencilLock) PencilLock[nm] = w; } }
+{ const _ln = lockNote; lockNote = async function (n, ...a) { const r = await _ln.call(this, n, ...a); if (isQuoteNote(n)) { QB.undo = []; QB.redo = []; qbRender(); } if (isIdeaNote(n)) { IB.undo = []; IB.redo = []; qbRender(); } if (n && n.id === INBOX_ID) { INB.undo = []; INB.redo = []; qbRender(); qbBadge(); } return r; }; if (window.PencilLock) PencilLock.lockNote = lockNote;
+  for (const nm of ['unlockWithPin', 'unlockWith']) { const f = window[nm]; if (typeof f !== 'function') continue; const w = async function (n, ...a) { const r = await f.call(this, n, ...a); if (isQuoteNote(n) || isIdeaNote(n) || (n && n.id === INBOX_ID)) { qbRender(); qbBadge(); } return r; }; window[nm] = w; if (window.PencilLock) PencilLock[nm] = w; } }
 { const _on = openNote; openNote = function (id) {
-    if (id !== QUOTE_ID) return _on(id);
-    if (!curNote() || S.cur === QUOTE_ID) { const alt = S.notes.filter(n => n.id !== QUOTE_ID).sort((a, b) => b.updatedAt - a.updatedAt)[0]; if (alt) _on(alt.id); else createNote(S.notebooks[0].id); }
-    if (window.__ready) qbOpen(true);     // at boot (most-recent note = the board) just open a real note
+    const SYS = [QUOTE_ID, IDEA_ID, INBOX_ID];
+    if (!SYS.includes(id)) return _on(id);
+    if (!curNote() || SYS.includes(S.cur)) { const alt = S.notes.filter(n => !SYS.includes(n.id)).sort((a, b) => b.updatedAt - a.updatedAt)[0]; if (alt) _on(alt.id); else createNote(S.notebooks[0].id); }
+    if (window.__ready) qbOpen(true, { mode: id === IDEA_ID ? 'ideas' : id === INBOX_ID ? 'inbox' : 'quotes' });     // at boot (most-recent note = the board) just open a real note
   }; }
-{ const _jt = jumpTo; jumpTo = function (noteId, taskId) { if (noteId !== QUOTE_ID) return _jt(noteId, taskId); if (isDrawer()) setPanel(false); qbOpen(true); if (taskId) setTimeout(() => boardFlash(QPI, taskId), 60); }; }
+{ const _jt = jumpTo; jumpTo = function (noteId, taskId) { if (noteId === INBOX_ID) { if (isDrawer()) setPanel(false); qbOpen(true, { mode: 'inbox' }); if (taskId) setTimeout(() => inFlash(taskId), 60); return; } const pi = piOfSysNote(noteId); if (pi === null) return _jt(noteId, taskId); if (isDrawer()) setPanel(false); qbOpen(true, { mode: pi === IPI ? 'ideas' : 'quotes' }); if (taskId) setTimeout(() => boardFlash(pi, taskId), 60); }; }
 { const _nst = noteSearchText; noteSearchText = function (n) { const base = _nst(n); if (!isQuoteNote(n) || qbSealed()) return base;
     return base + ' ' + quoteCards().map(t => { const q = t.q; return [q.customer, q.contact, q.email, q.rfq, q.subject, q.notes, q.deliveryText, ...(q.items || []).map(i => i.desc), ...(q.specs || []), ...(q.followups || []).map(f => f.snippet)].join(' '); }).join(' ').toLowerCase(); }; }
 { const _rs = renderSidebar; renderSidebar = function () {
@@ -453,17 +540,28 @@ async function qbPasteClipboard() {
     const row = document.createElement('div'); row.className = 'today-row qb-row'; row.id = 'qbRow'; row.setAttribute('role', 'button');
     row.innerHTML = `💲 <span class="name">Quote Board${hit ? `<small class="s hit">${esc(hit.text)}</small>` : ''}</span><span class="cnt ${open ? 'on' : ''}">${qbSealed() ? '🔒' : open}</span>`;
     const t = box.querySelector('#todayRow'); t ? t.after(row) : box.prepend(row);
+    const ib = ideaNote(); if (!ib || box.querySelector('#ibRow') || (q && !noteSearchText(ib).includes(q))) return;
+    const ic = ideaCards(), iopen = ic.filter(c => !c.done).length, ihit = q && !ibSealed() ? ic.find(c => String(c.text || '').toLowerCase().includes(q)) : null;
+    const r2 = document.createElement('div'); r2.className = 'today-row qb-row'; r2.id = 'ibRow'; r2.setAttribute('role', 'button');
+    r2.innerHTML = `💡 <span class="name">Idea Board${ihit ? `<small class="s hit">${esc(ihit.text)}</small>` : ''}</span><span class="cnt ${iopen ? 'on' : ''}">${ibSealed() ? '🔒' : iopen}</span>`;
+    row.before(r2);
   }; }
-$('#notebookList').addEventListener('click', e => { const r = e.target.closest('#qbRow'); if (!r) return; e.stopPropagation(); if (isDrawer()) setSidebar(false); qbOpen(true); const q = S.search.trim().toLowerCase(); if (q) { const t = quoteCards().find(c => [c.text, c.q.customer, c.q.rfq, c.q.subject, ...(c.q.items || []).map(i => i.desc)].join(' ').toLowerCase().includes(q)); if (t) setTimeout(() => boardFlash(QPI, t.id), 80); } }, true);
+$('#notebookList').addEventListener('click', e => { const ir = e.target.closest('#ibRow'); if (ir) { e.stopPropagation(); if (isDrawer()) setSidebar(false); qbOpen(true, { mode: 'ideas' }); const q = S.search.trim().toLowerCase(); if (q) { const t = ideaCards().find(c => String(c.text || '').toLowerCase().includes(q)); if (t) setTimeout(() => boardFlash(IPI, t.id), 80); } return; }
+  const r = e.target.closest('#qbRow'); if (!r) return; e.stopPropagation(); if (isDrawer()) setSidebar(false); qbOpen(true, { mode: 'quotes' }); const q = S.search.trim().toLowerCase(); if (q) { const t = quoteCards().find(c => [c.text, c.q.customer, c.q.rfq, c.q.subject, ...(c.q.items || []).map(i => i.desc)].join(' ').toLowerCase().includes(q)); if (t) setTimeout(() => boardFlash(QPI, t.id), 80); } }, true);
 { const _ra = renderAll; renderAll = function (...a) { const r = _ra.apply(this, a); if (QB.open) qbRefreshBoard(); else qbBadge(); return r; }; }
 { const _ss = settingsSections; settingsSections = function () {
     const secs = _ss(), i = secs.findIndex(s => s.id === 'storage');
-    const sec = { id: 'quotes', h: 'Quote Board', note: 'One board for every RFQ, reachable from the 💲 tab on the right edge.', rows: [
+    const sec = { id: 'quotes', h: 'Boards (slide-out)', note: 'The 💲 Quote Board, 💡 Idea Board and 📥 Inbox share one slide-out panel — tap 📋 in the top bar or swipe in from the right edge, then pick a board from the dropdown at the top.', rows: [
+      { label: '💡 Open the Idea Board', sub: 'Projects, tasks & ideas — To Do · Doing · Done', fn: () => qbOpen(true, { mode: 'ideas' }) },
       { label: '📧 Email sync: ' + syncProviderLabel() + '…', sub: 'Work email (Microsoft 365 / Exchange) — even if you read mail in Apple Mail', fn: () => qbEmailSettings() },
-      { label: '⟳ Check email now', fn: () => { qbOpen(true, { quiet: true }); syncNow({ manual: true }); } },
-      { label: '💲 Open the Quote Board', fn: () => qbOpen(true) },
+      { label: '⟳ Check email now', fn: () => { qbOpen(true, { quiet: true, mode: 'quotes' }); syncNow({ manual: true }); } },
+      { label: '💲 Open the Quote Board', fn: () => qbOpen(true, { mode: 'quotes' }) },
       { label: '🙈 Skipped emails…', sub: 'Emails the sync passed over — add any it got wrong', fn: () => qbSkippedSheet() },
-      { label: '🔒 Lock the Quote Board…', sub: 'Encrypts quotes, contacts and prices with Pencil Lock', fn: () => { qbOpen(true); $('#qbLock').click(); } }] };
+      { label: '🔒 Lock the Quote Board…', sub: 'Encrypts quotes, contacts and prices with Pencil Lock', fn: () => { qbOpen(true, { mode: 'quotes' }); $('#qbLock').click(); } },
+      { label: '🔒 Lock the Idea Board…', fn: () => { qbOpen(true, { mode: 'ideas' }); $('#qbLock').click(); } },
+      { label: '📥 Open the Inbox', sub: 'Emails you paste or drop, with summaries, priorities and threads — plus meeting briefs', fn: () => qbOpen(true, { mode: 'inbox' }) },
+      { label: '📧 Emails the quote sync skips → Inbox: ' + (localStorage.getItem('inboxFromSync') === '1' ? 'On' : 'Off'), sub: 'Off: they only go to 🙈 Skipped emails. On: they also get a summary card in the 📥 Inbox', fn: () => { const on = localStorage.getItem('inboxFromSync') === '1'; localStorage.setItem('inboxFromSync', on ? '0' : '1'); toast(on ? 'Skipped emails stay out of the Inbox' : 'Skipped work emails will also land in the 📥 Inbox'); openSettings('quotes'); } },
+      { label: '🔒 Lock the Inbox…', fn: () => { qbOpen(true, { mode: 'inbox' }); $('#qbLock').click(); } }] };
     secs.splice(i < 0 ? secs.length : i, 0, sec); return secs; }; }
 
 /* ======================= email sync layer =======================
@@ -476,7 +574,9 @@ function syncProviderLabel() { const p = activeProvider(); if (!p) return 'Not c
 const qbLastSync = () => +localStorage.getItem('qbLastSync') || 0;
 function agoText(ms) { const s = (Date.now() - ms) / 1000; if (s < 60) return 'just now'; if (s < 3600) return Math.floor(s / 60) + ' min ago'; if (s < 86400) return Math.floor(s / 3600) + ' h ago'; return new Date(ms).toLocaleDateString([], { month: 'short', day: 'numeric' }); }
 function qbSyncStatus() {
-  const el = $('#qbSync'); if (!el) return; const p = activeProvider(), st = p && p.status();
+  const el = $('#qbSync'); if (!el) return;
+  if (QB.mode !== 'quotes') { el.classList.remove('err'); el.textContent = curB().sub(); return; }
+  const p = activeProvider(), st = p && p.status();
   el.classList.toggle('err', !!QSync.err && !QSync.running);
   el.textContent = QSync.running ? 'Checking…' : QSync.err ? '⚠︎ ' + QSync.err : !st || !st.signedIn ? 'Email not connected — tap ⟳ Refresh' : qbLastSync() ? 'Synced ' + agoText(qbLastSync()) : 'Not synced yet';
 }
@@ -496,11 +596,11 @@ async function syncNow({ manual = false, via = 'button' } = {}) {
     let added = 0, fu = 0, skipped = 0;
     msgs.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));   // oldest first so replies attach to the original
     const keep = [];
-    for (const m of msgs) { if (isRFQ(m.subject, m.text)) keep.push(m); else if (!m.fromSelf) { qbSkip(m, 'No RFQ / quote wording'); skipped++; } }
+    for (const m of msgs) { if (isRFQ(m.subject, m.text)) keep.push(m); else if (!m.fromSelf) { qbSkip(m, 'No RFQ / quote wording'); skipped++; if (typeof inFromSync === 'function') await inFromSync(m); } }
     const verdicts = await grokClassify(keep.filter(m => !m.fromSelf && !findQuoteMatch({ subject: m.subject || '', fromAddr: (m.from && m.from.address) || parseAddr(m.from).address, date: m.date, messageId: m.messageId || '', conversationId: m.conversationId || '' })));
     for (const m of keep) {
       const v = verdicts.get(m);
-      if (v && !v.rfq) { qbSkip(m, 'Grok: ' + (v.reason || 'not a request for a quote')); skipped++; continue; }
+      if (v && !v.rfq) { qbSkip(m, 'Grok: ' + (v.reason || 'not a request for a quote')); skipped++; if (typeof inFromSync === 'function') await inFromSync(m); continue; }
       const r = await addQuoteFromEmail(m, { source: p.label, silent: true, followOnly: !!m.fromSelf });
       if (r.status === 'new') added++; else if (r.status === 'followup') fu++; else if (r.status === 'locked') break;
     }
@@ -544,13 +644,15 @@ function qbSkippedSheet() {
   if (qbSealed()) return toast('🔒 Unlock the Quote Board first');
   const list = qbSkipped(), w = modalWrap('qbSkipWrap');
   w.innerHTML = `<div class="sheet qb-edit" role="dialog" aria-modal="true" aria-label="Skipped emails"><h3>🙈 Skipped emails</h3><p class="fine">Emails the sync looked at but didn’t turn into quotes. Add any it got wrong.</p>
-    ${list.length ? `<ul class="qb-skip">${list.map((x, i) => `<li><div><b>${esc(x.subject || '(no subject)')}</b><small>${esc((x.from && (x.from.name || x.from.address)) || '')}${x.date ? ' · ' + esc(new Date(x.date).toLocaleDateString([], { month: 'short', day: 'numeric' })) : ''} · ${esc(x.reason)}</small></div><button class="btn" data-sk="${i}">＋ Add</button></li>`).join('')}</ul>` : '<p class="fine">Nothing skipped.</p>'}
+    ${list.length ? `<ul class="qb-skip">${list.map((x, i) => `<li><div><b>${esc(x.subject || '(no subject)')}</b><small>${esc((x.from && (x.from.name || x.from.address)) || '')}${x.date ? ' · ' + esc(new Date(x.date).toLocaleDateString([], { month: 'short', day: 'numeric' })) : ''} · ${esc(x.reason)}</small></div><button class="btn" data-sk="${i}">＋ Quote</button><button class="btn" data-ski="${i}" title="Add to the Inbox instead">📥 Inbox</button></li>`).join('')}</ul>` : '<p class="fine">Nothing skipped.</p>'}
     <div class="sheet-actions">${list.length ? '<button class="btn danger" data-sk="clear">Clear list</button>' : ''}<div class="spacer"></div><button class="btn primary" data-sk="x">Done</button></div></div>`;
   w.hidden = false;
-  w.onclick = async e => { if (e.target === w) { w.hidden = true; return; } const b = e.target.closest('[data-sk]'); if (!b) return; const k = b.dataset.sk;
+  w.onclick = async e => { if (e.target === w) { w.hidden = true; return; }
+    const bi = e.target.closest('[data-ski]'); if (bi) { const x = list[+bi.dataset.ski]; localStorage.setItem('qbSkipped', JSON.stringify(list.filter((_, j) => j !== +bi.dataset.ski))); w.hidden = true; await inFromSync(x, { force: true, open: true }); return; }
+    const b = e.target.closest('[data-sk]'); if (!b) return; const k = b.dataset.sk;
     if (k === 'x') { w.hidden = true; return; } if (k === 'clear') { localStorage.removeItem('qbSkipped'); w.hidden = true; toast('Skipped list cleared'); return; }
     const x = list[+k]; const r = await addQuoteFromEmail(x, { source: 'skipped' }); localStorage.setItem('qbSkipped', JSON.stringify(list.filter((_, j) => j !== +k)));
-    w.hidden = true; qbOpen(true, { quiet: true }); if (r.card) boardFlash(QPI, r.card.id); toast(r.status === 'new' ? '💲 Added from Skipped' : r.status === 'followup' ? '↩︎ Added as a follow-up' : 'Already on the Quote Board'); };
+    w.hidden = true; qbOpen(true, { quiet: true, mode: 'quotes' }); if (r.card) boardFlash(QPI, r.card.id); toast(r.status === 'new' ? '💲 Added from Skipped' : r.status === 'followup' ? '↩︎ Added as a follow-up' : 'Already on the Quote Board'); };
 }
 function qbEmailSettings(opt = {}) {
   const p = activeProvider();
@@ -560,11 +662,12 @@ function qbEmailSettings(opt = {}) {
 
 /* ======================= startup (after notes have loaded from IndexedDB) ======================= */
 const whenAppReady = f => { if (window.__ready) return f(); const t = setInterval(() => { if (window.__ready) { clearInterval(t); f(); } }, 40); };
-qbApplyW();
+setDrawerBoard(QB.mode, { render: false });
 whenAppReady(() => {
+  try { ensureIdeaNote(); } catch (e) { console.warn(e); }
   if (localStorage.getItem('qbOpen') === '1') qbOpen(true, { quiet: true }); else qbBadge();
   renderSidebar(); qbSyncStatus();
   setTimeout(qbAutoSync, 2500);
 });
-window.QuoteBoard = { whenAppReady, isRFQ, extractQuote, addQuoteFromEmail, addManualQuote, findQuoteMatch, quoteNote, ensureQuoteNote, qbOpen, qbRender, syncNow, QSync, registerQuoteProvider, activeProvider, emailFromSnap, intakeSnapToQuotes, qbEdit, money, QB, grokClassify, qbSkipped, qbSkippedSheet };
+window.QuoteBoard = { qbBadge, setDrawerBoard, ensureIdeaNote, ideaNote, BOARDS, dbMenu, whenAppReady, isRFQ, extractQuote, addQuoteFromEmail, addManualQuote, findQuoteMatch, quoteNote, ensureQuoteNote, qbOpen, qbRender, syncNow, QSync, registerQuoteProvider, activeProvider, emailFromSnap, intakeSnapToQuotes, qbEdit, money, QB, grokClassify, qbSkipped, qbSkippedSheet };
 { const _ss2 = setSidebar; setSidebar = function (open, ...a) { if (open && QB.open && qbW() >= 0.99) qbOpen(false); return _ss2.call(this, open, ...a); }; }

@@ -2,7 +2,7 @@
    One ＋ Insert menu, one grouped Settings screen, a Gestures sheet, a short first-run tour,
    Undo for every delete, a safe importer, storage-full handling and lock hardening.
    Nothing is removed — features are only reached through fewer, more consistent doors. */
-const APP_VERSION = 'v20';
+const APP_VERSION = 'v21';
 
 /* ---------- import sanitizer: hostile backups must not inject markup ----------
    Rendering escapes free text, but ids/enums/colors are interpolated into attributes, so they are
@@ -49,15 +49,15 @@ $('#importFile').onchange = async e => {
       for (const nb of nbs) { S.notebooks = S.notebooks.filter(x => x.id !== nb.id).concat(nb); await saveNotebook(nb); }
       for (const n of incoming) { S.notes = S.notes.filter(x => x.id !== n.id).concat(n); await DB.put('notes', n); }
       if (!S.notebooks.length) { const nb = { id: uid('nb'), name: 'Notebook', order: 0 }; S.notebooks.push(nb); await saveNotebook(nb); }
-      for (const n of S.notes) if (n.id !== 'quoteboard' && !S.notebooks.find(b => b.id === n.notebookId)) { n.notebookId = S.notebooks[0].id; DB.put('notes', n); }
-      normalizeOrder(); if (!S.notes.some(n => n.id !== 'quoteboard')) createNote(S.notebooks[0].id);
-      openNote((curNote() || S.notes.find(n => n.id !== 'quoteboard')).id); renderAll();
+      for (const n of S.notes) if (!['quoteboard', 'ideaboard', 'inbox'].includes(n.id) && !S.notebooks.find(b => b.id === n.notebookId)) { n.notebookId = S.notebooks[0].id; DB.put('notes', n); }
+      normalizeOrder(); if (!S.notes.some(n => !['quoteboard', 'ideaboard', 'inbox'].includes(n.id))) createNote(S.notebooks[0].id);
+      openNote((curNote() || S.notes.find(n => !['quoteboard', 'ideaboard', 'inbox'].includes(n.id))).id); renderAll();
       const extra = [kept && `kept ${kept} newer on this iPad`, bad && `skipped ${bad} damaged`, badA && `skipped ${badA} unsafe attachment${badA > 1 ? 's' : ''}`, st.fixed && `cleaned ${st.fixed} unsafe value${st.fixed > 1 ? 's' : ''}`].filter(Boolean);
       toast(`Imported ${incoming.length} note${incoming.length === 1 ? '' : 's'}` + (extra.length ? ' · ' + extra.join(' · ') : ''), 5000);
     } catch (err) { console.error(err); toast('Import stopped: ' + (err && err.message || err) + (replace ? '' : ' — your notes were not changed'), 6000); }
   };
-  const mine = S.notes.length;
-  actionSheet(`Import ${notes.length} note${notes.length === 1 ? '' : 's'}?` + (bad ? ` (${bad} damaged will be skipped)` : ''), [
+  const mine = S.notes.filter(n => !n.system).length, nIn = notes.filter(n => !n.system).length;
+  actionSheet(`Import ${nIn} note${nIn === 1 ? '' : 's'}?` + (bad ? ` (${bad} damaged will be skipped)` : ''), [
     { label: 'Merge — keep whichever copy is newer', primary: true, fn: () => run(false) },
     { label: `Replace everything — deletes your ${mine} current note${mine === 1 ? '' : 's'}`, danger: true, fn: () => actionSheet('Replace all notes on this iPad?', [
       { label: '⬇︎ Export my current notes first', fn: () => $('#exportBtn').click() },

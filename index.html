@@ -52,7 +52,7 @@
       <button class="icon-btn" id="todayBtn" aria-label="Today" title="Today">☀️</button>
       <button class="icon-btn" id="focusBtn" aria-label="Full screen" title="Full screen writing">⤢</button>
       <button class="icon-btn" id="noteMenuBtn" aria-label="Note options" title="Note options">⋯</button>
-      <button class="icon-btn" id="quotesBtn" aria-label="Quote Board" title="Quote Board">💲</button>
+      <button class="icon-btn" id="quotesBtn" aria-label="Boards" title="Boards — Quote Board, Idea Board &amp; Inbox">📋</button>
       <button class="icon-btn" id="togglePanel" aria-label="Reminders" title="Reminders &amp; tasks">🔔<span id="dueBadge" class="badge" hidden></span></button>
     </header>
 
@@ -110,10 +110,11 @@
   </main>
 
 
-  <aside id="qbDrawer" aria-label="Quote Board" hidden>
-    <div id="qbResize" role="separator" aria-label="Drag to resize the Quote Board" title="Drag to resize · double-tap to switch half / full"><i></i></div>
+  <aside id="qbDrawer" aria-label="Boards" hidden>
+    <div id="qbResize" role="separator" aria-label="Drag to resize the board panel" title="Drag to resize · double-tap to switch half / full"><i></i></div>
     <header id="qbHead">
-      <div class="qb-title"><b>💲 Quote Board</b><small id="qbSync">Email sync off</small></div>
+      <div class="qb-title"><button id="dbSwitch" class="db-switch" aria-haspopup="listbox" aria-expanded="false" title="Switch board"><b id="dbName"><i>💲</i>Quote Board</b><span class="db-car" aria-hidden="true">▾</span><em id="dbDot" hidden></em></button><small id="qbSync">Email sync off</small></div>
+      <div id="dbMenu" role="listbox" aria-label="Choose a board" hidden></div>
       <div class="spacer"></div>
       <button class="qb-btn qb-refresh" id="qbRefresh" aria-label="Refresh — check email for new RFQs"><i>⟳</i><span>Refresh</span></button>
       <button class="qb-btn" id="qbAdd" aria-label="Add a quote"><i>＋</i><span>Quote</span></button>
@@ -124,9 +125,11 @@
       <button class="qb-btn icon" id="qbClose" aria-label="Close the Quote Board">✕</button>
       <div id="qbPull" aria-hidden="true"><span>↓ Pull to check email</span></div>
     </header>
-    <div id="qbHost" data-pi="-1"></div>
+    <div id="qbHost" class="dr-host" data-pi="-1"></div>
+    <div id="ibHost" class="dr-host" data-pi="-2" hidden></div>
+    <div id="inHost" class="dr-host in-host" hidden></div>
   </aside>
-  <button id="qbTab" aria-label="Open the Quote Board" title="Quote Board — tap or swipe in from the right edge"><span>💲</span><b>Quotes</b><em id="qbTabBadge" hidden></em></button>
+  <button id="qbTab" aria-label="Open the board panel" title="Boards — tap or swipe in from the right edge"><span>💲</span><b>Quotes</b><em id="qbTabBadge" hidden></em></button>
 
   <aside id="panel" aria-label="Reminders and tasks">
     <div class="panel-head">
@@ -184,5 +187,7 @@
   <script src="audit.js"></script>
   <script src="quotes.js"></script>
   <script src="graph.js"></script>
+  <script src="v21.js"></script>
+  <script src="inbox.js"></script>
 </body>
 </html>

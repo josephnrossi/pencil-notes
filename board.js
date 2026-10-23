@@ -30,28 +30,40 @@ const lastColId = pg => { const c = boardCols(pg); return c[c.length - 1].id; };
 const BS = { g: null, editing: false, dirty: false, suppress: false, keep: {} };
 /* v19: board hosts. pi >= 0 = a board page of the open note; pi === QPI = the global Quote Board drawer
    (a hidden system note, so Pencil Lock, Export/Import, search, reminders and Today cover it for free). */
-const QPI = -1, QUOTE_ID = 'quoteboard';
-const QB = { undo: [], redo: [], host: null, open: false };
+/* v21: a second drawer board — pi === IPI = the 💡 Idea Board (hidden system note 'ideaboard'), the former Project Board.
+   The drawer shows one of them at a time (QB.mode = 'quotes' | 'ideas'); each keeps its own undo stack. */
+const QPI = -1, IPI = -2, QUOTE_ID = 'quoteboard', IDEA_ID = 'ideaboard', INBOX_ID = 'inbox';   // v21b: 📥 Inbox = hidden system note 'inbox' (not a board; rendered by inbox.js)
+const QB = { undo: [], redo: [], host: null, open: false, mode: 'quotes' };
+const IB = { undo: [], redo: [], host: null };
+const isSysPi = pi => pi === QPI || pi === IPI;
+const sysSt = pi => pi === IPI ? IB : QB;
 const quoteNote = () => S.notes.find(n => n.id === QUOTE_ID);
-const bN = pi => pi === QPI ? quoteNote() : curNote();
-const bP = (n, pi) => n ? (pi === QPI ? (n.id === QUOTE_ID ? n.pages[0] : null) : n.pages[pi]) : null;
-const bE = pi => pi === QPI ? QB.host : pageEls[pi];
+const ideaNote = () => S.notes.find(n => n.id === IDEA_ID);
+const inboxNote = () => S.notes.find(n => n.id === INBOX_ID);
+const sysNoteId = pi => pi === IPI ? IDEA_ID : QUOTE_ID;
+const piOfSysNote = id => id === IDEA_ID ? IPI : id === QUOTE_ID ? QPI : null;
+const drawerPi = () => QB.mode === 'ideas' ? IPI : QPI;
+const drawerShows = pi => QB.open && drawerPi() === pi;
+const bN = pi => pi === QPI ? quoteNote() : pi === IPI ? ideaNote() : curNote();
+const bP = (n, pi) => n ? (isSysPi(pi) ? (n.id === sysNoteId(pi) ? n.pages[0] : null) : n.pages[pi]) : null;
+const bE = pi => isSysPi(pi) ? sysSt(pi).host : pageEls[pi];
 const bPi = el => +el.closest('[data-pi]').dataset.pi;
-const bPage = pi => pi === QPI ? 0 : pi;           // real page index (reminder editor, items)
-function bSnap(pi) { return pi === QPI ? JSON.stringify(quoteNote().pages) : snapshot(); }
-function bPushSnap(pi, snap) { if (pi === QPI) { QB.undo.push(snap); if (QB.undo.length > 80) QB.undo.shift(); QB.redo = []; qbUndoUI(); } else { S.undo.push(snap); S.redo = []; updateUndo(); } }
-function bH(pi) { if (pi === QPI) bPushSnap(QPI, bSnap(QPI)); else pushHistory(); }
+const bPage = pi => isSysPi(pi) ? 0 : pi;           // real page index (reminder editor, items)
+function bSnap(pi) { return isSysPi(pi) ? JSON.stringify(bN(pi).pages) : snapshot(); }
+function bPushSnap(pi, snap) { if (isSysPi(pi)) { const st = sysSt(pi); st.undo.push(snap); if (st.undo.length > 80) st.undo.shift(); st.redo = []; qbUndoUI(); } else { S.undo.push(snap); S.redo = []; updateUndo(); } }
+function bH(pi) { if (isSysPi(pi)) bPushSnap(pi, bSnap(pi)); else pushHistory(); }
 function qbUndoUI() { if (typeof qbSyncUndo === 'function') qbSyncUndo(); }
-function qbRestore(from, to) {
-  const n = quoteNote(); if (!n || !from.length || (n.lock && !(typeof LK !== 'undefined' && LK.open && LK.open.has(n.id)))) return false;
-  to.push(JSON.stringify(n.pages)); n.pages = JSON.parse(from.pop()); saveNote(n, true); renderBoard(QPI); renderPanel(); qbUndoUI(); return true;
+function qbRestore(from, to, pi = QPI) {
+  const n = bN(pi); if (!n || !from.length || (n.lock && !(typeof LK !== 'undefined' && LK.open && LK.open.has(n.id)))) return false;
+  to.push(JSON.stringify(n.pages)); n.pages = JSON.parse(from.pop()); saveNote(n, true); renderBoard(pi); renderPanel(); qbUndoUI(); return true;
 }
-function bUndo(pi) { if (pi === QPI) qbRestore(QB.undo, QB.redo); else restore(S.undo, S.redo); }
+function bUndo(pi) { if (isSysPi(pi)) { const st = sysSt(pi); qbRestore(st.undo, st.redo, pi); } else restore(S.undo, S.redo); }
+const boardName = pi => pi === QPI ? ' on the Quote Board' : pi === IPI ? ' on the Idea Board' : '';
 /* done columns: by default the last column; a board may list several (Quote Board: Won + Lost) */
 const doneCols = pg => { const cols = boardCols(pg), d = (pg.board.doneCols || []).filter(id => cols.some(c => c.id === id)); return d.length ? d : [cols[cols.length - 1].id]; };
 const isDoneCol = (pg, colId) => boardCols(pg).length > 1 && doneCols(pg).includes(colId);
 const PAGES = $('#pages');
-const BHOSTS = [PAGES, document.getElementById('qbHost')].filter(Boolean);
+const BHOSTS = [PAGES, document.getElementById('qbHost'), document.getElementById('ibHost')].filter(Boolean);
 const onBoards = (type, fn, opt) => BHOSTS.forEach(h => h.addEventListener(type, fn, opt));
 const boardBusy = () => BS.editing || !!(BS.g && (BS.g.mode !== 'pending' || BS.g.ink));
 function buzz() { try { if (navigator.vibrate && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) navigator.vibrate(8); } catch (_) {} }
@@ -127,7 +139,7 @@ function renderBoard(pi) {
   BS.keep[pg.id] = null;
   applyFilter(b, pg); updateWarnings(pi);
 }
-function rerenderBoards() { BS.dirty = false; if (QB.open) renderBoard(QPI); const n = curNote(); if (!n) return; n.pages.forEach((pg, i) => { if (isBoardPage(pg)) renderBoard(i); }); }
+function rerenderBoards() { BS.dirty = false; if (QB.open) renderBoard(drawerPi()); const n = curNote(); if (!n) return; n.pages.forEach((pg, i) => { if (isBoardPage(pg)) renderBoard(i); }); }
 function afterChange(pi) { renderBoard(pi); renderSidebar(); renderPanel(); }
 
 /* ---------- card ink (re-uses the page ink engine: drawStroke / drawPenSeg, pressure, colours, highlighter, eraser) ---------- */
@@ -398,7 +410,7 @@ function liftFrame(g) {
   const W = $('#pages'), wr = W.getBoundingClientRect(), dock = planDock(), dr = dock.getBoundingClientRect();
   const overDock = g.x >= dr.left - 8 && g.x <= dr.right + 8 && g.y >= dr.top - 8 && g.y <= dr.bottom + 8;
   const hits = document.elementsFromPoint(g.x, g.y), inDrawer = hits.some(e => e.id === 'qbDrawer');
-  if (!overDock && !inDrawer && g.pi !== QPI) {   // page auto-scroll so a planner page further down the note can be reached
+  if (!overDock && !inDrawer && !isSysPi(g.pi)) {   // page auto-scroll so a planner page further down the note can be reached
     if (g.y > wr.bottom - 70 && g.y < wr.bottom + 40) W.scrollTop += Math.ceil((g.y - wr.bottom + 70) / 4);
     else if (g.y < wr.top + 40 && g.y > wr.top - 40) W.scrollTop -= Math.ceil((wr.top + 40 - g.y) / 4);
   }
@@ -409,7 +421,7 @@ function liftFrame(g) {
   let slot = null;
   let xb = null;     // v19: over another board (drawer ↔ note board page)?
   if (!overDock) { const col = hits.find(e => e.classList && e.classList.contains('bcol')), host = col && col.closest('[data-pi]');
-    if (col && host && bPi(host) !== g.pi && !(inDrawer && bPi(host) !== QPI)) xb = { type: 'xboard', pi: bPi(host), col: col.dataset.col, el: col }; }
+    if (col && host && bPi(host) !== g.pi && !(inDrawer && !isSysPi(bPi(host)))) xb = { type: 'xboard', pi: bPi(host), col: col.dataset.col, el: col }; }
   document.querySelectorAll('.bcol.bdrop-x').forEach(e => { if (!xb || e !== xb.el) e.classList.remove('bdrop-x'); }); if (xb) xb.el.classList.add('bdrop-x');
   if (!overDock && !xb && !inDrawer) {
     const pageEl = hits.find(e => e.classList && e.classList.contains('page'));
@@ -675,11 +687,11 @@ toggleDone = function (it) {
   if (o.done && !isDoneCol(pg, o.col)) { o.col = last; o.ord = -1; renumber(pg, last); renumber(pg, from); }
   else if (!o.done && isDoneCol(pg, o.col)) { o.col = cols[0].id; o.ord = -1; renumber(pg, o.col); renumber(pg, from); }
   else return;
-  saveNote(it.note, true); if (it.note.id === QUOTE_ID) { if (QB.open) renderBoard(QPI); } else if (it.note.id === S.cur) renderBoard(it.page);
+  saveNote(it.note, true); if (piOfSysNote(it.note.id) !== null) { if (drawerShows(piOfSysNote(it.note.id))) renderBoard(piOfSysNote(it.note.id)); } else if (it.note.id === S.cur) renderBoard(it.page);
 };
 function boardFlash(pi, id) {
   const rec = bE(pi), w = $('#pages'); if (!rec) return;
-  if (pi !== QPI) w.scrollTo({ top: rec.el.offsetTop, behavior: 'smooth' });
+  if (!isSysPi(pi)) w.scrollTo({ top: rec.el.offsetTop, behavior: 'smooth' });
   requestAnimationFrame(() => { const el = cardWrap(pi, id); if (!el) return; el.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' }); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); });
 }
 function drawBoardExport(ctx, pg) {
@@ -824,7 +836,7 @@ function updateWarnings(pi) {
   b.querySelectorAll('.bcard').forEach(c => { const t = pg.tasks.find(x => x.id === c.dataset.id); if (!t) return; const w = warnOf(t, pg, now); c.classList.toggle('overdue', w === 'overdue'); c.classList.toggle('soon', w === 'soon'); if (w === 'overdue') od++; if (w === 'soon') soon++; });
   const h = b.querySelector('.bwarn'); if (h) h.innerHTML = (od ? `<span class="w-od">${od} overdue</span>` : '') + (soon ? `<span class="w-soon">${soon} due soon</span>` : '');
 }
-function boardTick() { if (QB.open) updateWarnings(QPI); const n = curNote(); if (n) n.pages.forEach((pg, i) => { if (isBoardPage(pg)) updateWarnings(i); }); }
+function boardTick() { if (QB.open) updateWarnings(drawerPi()); const n = curNote(); if (n) n.pages.forEach((pg, i) => { if (isBoardPage(pg)) updateWarnings(i); }); }
 setInterval(boardTick, 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) boardTick(); });
 
@@ -932,17 +944,17 @@ function cardFromInk(src, dstNote, dstPi, colId, fromCarry) {
   const ox = 6, oy = (TITLE_H - bh * sc) / 2;
   const tstrokes = strokes.map(st => { const pts = st.points.map(p => [+(ox + (p[0] - bb[0]) * sc).toFixed(1), +(oy + (p[1] - bb[1]) * sc).toFixed(1), p[2]]); return { id: uid('s'), tool: st.tool, color: st.color, width: +Math.max(0.8, st.width * Math.max(sc, 0.45)).toFixed(2), points: pts, bb: bbox(pts) }; });
   const dpg = bP(dstNote, dstPi); if (!isBoardPage(dpg)) return null;
-  if (dstPi === QPI) bH(QPI); else if (dstNote.id === S.cur) pushHistory(); else pushHistoryMulti([dstNote.id]);
+  if (isSysPi(dstPi)) bH(dstPi); else if (dstNote.id === S.cur) pushHistory(); else pushHistoryMulti([dstNote.id]);
   const cols = boardCols(dpg), col = cols.find(c => c.id === colId) || cols[0];
   const t = { id: uid('t'), kind: 'card', col: col.id, ord: -1, text: '', tstrokes, strokes: [], done: isDoneCol(dpg, col.id), due: null, repeat: '', notified: false, createdAt: Date.now() };
   if (t.done) t.doneAt = Date.now();
   dpg.tasks.push(t); renumber(dpg, col.id);
   saveNote(dstNote, true); if (dstNote !== sn) saveNote(sn, true);
   hideLasso(); thumbCache.clear();
-  if (dstPi === QPI || dstNote.id === S.cur) { afterChange(dstPi); const w = cardWrap(dstPi, t.id); if (w) { w.classList.add('appear', 'flash'); setTimeout(() => w.classList.remove('appear', 'flash'), 1600); } }
+  if (isSysPi(dstPi) || dstNote.id === S.cur) { afterChange(dstPi); const w = cardWrap(dstPi, t.id); if (w) { w.classList.add('appear', 'flash'); setTimeout(() => w.classList.remove('appear', 'flash'), 1600); } }
   else { renderSidebar(); renderPanel(); }
   const srcNoteId = sn.id, srcPageId = spg.id, keepIds = ids.slice();
-  actionToast(`📋 Card added to “${col.title}”${dstPi === QPI ? ' on the Quote Board' : dstNote.id !== S.cur ? ' in ' + dstNote.title : ''} · original ink kept`, 'Remove original', () => {
+  actionToast(`📋 Card added to “${col.title}”${isSysPi(dstPi) ? boardName(dstPi) : dstNote.id !== S.cur ? ' in ' + dstNote.title : ''} · original ink kept`, 'Remove original', () => {
     const n2 = S.notes.find(x => x.id === srcNoteId), p2 = n2 && n2.pages.find(q => q.id === srcPageId); if (!p2 || n2.id !== S.cur) return;
     pushHistory(); p2.strokes = p2.strokes.filter(s => !keepIds.includes(s.id)); p2.labels = (p2.labels || []).filter(l => !l.strokeIds.every(id => keepIds.includes(id)));
     saveNote(n2, true); const i = n2.pages.indexOf(p2); renderPageInk(i); renderOverlay(i); toast('Original ink removed', 1400);
@@ -951,7 +963,7 @@ function cardFromInk(src, dstNote, dstPi, colId, fromCarry) {
 }
 async function sendInkToBoardPicker(src) {
   const list = [];
-  for (const n of S.notes) if (n.id !== QUOTE_ID) n.pages.forEach((pg, i) => { if (isBoardPage(pg)) list.push({ n, i }); });
+  for (const n of S.notes) if (!piOfSysNote(n.id)) n.pages.forEach((pg, i) => { if (isBoardPage(pg)) list.push({ n, i }); });
   const items = list.map(x => ({ label: '📋 ' + x.n.title, sub: `${x.n.id === S.cur ? 'This note · ' : ''}page ${x.i + 1} · ${boardCols(x.n.pages[x.i]).map(c => c.title).join(' · ')}`, value: x }));
   items.push({ label: '＋ New Project Board page', sub: `Adds a board page to “${curNote().title}”`, value: 'new' });
   const ch = await pickSheet('Send handwriting to which board?', items); if (!ch) { if (selection) $('#lassoMenu').hidden = false; return; }
@@ -983,6 +995,6 @@ function moveCardAcross(fromPi, id, toPi, colId) {
   saveNote(sn, true); if (dn !== sn) saveNote(dn, true);
   renderBoard(fromPi); renderBoard(toPi); renderSidebar(); renderPanel();
   const col = boardCols(dpg).find(c => c.id === colId);
-  actionToast(`📋 Moved to “${col ? col.title : 'board'}”${toPi === QPI ? ' on the Quote Board' : ' in ' + dn.title}`, 'Undo', () => { if (toPi === QPI || fromPi === QPI) { bUndo(QPI); } if (toPi !== QPI || fromPi !== QPI) restore(S.undo, S.redo); renderBoard(fromPi); renderBoard(toPi); }, 7000);
+  actionToast(`📋 Moved to “${col ? col.title : 'board'}”${isSysPi(toPi) ? boardName(toPi) : ' in ' + dn.title}`, 'Undo', () => { const sys = [...new Set([fromPi, toPi].filter(isSysPi))]; sys.forEach(p => bUndo(p)); if (!isSysPi(toPi) || !isSysPi(fromPi)) restore(S.undo, S.redo); renderBoard(fromPi); renderBoard(toPi); }, 7000);
   const w = cardWrap(toPi, t.id); if (w) { w.classList.add('appear', 'flash'); setTimeout(() => w.classList.remove('appear', 'flash'), 1600); }
 }
