@@ -520,29 +520,330 @@ function estH(c) {
   return Math.max(c.btype === 'followup' ? 340 : 170, Math.min(980, 118 + lines * 29));
 }
 function writeBrief(f, b, engine, warn) {
+  /* v21c: ONE Meeting home page (scrollable). Old builds paginated cards across many notebook
+     pages — one half-width card per speaker — so a 4-person meeting spilled onto 3–6 pages and
+     the transcript was truncated to fit PAGE_H. */
   const n = f.n; if (n.id === S.cur) pushHistory();
   for (const [, i] of briefPagesOf(n, f.rec.id).reverse()) n.pages.splice(i, 1);
-  const recPi = n.pages.findIndex(pg => pg.rec && pg.rec.id === f.rec.id), cards = briefCardsFrom(b, f.rec, engine), pages = [], TOP = 176;
-  const newBriefPage = () => { const p = makeTemplatePage('assistant', n); p.assist.brief = { rec: f.rec.id, title: b.title || n.title, engine, warn: warn || '', at: Date.now() }; pages.push(p); return p; };
-  let pg = newBriefPage(), y = TOP, col = 0, rowH = 0;
-  const fit = h => { if (y + h > PAGE_H - 24 && y > TOP) { pg = newBriefPage(); y = TOP; } };
-  for (const c of cards) {
-    c.h = estH(c);
-    if (c.w < PAGE_W / 2) { if (col === 1) { c.x = 24 + c.w + 16; c.y = y; rowH = Math.max(rowH, c.h); col = 0; y += rowH + 16; rowH = 0; } else { fit(c.h); c.x = 24; c.y = y; rowH = c.h; col = 1; } }
-    else { if (col === 1) { y += rowH + 16; col = 0; rowH = 0; } fit(c.h); c.h = Math.min(c.h, PAGE_H - 24 - y); c.x = 24; c.y = y; y += c.h + 16; }
-    pg.assist.cards.push(c);
-  }
-  n.pages.splice(recPi + 1, 0, ...pages); saveNote(n, true);
+  const recPi = n.pages.findIndex(pg => pg.rec && pg.rec.id === f.rec.id);
+  const cards = briefCardsFrom(b, f.rec, engine);
+  for (const c of cards) { c.x = 0; c.y = 0; c.w = PAGE_W - 48; c.h = 1; c._park = true; }  // kept for Inbox sync + search; UI is the home panel
+  const p = makeTemplatePage('assistant', n);
+  p.assist.brief = { rec: f.rec.id, title: b.title || n.title, engine, warn: warn || '', at: Date.now(), unified: true, tab: 'brief', filterSp: '' };
+  p.assist.cards = cards;
+  n.pages.splice(Math.max(0, recPi + 1), 0, p); saveNote(n, true);
   if (n.id === S.cur) { buildPages(); renderAll(); }
+}
+/** Collapse any legacy multi-page Meeting Brief for a recording into one unified home. */
+function migrateBriefUnified(n, recId) {
+  const pages = briefPagesOf(n, recId); if (!pages.length) return false;
+  if (pages.length === 1 && pages[0][0].assist.brief.unified) return false;
+  const B0 = pages[0][0].assist.brief, cards = pages.flatMap(([pg]) => (pg.assist.cards || []).map(c => ({ ...c })));
+  for (const [, i] of pages.slice().reverse()) n.pages.splice(i, 1);
+  const recPi = n.pages.findIndex(pg => pg.rec && pg.rec.id === recId);
+  for (const c of cards) { c.x = 0; c.y = 0; c.w = PAGE_W - 48; c.h = 1; c._park = true; }
+  const p = makeTemplatePage('assistant', n);
+  p.assist.brief = { rec: recId, title: B0.title || n.title, engine: B0.engine || 'Built-in', warn: B0.warn || '', at: B0.at || Date.now(), unified: true, tab: 'brief', filterSp: '', migrated: true };
+  p.assist.cards = cards;
+  n.pages.splice(Math.max(0, recPi + 1), 0, p);
+  return true;
+}
+function migrateAllBriefs(n) {
+  if (!n || !n.pages) return 0;
+  const ids = [...new Set(n.pages.filter(pg => pg.assist && pg.assist.brief).map(pg => pg.assist.brief.rec).filter(Boolean))];
+  let k = 0; for (const id of ids) if (migrateBriefUnified(n, id)) k++;
+  return k;
 }
 const ul = (l, cls = '') => l && l.length ? `<ul class="mb-ul ${cls}">${l.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '';
 const sec = (h, l, cls) => l && l.length ? `<h4>${h}</h4>${ul(l, cls)}` : '';
 function briefHeadHTML(pg, s) {
+  /* Legacy non-unified briefs keep the old header; unified homes render via briefHomeHTML. */
+  if (pg.assist.brief && pg.assist.brief.unified) return '';
   const B = pg.assist.brief, f = findRec(B.rec), rec = f && f.rec, P = R.player && rec && R.player.recId === rec.id ? R.player : null;
   return `<div class="mb-head as-drop" style="left:${24 * s}px;top:${24 * s}px;width:${(PAGE_W - 48) * s}px;height:${136 * s}px">
     <div class="mb-t1">📋 Meeting Brief</div><div class="mb-t2">${esc(B.title || '')}</div>
     <div class="mb-meta">${rec ? esc(new Date(rec.startedAt || rec.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })) + ' · ' + mmss(rec.dur) + ' · ' : ''}<span class="as-eng ${B.engine === 'Built-in' ? '' : 'ai'}">${B.engine === 'Built-in' ? '⚙︎ Built-in' : '✨ ' + esc(B.engine)}</span>${rec && rec.transcript ? ' · transcript: ' + esc(rec.transcript.engine) : ''}${B.warn ? ` <span class="mb-warn" title="${esc(B.warn)}">⚠︎ ${esc(B.warn.slice(0, 90))}</span>` : ''}</div>
     <div class="as-dbtns">${rec && rec.segs.length ? `<button class="as-btn" data-mb="${P && P.playing ? 'pause' : 'play'}">${P && P.playing ? '⏸ Pause' : '▶ Play recording'}</button>` : ''}<button class="as-btn" data-mb="torec">🎙 Recording page</button><button class="as-btn" data-mb="redo">↻ Redo analysis</button><button class="as-btn" data-mb="speakers">✏️ Speakers</button></div></div>`;
+}
+const MB_TABS = [
+  { id: 'brief', label: 'Brief' },
+  { id: 'transcript', label: 'Transcript' }
+];
+const MB_TAB_ALIASES = { all: 'brief', overview: 'brief', summary: 'brief', actions: 'brief', more: 'brief', people: 'brief' };
+function briefNormTab(t) { t = MB_TAB_ALIASES[t] || t; return MB_TABS.some(x => x.id === t) ? t : 'brief'; }
+function briefCardsBy(pg) {
+  const m = { overview: null, people: [], decisions: null, actions: null, problems: [], risks: null, solutions: null, followup: null, transcript: null };
+  for (const c of (pg.assist.cards || [])) {
+    if (c.btype === 'overview') m.overview = c;
+    else if (c.btype === 'person') m.people.push(c);
+    else if (c.btype === 'decisions') m.decisions = c;
+    else if (c.btype === 'actions') m.actions = c;
+    else if (c.btype === 'problem') m.problems.push(c);
+    else if (c.btype === 'risks') m.risks = c;
+    else if (c.btype === 'solutions') m.solutions = c;
+    else if (c.btype === 'followup') m.followup = c;
+    else if (c.btype === 'transcript') m.transcript = c;
+  }
+  return m;
+}
+function briefLeadLine(p) {
+  const bits = [...(p.commitments || []).slice(0, 1), ...(p.key_points || []).slice(0, 1), ...(p.concerns || []).slice(0, 1)];
+  return bits[0] || '';
+}
+function briefActRows(list, { done = false } = {}) {
+  return `<ul class="as-acts mb-acts">${list.map(a => {
+    const prio = a.prio && a.prio !== 'normal' && typeof APRIO !== 'undefined' && APRIO[a.prio]
+      ? `<span class="as-aprio p-${a.prio}">${APRIO[a.prio].icon} ${APRIO[a.prio].label}</span>` : '';
+    return `<li class="as-act mb-row ${a.done ? 'done' : ''} ${a.sent ? 'sent' : ''}" data-act="${a.id}">
+    <span class="as-grip mb-grip" title="Drag to board" aria-label="Drag to board">⠿</span>
+    <span class="mb-ic" data-aa="editact">${a.done || done ? '✓' : '○'}</span>
+    <span class="as-at mb-row-t" data-aa="editact">${esc(a.text)}</span>
+    ${prio}
+    <span class="mb-own">${a.owner ? esc(a.owner) : ''}</span>
+    <button class="mb-ico" data-aa="sendone" data-act="${a.id}" title="Send to board" aria-label="Send to board">📋</button>
+  </li>`;
+  }).join('')}</ul>`;
+}
+function briefPersonStats(rec, C, p, sp) {
+  const name = p.name || '';
+  const lines = rec && rec.transcript ? rec.transcript.segs.filter(sg => sp ? sg.sp === sp : false).length : 0;
+  const acts = ((C.actions && C.actions.actions) || []).filter(a => a.owner && name && a.owner.toLowerCase() === name.toLowerCase()).length;
+  const bits = [];
+  if (lines) bits.push(String(lines));
+  if (acts) bits.push(acts + ' act' + (acts === 1 ? '' : 's'));
+  return bits.join(' · ');
+}
+function briefGroupSegs(segs) {
+  const groups = [];
+  for (const sg of segs) {
+    const last = groups[groups.length - 1];
+    if (last && last.sp === sg.sp) last.lines.push(sg);
+    else groups.push({ sp: sg.sp, lines: [sg] });
+  }
+  return groups;
+}
+function briefSpResolve(rec, p) {
+  let sp = (String(p.name || '').match(/^Speaker (\d+)$/) || [])[1];
+  if (!sp && rec && rec.speakers) { const hit = Object.entries(rec.speakers).find(([, s]) => s && s.name === p.name); if (hit) sp = hit[0]; }
+  return sp || '';
+}
+function briefTranscriptHTML(rec, B, C, { focus = false } = {}) {
+  if (!rec || !rec.transcript) return '<p class="mb-empty">No transcript yet.</p>';
+  const filterSp = B.filterSp || '', q = (B.trQuery || '').trim();
+  const spIds = [...new Set(rec.transcript.segs.map(sg => sg.sp).filter(Boolean))].sort((a, b) => +a - +b);
+  let segs = filterSp ? rec.transcript.segs.filter(sg => sg.sp === filterSp) : rec.transcript.segs;
+  if (q) {
+    const qq = q.toLowerCase();
+    segs = segs.filter(sg => (sg.text || '').toLowerCase().includes(qq) || (sg.sp && spName(rec, sg.sp).toLowerCase().includes(qq)));
+  }
+  const groups = briefGroupSegs(segs);
+  const sticky = `<div class="mb-tr-sticky">
+    <input class="mb-search" type="search" data-mb="trq" placeholder="Search transcript" value="${esc(B.trQuery || '')}" autocomplete="off" enterkeyhint="search">
+    <div class="mb-filter-row">
+      ${spIds.length ? `<button class="mb-chip ${!filterSp ? 'on' : ''}" data-mb="filter" data-sp="">All</button>${spIds.map(sp =>
+        `<button class="mb-chip ${filterSp === sp ? 'on' : ''}" data-mb="filter" data-sp="${esc(sp)}"><i class="mb-dot sp${(+sp - 1) % 6}"></i>${esc(spName(rec, sp))}</button>`
+      ).join('')}` : ''}
+      <span class="mb-filter-spacer"></span>
+      <button class="mb-chip quiet ico" data-mb="copytr" title="Copy" aria-label="Copy">⧉</button>
+    </div>
+  </div>`;
+  const body = groups.length ? groups.map(g => {
+    const name = g.sp ? esc(spName(rec, g.sp)) : '';
+    const lines = g.lines.map(sg => {
+      const hit = q && (sg.text || '').toLowerCase().includes(q.toLowerCase());
+      return `<div class="mb-line ${hit ? 'hit' : ''}" data-sp="${esc(g.sp || '')}">
+        <button class="mb-ts" data-mb="seek" data-t="${+sg.t || 0}">${mmss(sg.t)}</button>
+        <span class="mb-text">${esc(sg.text)}</span>
+      </div>`;
+    }).join('');
+    return `<div class="mb-group" data-sp="${esc(g.sp || '')}">
+      ${g.sp ? `<button class="mb-sp mb-sp-name sp${(+g.sp - 1) % 6}" data-mb="spk" data-sp="${esc(g.sp)}">${name}</button>` : ''}
+      ${lines}
+    </div>`;
+  }).join('') : `<p class="mb-empty">${q || filterSp ? 'No matching lines.' : 'No lines yet.'}</p>`;
+  return `<div class="b-transcript">${sticky}<div class="mb-tr ${focus ? 'focus' : ''}">${body}</div></div>`;
+}
+function briefHomeHTML(pg, s) {
+  const B = pg.assist.brief, f = findRec(B.rec), rec = f && f.rec, P = R.player && rec && R.player.recId === rec.id ? R.player : null;
+  const C = briefCardsBy(pg), tab = briefNormTab(B.tab), filterSp = B.filterSp || '';
+  if (B.tab !== tab) B.tab = tab;
+  const sumOpen = !!B.sumOpen, doneOpen = !!B.doneOpen, focusTr = tab === 'transcript';
+  const nTr = rec && rec.transcript ? rec.transcript.segs.length : 0;
+  const ov = C.overview;
+  const decisions = (C.decisions && C.decisions.decisions) || [];
+  const allActs = (C.actions && C.actions.actions) || [];
+  const openActs = allActs.filter(a => !a.done);
+  const doneActs = allActs.filter(a => a.done);
+  const sumText = (ov && ov.summary) || '';
+  const sumLong = sumText.length > 140;
+  const points = (ov && ov.points) || [];
+
+  const modeTabs = `<nav class="mb-modes" aria-label="Meeting mode">
+    <button class="mb-mode ${!focusTr ? 'on' : ''}" data-mb="tab" data-tab="brief">Brief</button>
+    <button class="mb-mode ${focusTr ? 'on' : ''}" data-mb="tab" data-tab="transcript">Transcript${nTr ? `<span class="mb-tab-n">${nTr}</span>` : ''}</button>
+  </nav>`;
+
+  // Jump chips only in Brief
+  const jumps = [];
+  if (sumText || points.length) jumps.push({ id: 'overview', label: 'Overview' });
+  if (decisions.length) jumps.push({ id: 'decisions', label: 'Decisions' });
+  if (openActs.length || doneActs.length || C.actions) jumps.push({ id: 'actions', label: 'Actions' });
+  if (C.people.length) jumps.push({ id: 'people', label: 'People' });
+  if (nTr) jumps.push({ id: 'transcript', label: 'Transcript' });
+  const jumpNav = !focusTr && jumps.length ? `<nav class="mb-jumps" aria-label="Jump to section">${jumps.map(j =>
+    `<button class="mb-jump" data-mb="jump" data-sec="${j.id}">${j.label}</button>`
+  ).join('')}</nav>` : '';
+
+  // Next up strip
+  const nextUp = !focusTr && openActs.length ? `<div class="mb-nextup ${C.actions ? 'as-card brief b-actions' : ''}" ${C.actions ? `data-card="${C.actions.id}"` : ''}>
+    <div class="mb-nextup-h">Next up</div>
+    ${briefActRows(openActs.slice(0, 2))}
+  </div>` : '';
+
+  // People rail
+  const rail = C.people.length ? `<div class="mb-rail" role="list">${C.people.map(c => {
+    const p = c.person || {}, sp = briefSpResolve(rec, p);
+    const on = filterSp && sp && filterSp === sp;
+    return `<button class="mb-rail-chip ${on ? 'on' : ''} sp${sp ? (+sp - 1) % 6 : 0}" data-mb="rail" data-sp="${esc(sp)}" role="listitem">${esc((p.name || 'Speaker').split(' ')[0])}</button>`;
+  }).join('')}<button class="mb-rail-chip quiet ${!filterSp ? 'on' : ''}" data-mb="rail" data-sp="">All</button></div>` : '';
+
+  // —— Brief document ——
+  const blocks = [];
+  if (sumText || points.length || (ov && ov.builtin)) {
+    const grokNote = ov && ov.builtin
+      ? `<p class="mb-note">⚙︎ Built-in summary of the transcript. ${aiReady() ? 'Tap ↻ Redo analysis for Grok’s full analysis.' : 'Connect Grok (Settings → ✨ Smarter AI) for each person’s positions, root causes and solutions.'}</p>`
+      : '';
+    blocks.push(`<section class="mb-block as-card brief b-overview" id="mb-sec-overview" data-sec="overview"${ov ? ` data-card="${ov.id}"` : ''}>
+      <div class="mb-label">Overview</div>
+      ${sumText ? `<p class="mb-sum ${sumOpen || !sumLong ? '' : 'clamp'}">${esc(sumText)}</p>${sumLong ? `<button class="mb-link" data-mb="summore">${sumOpen ? 'Less' : 'More'}</button>` : ''}` : ''}
+      ${points.length ? `<ul class="mb-keys">${points.slice(0, 6).map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      ${grokNote}
+    </section>`);
+  }
+  if (decisions.length) {
+    blocks.push(`<section class="mb-block" id="mb-sec-decisions" data-sec="decisions">
+      <div class="mb-label">Decisions</div>
+      ${decisions.map(d => `<div class="mb-row dec"><span class="mb-ic">✓</span><span class="mb-row-t">${esc(d.text)}</span><span class="mb-own">${d.by ? esc(d.by) : ''}</span></div>`).join('')}
+    </section>`);
+  }
+  if (C.actions || openActs.length || doneActs.length) {
+    blocks.push(`<section class="mb-block ${C.actions ? 'as-card brief b-actions' : ''}" id="mb-sec-actions" data-sec="actions" ${C.actions ? `data-card="${C.actions.id}"` : ''}>
+      <div class="mb-label-row"><div class="mb-label">Actions</div>
+        <div class="mb-inline-acts">${openActs.length ? '<button class="mb-link" data-aa="sendall">All to board</button>' : ''}<button class="mb-link" data-aa="addact">＋</button></div></div>
+      ${openActs.length ? briefActRows(openActs) : '<p class="mb-empty">No open actions.</p>'}
+      ${doneActs.length ? `<details class="mb-done" ${doneOpen ? 'open' : ''}><summary>Done (${doneActs.length})</summary>${briefActRows(doneActs, { done: true })}</details>` : ''}
+    </section>`);
+  }
+  if (C.risks && ((C.risks.risks || []).length || (C.risks.questions || []).length)) {
+    const rs = [...(C.risks.risks || []).slice(0, 4), ...(C.risks.questions || []).slice(0, 2)];
+    blocks.push(`<section class="mb-block" data-sec="risks"><div class="mb-label">Risks</div><ul class="mb-keys">${rs.map(x => `<li>${esc(x)}</li>`).join('')}</ul></section>`);
+  }
+  for (const c of C.problems) {
+    blocks.push(`<section class="mb-block as-card brief b-problem ${c.chatOpen ? 'chatting' : ''}" data-sec="problem" data-card="${c.id}">
+      <div class="mb-label-row"><div class="mb-label">Problem</div>
+        <div class="as-hbtns"><button class="as-hb" data-aa="chat" aria-label="Ask about this section" title="Ask about this section">💬</button></div></div>
+      <div class="as-body">${briefCardBody(c)}</div>${c.chatOpen ? chatHTML(c) : ''}
+    </section>`);
+  }
+  if (C.solutions && (C.solutions.solutions || []).length) {
+    const c = C.solutions;
+    blocks.push(`<section class="mb-block as-card brief b-solutions ${c.chatOpen ? 'chatting' : ''}" data-sec="solutions" data-card="${c.id}">
+      <div class="mb-label-row"><div class="mb-label">Solutions</div>
+        <div class="as-hbtns"><button class="as-hb" data-aa="chat" aria-label="Ask about this section" title="Ask about this section">💬</button></div></div>
+      <div class="as-body">${briefCardBody(c)}</div>${c.chatOpen ? chatHTML(c) : ''}
+    </section>`);
+  }
+  if (C.people.length) {
+    blocks.push(`<section class="mb-block" id="mb-sec-people" data-sec="people">
+      <div class="mb-label">People</div>
+      <div class="mb-people">${C.people.map(c => {
+        const p = c.person || {}, sp = briefSpResolve(rec, p);
+        const lead = briefLeadLine(p), stats = briefPersonStats(rec, C, p, sp);
+        const pts = (p.key_points || []).slice(0, 3), commits = (p.commitments || []).slice(0, 3);
+        const dim = filterSp && sp && filterSp !== sp;
+        return `<details class="mb-person ${dim ? 'dim' : ''}" id="mb-person-${esc(sp || c.id)}"><summary>
+          <span class="mb-name-line"><span class="mb-sp-name sp${sp ? (+sp - 1) % 6 : 0}">${esc(p.name || 'Speaker')}</span>${p.role ? `<span class="mb-role-chip">${esc(p.role)}</span>` : ''}</span>
+          ${lead ? `<span class="mb-lead">${esc(lead)}</span>` : ''}
+          ${stats ? `<span class="mb-stat">${esc(stats)}</span>` : ''}
+        </summary>
+        <div class="mb-person-body">
+          ${pts.length ? `<div class="mb-mini-label">Points</div><ul class="mb-keys">${pts.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+          ${commits.length ? `<div class="mb-mini-label">Commitments</div><ul class="mb-keys">${commits.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+          ${!pts.length && !commits.length ? '<p class="mb-empty">No notes for this person.</p>' : ''}
+          ${sp ? `<div class="mb-inline-acts"><button class="mb-link" data-mb="spk" data-sp="${esc(sp)}">Rename</button><button class="mb-link" data-mb="rail" data-sp="${esc(sp)}" data-focus="1">In transcript</button></div>` : ''}
+        </div>
+      </details>`;
+      }).join('')}</div>
+    </section>`);
+  }
+  if (nTr) {
+    blocks.push(`<section class="mb-block mb-brief-tr" id="mb-sec-transcript" data-sec="transcript">
+      <div class="mb-label-row"><div class="mb-label">Transcript</div><button class="mb-link" data-mb="tab" data-tab="transcript">Full view</button></div>
+      ${briefTranscriptHTML(rec, B, C, { focus: false })}
+    </section>`);
+  }
+  if (C.followup && C.followup.email && C.followup.email.subject) {
+    const c = C.followup;
+    blocks.push(`<section class="mb-block mb-follow as-card brief b-followup ${c.chatOpen ? 'chatting' : ''}" data-card="${c.id}">
+      <div class="mb-label-row"><div class="mb-label">Follow-up</div>
+        <div class="mb-inline-acts"><button class="mb-link" data-mb="recap">Mail</button><button class="mb-link" data-mb="copy">Copy</button>
+          <button class="as-hb" data-aa="chat" aria-label="Ask about this section" title="Ask about this section">💬</button></div></div>
+      <div class="as-body">${briefCardBody(c)}</div>${c.chatOpen ? chatHTML(c) : ''}
+    </section>`);
+  }
+  if (!blocks.length) blocks.push('<p class="mb-empty">Nothing in this brief yet — transcribe the recording to fill it in.</p>');
+
+  const briefDoc = `<div class="mb-brief" ${focusTr ? 'hidden' : ''}>${nextUp}${blocks.join('')}</div>`;
+  const trFocus = `<div class="mb-tr-focus" ${focusTr ? '' : 'hidden'}>${briefTranscriptHTML(rec, B, C, { focus: true })}</div>`;
+
+  const when = rec ? esc(new Date(rec.startedAt || rec.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })) : '';
+  const dur = rec ? mmss(rec.dur) : '';
+
+  return `<div class="mb-home doc" style="left:${12 * s}px;top:${12 * s}px;width:${(PAGE_W - 24) * s}px;height:${(PAGE_H - 24) * s}px;font-size:${18 * s}px">
+    <header class="mb-home-head mb-head sticky">
+      <div class="mb-head-row">
+        <div class="mb-title-stack">
+          <div class="mb-t2">${esc(B.title || 'Meeting')}</div>
+          <div class="mb-meta">${[when, dur].filter(Boolean).join(' · ')}${B.warn ? ' · ⚠︎' : ''}</div>
+        </div>
+        <div class="mb-tools">${rec && rec.segs.length ? `<button class="mb-ico" data-mb="${P && P.playing ? 'pause' : 'play'}" aria-label="Play">${P && P.playing ? '⏸' : '▶'}</button>` : ''}<button class="mb-ico" data-mb="torec" title="Recording page" aria-label="Recording">🎙</button></div>
+      </div>
+      ${modeTabs}
+      ${!focusTr ? rail : ''}
+      ${jumpNav}
+    </header>
+    <div class="mb-home-body">${briefDoc}${trFocus}</div>
+  </div>`;
+}
+/** Body-only render for a brief card (used inside the unified home). */
+function briefCardBody(c) {
+  if (!c) return '';
+  const f = findRec(c.rec), rec = f && f.rec; let body = '';
+  switch (c.btype) {
+    case 'overview': body = `<p class="as-sum">${esc(c.summary || '')}</p>${sec('Key points', c.points)}`; break;
+    case 'person': { const p = c.person || {}; body = `${p.role ? `<p class="mb-role">${esc(p.role)}</p>` : ''}${sec('Key points', p.key_points)}${sec('Positions', p.positions)}${sec('Concerns', p.concerns)}${sec('Commitments', p.commitments, 'mb-commit')}`; break; }
+    case 'decisions': body = `<ul class="mb-ul mb-dec">${(c.decisions || []).map(d => `<li>✅ ${esc(d.text)}${d.by ? ` <span class="mb-by">— ${esc(d.by)}</span>` : ''}</li>`).join('')}</ul>`; break;
+    case 'actions': body = typeof actsHTML === 'function' ? actsHTML(c) : `<ul class="mb-ul">${(c.actions || []).map(a => `<li>${esc(a.text)}</li>`).join('')}</ul>`; break;
+    case 'problem': { const p = c.problem || {};
+      body = `${p.root_cause ? `<div class="mb-root"><b>Root cause</b> ${esc(p.root_cause)}</div>` : ''}${(p.whys || []).length ? `<h4>5 whys</h4><ol class="mb-whys">${p.whys.map(w => `<li>${esc(w)}</li>`).join('')}</ol>` : ''}
+        ${Object.keys(p.fishbone || {}).length ? `<h4>Contributing causes</h4><div class="mb-fish">${Object.entries(p.fishbone).map(([k, v]) => `<div><b>${esc(k)}</b>${ul(v)}</div>`).join('')}</div>` : ''}
+        ${sec('Corrective actions', p.corrective_actions, 'mb-fix')}${sec('Preventive actions', p.preventive_actions, 'mb-prev')}`; break; }
+    case 'risks': body = `${sec('Risks', c.risks)}${sec('Open questions', c.questions)}${(c.disagreements || []).length ? `<h4>Disagreements</h4><ul class="mb-ul">${c.disagreements.map(d => `<li><b>${esc(d.topic)}</b>${d.sides.length ? ': ' + d.sides.map(esc).join(' <i>vs</i> ') : ''}</li>`).join('')}</ul>` : ''}${sec('Other discussion', c.other)}`; break;
+    case 'solutions': body = (c.solutions || []).map(s => `<div class="mb-sol"><h4>${esc(s.problem)}</h4>${s.options.map(o => `<div class="mb-opt"><b>${esc(o.title)}</b><div class="mb-pc"><div>${o.pros.map(x => `<span class="mb-pro">✓ ${esc(x)}</span>`).join('')}</div><div>${o.cons.map(x => `<span class="mb-con">✗ ${esc(x)}</span>`).join('')}</div></div></div>`).join('')}
+      ${s.recommendation ? `<div class="mb-rec">★ <b>Recommendation</b> ${esc(s.recommendation)}</div>` : ''}${s.next_step ? `<div class="mb-next">➜ <b>Next step</b> ${esc(s.next_step)}</div>` : ''}</div>`).join(''); break;
+    case 'followup': { const e = c.email || {}; body = `<p class="mb-subj"><b>Subject:</b> ${esc(e.subject || '')}</p><pre class="mb-mail">${esc(e.body || '')}</pre><div class="as-arow"><button class="as-btn" data-mb="recap">✉︎ Edit &amp; open in Mail</button><button class="as-btn" data-mb="copy">⧉ Copy</button></div>`; break; }
+  }
+  return body;
+}
+function renderBriefHome(pi) {
+  const n = curNote(), pg = n && n.pages[pi], el = pageEls[pi]; if (!el || !pg || !pg.assist || !pg.assist.brief || !pg.assist.brief.unified) return;
+  const keepY = (el.ov.querySelector('.mb-home-body') || {}).scrollTop || 0;
+  el.ov.querySelectorAll('.as-layer').forEach(e => e.remove());
+  const s = S.scale, L = document.createElement('div'); L.className = 'as-layer mb-layer'; L.style.fontSize = (20 * s) + 'px';
+  L.innerHTML = briefHomeHTML(pg, s);
+  el.ov.append(L);
+  const body = L.querySelector('.mb-home-body'); if (body) body.scrollTop = keepY;
+  if (typeof wireChat === 'function') try { wireChat(L, pg); } catch (_) {}
 }
 function briefCardHTML(c, ctx = {}) {
   const f = findRec(c.rec), rec = f && f.rec; let body = '';
@@ -583,9 +884,98 @@ PAGES.addEventListener('click', e => {
   else if (a === 'torec') { const f = findRec(recId); if (f && pageEls[f.pi]) pageEls[f.pi].el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
   else if (a === 'redo') analyzeRec(recId); else if (a === 'speakers') speakerList(recId);
   else if (a === 'spk') renameSpeaker(recId, b.dataset.sp);
+  else if (a === 'tab' && pg.assist && pg.assist.brief) { pg.assist.brief.tab = briefNormTab(b.dataset.tab); saveNote(n); renderBriefHome(pi); }
+  else if (a === 'summore' && pg.assist && pg.assist.brief) { pg.assist.brief.sumOpen = !pg.assist.brief.sumOpen; saveNote(n); renderBriefHome(pi); }
+  else if (a === 'jump' && pg.assist && pg.assist.brief) {
+    pg.assist.brief.tab = 'brief'; saveNote(n); renderBriefHome(pi);
+    requestAnimationFrame(() => { const el = pageEls[pi] && pageEls[pi].ov.querySelector('#mb-sec-' + CSS.escape(b.dataset.sec || '')); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); });
+  }
+  else if (a === 'rail' && pg.assist && pg.assist.brief) {
+    const sp = b.dataset.sp || '';
+    pg.assist.brief.filterSp = sp;
+    if (b.dataset.focus === '1') pg.assist.brief.tab = 'transcript';
+    else pg.assist.brief.tab = 'brief';
+    saveNote(n); renderBriefHome(pi);
+    requestAnimationFrame(() => {
+      const ov = pageEls[pi] && pageEls[pi].ov; if (!ov) return;
+      if (pg.assist.brief.tab === 'transcript') {
+        const line = ov.querySelector('.mb-group[data-sp="' + CSS.escape(sp) + '"], .mb-line[data-sp="' + CSS.escape(sp) + '"]');
+        if (line) line.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      } else {
+        const person = sp && ov.querySelector('#mb-person-' + CSS.escape(sp));
+        const sec = ov.querySelector('#mb-sec-people');
+        (person || sec) && (person || sec).scrollIntoView({ block: 'start', behavior: 'smooth' });
+        if (sp) ov.querySelectorAll('.mb-jump').forEach(j => j.classList.toggle('on', j.dataset.sec === 'people'));
+      }
+    });
+  }
+  else if (a === 'filter' && pg.assist && pg.assist.brief) {
+    pg.assist.brief.filterSp = b.dataset.sp || '';
+    if (b.dataset.jump === 'transcript') { pg.assist.brief.tab = 'transcript'; pg.assist.brief.trQuery = ''; }
+    saveNote(n); renderBriefHome(pi);
+    if (b.dataset.jump === 'transcript' || b.dataset.sp) requestAnimationFrame(() => {
+      const ov = pageEls[pi] && pageEls[pi].ov; if (!ov) return;
+      const line = ov.querySelector('.mb-line' + (b.dataset.sp ? `[data-sp="${CSS.escape(b.dataset.sp)}"]` : '')) || ov.querySelector('[data-sec="transcript"]');
+      if (line) line.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    });
+  }
+  else if (a === 'copytr') {
+    const f = findRec(recId); if (!f || !f.rec.transcript) return toast('No transcript');
+    copyText(trLines(f.rec).join('\n'));
+  }
+  else if (a === 'copyone') {
+    const f = findRec(recId); if (!f || !f.rec.transcript) return toast('No transcript');
+    const sp = b.dataset.sp, lines = f.rec.transcript.segs.filter(sg => sg.sp === sp).map(sg => '[' + mmss(sg.t) + '] ' + spName(f.rec, sp) + ': ' + sg.text);
+    copyText(lines.join('\n'));
+  }
   else if (a === 'recap' && fc) openRecap(fc); else if (a === 'copy' && fc) copyText(fc.c.email.subject + '\n\n' + fc.c.email.body);
 });
+/* Divert unified Meeting Briefs away from the old card-paginated Assistant renderer. */
+{ const _renderAssist = typeof renderAssist === 'function' ? renderAssist : null;
+  if (_renderAssist) {
+    renderAssist = function (pi) {
+      const n = curNote(), pg = n && n.pages[pi];
+      if (pg && pg.assist && pg.assist.brief) {
+        if (!pg.assist.brief.unified && migrateBriefUnified(n, pg.assist.brief.rec)) {
+          saveNote(n, true); buildPages(); renderAll(); return;
+        }
+        if (pg.assist.brief.unified) return renderBriefHome(pi);
+      }
+      return _renderAssist(pi);
+    };
+  }
+}
+/* One-time cleanup when a note opens: merge any leftover multi-page briefs. */
+{ const _openNote = typeof openNote === 'function' ? openNote : null;
+  if (_openNote) {
+    openNote = function (id, ...rest) {
+      const r = _openNote.call(this, id, ...rest);
+      try {
+        const n = S.notes.find(x => x.id === id);
+        if (n && migrateAllBriefs(n)) { saveNote(n, true); if (S.cur === id) { buildPages(); renderAll(); } }
+      } catch (e) { console.warn('brief migrate', e); }
+      return r;
+    };
+  }
+}
 async function copyText(t) { try { await navigator.clipboard.writeText(t); toast('Copied'); } catch (_) { toast('Couldn’t copy — select the text and copy it'); } }
+
+
+PAGES.addEventListener('input', e => {
+  const inp = e.target.closest('input.mb-search[data-mb="trq"]'); if (!inp) return;
+  const page = inp.closest('.page'); if (!page) return;
+  const pi = +page.dataset.pi, n = curNote(), pg = n && n.pages[pi];
+  if (!pg || !pg.assist || !pg.assist.brief) return;
+  pg.assist.brief.trQuery = inp.value;
+  clearTimeout(PAGES._mbTrq); PAGES._mbTrq = setTimeout(() => { saveNote(n); renderBriefHome(pi); const el = pageEls[pi] && pageEls[pi].ov.querySelector('.mb-search'); if (el) { el.focus(); const v = el.value; el.setSelectionRange(v.length, v.length); } }, 160);
+});
+PAGES.addEventListener('toggle', e => {
+  const d = e.target.closest('details.mb-done'); if (!d) return;
+  const page = d.closest('.page'); if (!page) return;
+  const pi = +page.dataset.pi, n = curNote(), pg = n && n.pages[pi];
+  if (!pg || !pg.assist || !pg.assist.brief) return;
+  pg.assist.brief.doneOpen = d.open; saveNote(n);
+}, true);
 
 /* ---------- speakers: rename (typed or handwritten) and propagate ---------- */
 function speakerList(recId) {
@@ -626,7 +1016,9 @@ function applySpeakerName(recId, sp, name, ink) {
   const q = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), rx = new RegExp('(^|[^\\w])' + q(old) + '(?![\\w])', 'g'), labelRx = new RegExp('\\bSpeaker ' + sp + '(?!\\d)', 'g');
   const fix = v => typeof v === 'string' ? v.replace(rx, (m, p) => p + name).replace(labelRx, name) : Array.isArray(v) ? v.map(fix) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, ['id', 'rec', 'btype', 'kind', 'engine', 'icon', 'chat'].includes(k) ? x : fix(x)])) : v;
   for (const [pg] of briefPagesOf(f.n, recId)) { pg.assist.cards = pg.assist.cards.map(fix); pg.assist.brief.title = fix(pg.assist.brief.title); }
-  saveNote(f.n, true); rerenderRec(); toast(`Renamed ${old} → ${name} everywhere`);
+  saveNote(f.n, true); rerenderRec();
+  if (f.n.id === S.cur) { const b = briefPagesOf(f.n, recId)[0]; if (b && b[0].assist.brief.unified) renderBriefHome(b[1]); }
+  toast(`Renamed ${old} → ${name} everywhere`);
 }
 
 /* ---------- recap email (mailto only — the app never sends) ---------- */
