@@ -881,7 +881,7 @@ PAGES.addEventListener('click', e => {
   const recId = (pg.assist && pg.assist.brief && pg.assist.brief.rec) || (fc && fc.c.rec), a = b.dataset.mb;
   if (a === 'play') playAt(recId, R.player && R.player.recId === recId ? R.player.pos : 0); else if (a === 'pause') pausePlay(recId);
   else if (a === 'seek') playAt(recId, +b.dataset.t);
-  else if (a === 'torec') { const f = findRec(recId); if (f && pageEls[f.pi]) pageEls[f.pi].el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
+  else if (a === 'torec' || a === 'notes') { if (typeof V21e !== 'undefined' && V21e.goToNotesPage) V21e.goToNotesPage(recId); else { const f = findRec(recId); if (f && pageEls[f.pi]) pageEls[f.pi].el.scrollIntoView({ block: 'start', behavior: 'smooth' }); else { const n = curNote(); const pi = n && n.pages.findIndex(pg => !(pg.assist && pg.assist.brief) && (pg.rec || (pg.strokes && pg.strokes.length))); if (pi >= 0 && pageEls[pi]) pageEls[pi].el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } } }
   else if (a === 'redo') analyzeRec(recId); else if (a === 'speakers') speakerList(recId);
   else if (a === 'spk') renameSpeaker(recId, b.dataset.sp);
   else if (a === 'tab' && pg.assist && pg.assist.brief) { pg.assist.brief.tab = briefNormTab(b.dataset.tab); saveNote(n); renderBriefHome(pi); }

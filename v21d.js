@@ -93,33 +93,67 @@
   };
 
 
-  /* Re-attach Quote / Idea / Inbox search rows (quotes.js + inbox.js wrapped the old renderSidebar; we replaced it). */
+  /* Boards always reachable: ensure system notes, then pin Idea / Quote / Inbox under Today.
+     Root cause of “boards gone”: v21d replaced renderSidebar (breaking quotes.js wrappers), and
+     the reinjection only ran when quoteNote() already existed — but startup only ensureIdeaNote(),
+     so Quote (and often Idea row nested under it) never appeared. */
   {
     const _ours = renderSidebar;
     renderSidebar = function () {
       _ours();
       try {
         const box = $('#notebookList'); if (!box) return;
+        if (window.__ready) {
+          try { if (typeof ensureIdeaNote === 'function') ensureIdeaNote(); } catch (_) {}
+          try { if (typeof ensureQuoteNote === 'function') ensureQuoteNote(); } catch (_) {}
+          try { if (typeof ensureInboxNote === 'function') ensureInboxNote(); } catch (_) {}
+        }
         const q = S.search.trim().toLowerCase();
-        if (typeof quoteNote === 'function' && typeof quoteCards === 'function' && !box.querySelector('#qbRow')) {
+        const tod = box.querySelector('#todayRow');
+        let anchor = tod;
+
+        // Idea Board
+        if (!box.querySelector('#ibRow') && typeof ideaNote === 'function') {
+          const ib = ideaNote();
+          if (ib && !(q && typeof noteSearchText === 'function' && !noteSearchText(ib).includes(q))) {
+            const ic = typeof ideaCards === 'function' ? ideaCards() : [];
+            const iopen = ic.filter(c => !c.done).length;
+            const ihit = q && !(typeof ibSealed === 'function' && ibSealed()) ? ic.find(c => String(c.text || '').toLowerCase().includes(q)) : null;
+            const r2 = document.createElement('div'); r2.className = 'today-row qb-row'; r2.id = 'ibRow'; r2.setAttribute('role', 'button');
+            r2.innerHTML = `💡 <span class="name">Idea Board${ihit ? `<small class="s hit">${esc(ihit.text)}</small>` : ''}</span><span class="cnt ${iopen ? 'on' : ''}">${typeof ibSealed === 'function' && ibSealed() ? '🔒' : iopen}</span>`;
+            if (anchor && anchor.nextSibling) box.insertBefore(r2, anchor.nextSibling);
+            else if (anchor) anchor.after(r2);
+            else box.prepend(r2);
+            anchor = r2;
+          }
+        } else if (box.querySelector('#ibRow')) anchor = box.querySelector('#ibRow');
+
+        // Quote Board
+        if (!box.querySelector('#qbRow') && typeof quoteNote === 'function' && typeof quoteCards === 'function') {
           const n = quoteNote();
-          if (n && !(q && !noteSearchText(n).includes(q))) {
+          if (n && !(q && typeof noteSearchText === 'function' && !noteSearchText(n).includes(q))) {
             const cards = quoteCards(), open = cards.filter(t => !t.done).length;
             const hit = q && !(typeof qbSealed === 'function' && qbSealed()) ? cards.find(t => [t.text, t.q.customer, t.q.rfq, t.q.subject, ...(t.q.items || []).map(i => i.desc)].join(' ').toLowerCase().includes(q)) : null;
             const row = document.createElement('div'); row.className = 'today-row qb-row'; row.id = 'qbRow'; row.setAttribute('role', 'button');
             row.innerHTML = `💲 <span class="name">Quote Board${hit ? `<small class="s hit">${esc(hit.text)}</small>` : ''}</span><span class="cnt ${open ? 'on' : ''}">${typeof qbSealed === 'function' && qbSealed() ? '🔒' : open}</span>`;
-            const tod = box.querySelector('#todayRow'); tod ? tod.after(row) : box.prepend(row);
-            const ib = typeof ideaNote === 'function' && ideaNote();
-            if (ib && !box.querySelector('#ibRow') && !(q && !noteSearchText(ib).includes(q))) {
-              const ic = ideaCards(), iopen = ic.filter(c => !c.done).length;
-              const ihit = q && !(typeof ibSealed === 'function' && ibSealed()) ? ic.find(c => String(c.text || '').toLowerCase().includes(q)) : null;
-              const r2 = document.createElement('div'); r2.className = 'today-row qb-row'; r2.id = 'ibRow'; r2.setAttribute('role', 'button');
-              r2.innerHTML = `💡 <span class="name">Idea Board${ihit ? `<small class="s hit">${esc(ihit.text)}</small>` : ''}</span><span class="cnt ${iopen ? 'on' : ''}">${typeof ibSealed === 'function' && ibSealed() ? '🔒' : iopen}</span>`;
-              row.before(r2);
-            }
+            if (anchor && anchor.nextSibling) box.insertBefore(row, anchor.nextSibling);
+            else if (anchor) anchor.after(row);
+            else box.prepend(row);
+            anchor = row;
           }
-        }
+        } else if (box.querySelector('#qbRow')) anchor = box.querySelector('#qbRow');
+
+        // Inbox (inbox.js helper)
         if (typeof inSidebarRow === 'function') inSidebarRow();
+
+        // Label the board cluster once
+        if (!box.querySelector('.side-label.boards') && (box.querySelector('#ibRow') || box.querySelector('#qbRow') || box.querySelector('#inRow'))) {
+          const lab = document.createElement('div');
+          lab.className = 'side-label boards';
+          lab.textContent = 'Boards';
+          const first = box.querySelector('#ibRow') || box.querySelector('#qbRow') || box.querySelector('#inRow');
+          if (first) box.insertBefore(lab, first);
+        }
       } catch (e) { console.warn('v21d board rows', e); }
     };
   }

@@ -665,6 +665,7 @@ const whenAppReady = f => { if (window.__ready) return f(); const t = setInterva
 setDrawerBoard(QB.mode, { render: false });
 whenAppReady(() => {
   try { ensureIdeaNote(); } catch (e) { console.warn(e); }
+  try { ensureQuoteNote(); } catch (e) { console.warn(e); }
   if (localStorage.getItem('qbOpen') === '1') qbOpen(true, { quiet: true }); else qbBadge();
   renderSidebar(); qbSyncStatus();
   setTimeout(qbAutoSync, 2500);
