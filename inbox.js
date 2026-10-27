@@ -267,7 +267,7 @@ function inMoreMenu() {
     ...(L ? [{ label: `📥 Bring in old Assistant pages (${L})…`, fn: () => importAssistPages() }] : []),
     { label: '📧 Emails the quote sync skips: ' + (on ? 'also add here' : 'Skipped list only'), sub: 'Sync only looks at RFQ / quote emails; this decides where the non-RFQ ones go', fn: () => { localStorage.setItem('inboxFromSync', on ? '0' : '1'); toast(on ? 'Skipped emails stay in 🙈 Skipped only' : 'Skipped work emails will also land in the 📥 Inbox'); } },
     { label: `🧠 What the Inbox learned (${memRules().length})…`, sub: 'Rules from your edits to priorities, owners and action items', fn: memorySettings },
-    { label: '⚙︎ Settings…', fn: () => openSettings('quotes') }]);
+    { label: '⚙︎ Settings…', fn: () => openSettings('ai') }]);
 }
 // lasso → 📤 Send to… → 📥 Inbox (the old “🤖 To assistant”, without the page picker)
 lassoToAssistant = async function () {

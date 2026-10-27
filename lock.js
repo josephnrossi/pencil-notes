@@ -408,6 +408,7 @@ function lockMenu() {
     { label: '⚙︎ Pencil Lock settings…', fn: setupPencilLock }]);
 }
 function settingsMenu() {
+  if (typeof openSettings === 'function') return openSettings();
   const cfg = lockCfg();
   actionSheet('Settings', [
     { label: cfg ? '🔒 Pencil Lock: set up again (new shape & PIN)…' : '🔒 Set up Pencil Lock…', fn: setupPencilLock },
@@ -486,7 +487,7 @@ function setupPencilLock() {
   $('#noteMenuBtn').before(b);
   const foot = $('#exportBtn').parentElement, sb = document.createElement('button'); sb.className = 'btn small'; sb.id = 'settingsBtn'; sb.textContent = '⚙︎ Settings'; sb.onclick = settingsMenu; foot.append(sb);
   const nm = $('#noteMenuBtn'), orig = nm.onclick;
-  nm.onclick = e => { const n = curNote(); if (isSealed(n)) return actionSheet('🔒 Locked note', [{ label: '🔢 Unlock with PIN…', primary: true, fn: () => pinUnlockFlow(n) }, { label: 'Move / delete…', fn: () => noteMenu(n) }, { label: '⚙︎ Settings…', fn: settingsMenu }]); return orig(e); };
+  nm.onclick = e => { const n = curNote(); if (isSealed(n)) return actionSheet('🔒 Locked note', [{ label: '🔢 Unlock with PIN…', primary: true, fn: () => pinUnlockFlow(n) }, { label: 'Move / delete…', fn: () => noteMenu(n) }, { label: '⚙︎ Settings…', fn: () => (typeof openSettings === 'function' ? openSettings() : settingsMenu()) }]); return orig(e); };
   syncLockUI();
 })();
 window.PencilLock = { PRec, lockNote, unlockWith, unlockWithPin, removeLock, isSealed, isLockedOpen, lockCfg, LockDB, sealNote, setupPencilLock, LK };

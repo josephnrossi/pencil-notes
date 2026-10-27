@@ -2,7 +2,7 @@
    One ＋ Insert menu, one grouped Settings screen, a Gestures sheet, a short first-run tour,
    Undo for every delete, a safe importer, storage-full handling and lock hardening.
    Nothing is removed — features are only reached through fewer, more consistent doors. */
-const APP_VERSION = 'v21c5';
+const APP_VERSION = 'v21d';
 
 /* ---------- import sanitizer: hostile backups must not inject markup ----------
    Rendering escapes free text, but ids/enums/colors are interpolated into attributes, so they are
@@ -219,22 +219,27 @@ function settingsSections() {
   const ai = (typeof assistSettingsItems === 'function' ? assistSettingsItems() : []);
   const rec = ai.filter(i => /Recording/.test(i.label)), aiOnly = ai.filter(i => !rec.includes(i));
   const cfg = lockCfg(), finger = $('#fingerBtn').classList.contains('on');
+  const plan = typeof plannerDefaults === 'function' ? plannerDefaults() : { start: '07:00', end: '21:00', slot: 30 };
   return [
     { id: 'appearance', h: 'Appearance', rows: [{ label: 'Appearance: ' + { dark: 'Dark', light: 'Light', system: 'Match iPad' }[themePref()] + '…', fn: themeMenu }] },
     { id: 'writing', h: 'Writing & Pencil', rows: [
-      { label: '☝️ Draw with finger: ' + (finger ? 'On' : 'Off'), sub: 'Off = finger scrolls, Pencil writes (recommended)', fn: () => { $('#fingerBtn').click(); openSettings('writing'); } },
-      { label: '✋ Gestures…', sub: 'Every swipe, hold and pinch on one screen', fn: gesturesSheet }] },
+      { label: '☝️ Draw with finger: ' + (finger ? 'On' : 'Off'), sub: 'Off = finger scrolls, Pencil writes (recommended)', fn: () => { $('#fingerBtn').click(); openSettings('writing'); } }] },
+    { id: 'planner', h: 'Planner', rows: [
+      { label: '🗓 Planner defaults…', sub: `${plan.start}–${plan.end} · ${plan.slot}-min slots` + (typeof plannerSettings === 'function' ? ' · open a planner page to edit that page' : ''), fn: () => typeof plannerSettings === 'function' && plannerSettings() }] },
     { id: 'lock', h: 'Privacy & Pencil Lock', rows: [
       { label: cfg ? '🔒 Pencil Lock: set up again (new shape & PIN)…' : '🔒 Set up Pencil Lock…', fn: setupPencilLock },
       { label: '⏱ Auto-relock: ' + RELOCK_LABEL[relockPref()] + '…', fn: () => actionSheet('Auto-relock', Object.entries(RELOCK_LABEL).map(([k, l]) => ({ label: (relockPref() === k ? '✓ ' : '') + l, fn: () => localStorage.setItem('lockRelock', k) }))) }] },
     { id: 'ai', h: 'AI & Assistant', note: 'Your AI key stays on this iPad and is only sent to the provider you choose. It is never saved in notes or backups.', rows: aiOnly },
-    { id: 'recording', h: 'Recording', rows: rec },
+    { id: 'recording', h: 'Recording', rows: [
+      ...rec,
+      { label: '📁 Archive recordings', sub: 'Stopped meetings file into the Archive folder on the left', fn: () => { if (window.V21d) { const k = V21d.migrateRecordingsToArchive({ quiet: false }); if (!k) toast('No recordings to file — Archive is ready when you stop a meeting'); } } }
+    ] },
     { id: 'storage', h: 'Storage & backup', dyn: true, rows: [
       { label: '⬇︎ Export backup…', sub: 'Everything in one file. Locked notes stay encrypted.', fn: () => $('#exportBtn').click() },
       { label: '⬆︎ Import backup…', sub: 'Merge keeps whichever copy is newer', fn: () => $('#importBtn').click() },
       { label: '📌 Keep my notes on this device', sub: 'Asks Safari not to clear storage when space is low', fn: () => askPersist(true).then(() => openSettings('storage')) }] },
     { id: 'help', h: 'Help', rows: [
-      { label: '✋ Gestures…', fn: gesturesSheet },
+      { label: '✋ Gestures…', sub: 'Every swipe, hold and pinch — one place', fn: gesturesSheet },
       { label: '👋 Show the quick tour', fn: () => startTour(true) }] },
   ];
 }
@@ -280,7 +285,7 @@ const TOUR = [
   ['#insertBtn', '＋ Insert', 'Tasks, section numbers, photos, stickers, reminders, recordings, pages and PDFs live here.'],
   ['#recBtn', '🎙 Record a meeting', 'Captions while you write, then a summary with decisions, action items and next steps.'],
   ['#togglePanel', '🔔 Reminders & tasks', 'Everything that’s due, from every note. Swipe right for done.'],
-  ['#toggleSidebar', '☰ Notes & Settings', 'Notebooks, search, backup and ⚙︎ Settings (including ✋ Gestures).'],
+  ['#toggleSidebar', '☰ Notes', 'Notebooks, 📁 Archive for recordings, search, and ⚙︎ Settings (Gestures & Planner live there).'],
 ];
 function startTour(force) {
   if (!force && (localStorage.getItem('tourDone') || navigator.webdriver)) return;

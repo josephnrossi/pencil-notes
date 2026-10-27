@@ -956,15 +956,15 @@ $('#noteTitle').addEventListener('blur', () => renderPanel());
 $('#noteMenuBtn').onclick = () => {
   const n = curNote(), mark = p => n.paper === p ? '✓ ' : '';
   const setPaper = p => () => { n.paper = p; saveNote(n); for (let i = 0; i < pageEls.length; i++) renderPageInk(i); };
+  const onPlanner = n.pages.some(p => p.bg && p.bg.name === 'planner');
   actionSheet('Note options', [
     { label: mark('lined') + 'Lined paper', fn: setPaper('lined') }, { label: mark('grid') + 'Grid paper', fn: setPaper('grid') }, { label: mark('blank') + 'Blank paper', fn: setPaper('blank') },
-    { label: '＋ Add page…', fn: () => addPage() }, { label: '🗓 Planner settings…', fn: plannerSettings },
+    { label: '＋ Add page…', fn: () => addPage() },
+    ...(onPlanner ? [{ label: '🗓 This planner page…', sub: 'Times & slot length for the open page', fn: plannerSettings }] : []),
     { label: '📄 Import PDF…', fn: () => { pdfTargetNb = n.notebookId; $('#pdfFile').click(); } }, { label: '⬇︎ Export note as PDF', fn: () => exportNotePdf(n) },
     ...(clip ? [{ label: '📋 Paste', fn: pasteClip }] : []),
     { label: (localStorage.getItem('autoNumber') === '0' ? 'Turn on' : 'Turn off') + ' handwritten 1. 2. 3. detection', fn: () => { const on = localStorage.getItem('autoNumber') === '0'; localStorage.setItem('autoNumber', on ? '1' : '0'); toast(on ? 'Handwritten numbers become section badges' : 'Handwritten numbers stay as ink'); } },
-    { label: 'Rename / move / delete…', fn: () => noteMenu(n) },
-    { label: 'Appearance: ' + { dark: 'Dark', light: 'Light', system: 'Match iPad' }[themePref()] + '…', fn: themeMenu },
-    { label: '✋ Gestures…', fn: () => gesturesSheet() }, { label: '⚙︎ Settings…', fn: () => openSettings() }]);
+    { label: 'Rename / move / delete…', fn: () => noteMenu(n) }]);
 };
 function themeMenu() {
   const m = t => (themePref() === t ? '✓ ' : '');

@@ -343,7 +343,7 @@ hlChip.addEventListener('click', () => { const c = hlCtx; hlChip.hidden = true; 
   tb.append(nm);
   $('#todayBtn').classList.add('v21-moved');
   $('#undoBtn').classList.add('tb-gap');
-  nm.title = 'More: page, note, go to, settings'; nm.setAttribute('aria-label', 'More');
+  nm.title = 'More: page, note, go to'; nm.setAttribute('aria-label', 'More');
   ['exportBtn', 'importBtn'].forEach(id => document.getElementById(id).classList.add('v21-moved'));     // in ⚙︎ Settings → Storage & backup
 }
 const MM = (() => { const d = document.createElement('div'); d.id = 'moreMenu'; d.hidden = true; d.setAttribute('role', 'menu'); document.body.append(d); return d; })();
@@ -353,7 +353,7 @@ function moreItems() {
     { h: 'Page', rows: [
       { id: 'paper', seg: [['lined', 'Lined'], ['grid', 'Grid'], ['blank', 'Blank']], cur: n.paper || 'lined' },
       { ic: '＋', l: 'Add page…', s: 'Lined, grid, meeting, planner, recording', fn: () => addPage() },
-      { ic: '🗓', l: 'Planner settings…', s: hasPlanner ? 'This planner page or the defaults' : 'Defaults for new planner pages', fn: plannerSettings }] },
+      ...(hasPlanner ? [{ ic: '🗓', l: 'This planner page…', s: 'Times & slots for the open page — defaults live in ⚙︎ Settings', fn: plannerSettings }] : [])] },
     { h: 'Note', rows: [
       { ic: locked ? '🔓' : '🔒', l: locked ? 'Unlocked — lock again…' : 'Lock note…', s: 'Pencil Lock with your secret shape', fn: () => lockMenu() },
       { ic: '⬇︎', l: 'Export as PDF', fn: () => exportNotePdf(n) },
@@ -363,8 +363,8 @@ function moreItems() {
       { ic: '☀️', l: 'Today', s: 'Everything due today, from every note', fn: () => openToday() },
       { ic: '💡', l: 'Idea Board', fn: () => qbOpen(true, { mode: 'ideas' }) },
       { ic: '💲', l: 'Quote Board', fn: () => qbOpen(true, { mode: 'quotes' }) },
-      { ic: '📥', l: 'Inbox', s: 'Emails & meeting briefs', fn: () => qbOpen(true, { mode: 'inbox' }) }] },
-    { rows: [{ ic: '⚙︎', l: 'Settings…', s: 'Appearance, writing, AI, lock, backup, gestures', fn: () => openSettings() }] },
+      { ic: '📥', l: 'Inbox', s: 'Emails & meeting briefs', fn: () => qbOpen(true, { mode: 'inbox' }) },
+      { ic: '📁', l: 'Archive', s: 'Recordings filed after you stop', fn: () => { if (window.V21d) { V21d.ensureArchiveNb(); S.collapsed.delete(V21d.ARCHIVE_ID); localStorage.setItem('collapsed', JSON.stringify([...S.collapsed])); renderSidebar(); setSidebar(true); const first = notesIn(V21d.ARCHIVE_ID)[0]; if (first) openNote(first.id); else toast('Archive is empty — stop a meeting to file one'); } } }] },
   ];
 }
 function openMore() {
@@ -376,7 +376,7 @@ function openMore() {
   MM.onclick = e => { const p = e.target.closest('[data-paper]'); if (p) { const n = curNote(); n.paper = p.dataset.paper; saveNote(n); for (let i = 0; i < pageEls.length; i++) renderPageInk(i); MM.querySelectorAll('[data-paper]').forEach(x => x.classList.toggle('on', x === p)); return; }
     const r = e.target.closest('[data-mi]'); if (!r) return; MM.hidden = true; flat[+r.dataset.mi].fn(); };
 }
-$('#noteMenuBtn').onclick = e => { e.stopPropagation(); const n = curNote(); if (isSealed(n)) return actionSheet('🔒 Locked note', [{ label: '🔢 Unlock with PIN…', primary: true, fn: () => pinUnlockFlow(n) }, { label: 'Move / delete…', fn: () => noteMenu(n) }, { label: '⚙︎ Settings…', fn: () => openSettings() }]); MM.hidden ? openMore() : (MM.hidden = true); };
+$('#noteMenuBtn').onclick = e => { e.stopPropagation(); const n = curNote(); if (isSealed(n)) return actionSheet('🔒 Locked note', [{ label: '🔢 Unlock with PIN…', primary: true, fn: () => pinUnlockFlow(n) }, { label: 'Move / delete…', fn: () => noteMenu(n) }]); MM.hidden ? openMore() : (MM.hidden = true); };
 document.addEventListener('pointerdown', e => { if (!MM.hidden && !MM.contains(e.target) && !e.target.closest('#noteMenuBtn')) MM.hidden = true; }, true);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') MM.hidden = true; });
 
@@ -390,6 +390,6 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') MM.hidden = 
 /* tour mentions the new doors */
 { const i = TOUR.findIndex(t => t[0] === '#togglePanel'); TOUR.splice(i < 0 ? TOUR.length : i, 0, ['#quotesBtn', '📋 Boards', 'Your 💲 Quote Board, 💡 Idea Board and 📥 Inbox slide out from the right — switch with the dropdown at the top.'], ['#toolbar [data-tool="lasso"]', '✨ Ask Grok', 'Lasso handwriting or text, then tap ✨ Ask Grok to summarize, convert to text, make tasks or draft a reply.']); }
 GESTURES[1][0] = 'Lists, boards & reminders';
-GESTURES[3][1] = GESTURES[3][1].map(r => r[1] === 'Note options' ? ['⋯', 'More', 'paper, pages, lock, PDF, Today, boards, settings'] : r);
+GESTURES[3][1] = GESTURES[3][1].map(r => r[1] === 'Note options' || r[1] === 'More' ? ['⋯', 'More', 'paper, pages, lock, PDF, Today, boards — Settings is the gear in the sidebar'] : r);
 GESTURES[0][1].push(['✨', 'Lasso → Ask Grok', 'summarize · convert to text · make tasks · draft a reply · clean up · ask']);
 window.V21 = { openGrok, closeGrok, selContext, cardContext, runAct, GK, legacyBoardPages, importLegacyBoards, openMore, addIdeaCards };
