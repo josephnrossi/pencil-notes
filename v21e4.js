@@ -7,6 +7,7 @@
     { key: 'product', label: 'Product' },
     { key: 'size', label: 'Size' },
     { key: 'quantity', label: 'Quantity' },
+    { key: 'price', label: 'Price' },
     { key: 'other', label: 'Other' }
   ];
   const HEAD_H = 44;   // ink units
@@ -19,12 +20,12 @@
     try { return typeof isSealed === 'function' && isSealed(n); } catch (_) { return false; }
   }
   function ensureInkIds(form) {
-    if (!form.inkIds) form.inkIds = { distb: [], product: [], size: [], quantity: [], other: [] };
+    if (!form.inkIds) form.inkIds = { distb: [], product: [], size: [], quantity: [], price: [], other: [] };
     for (const { key } of QF_FIELDS) if (!Array.isArray(form.inkIds[key])) form.inkIds[key] = [];
     return form.inkIds;
   }
   function ensureFields(form) {
-    form.fields = form.fields || { distb: '', product: '', size: '', quantity: '', other: '' };
+    form.fields = form.fields || { distb: '', product: '', size: '', quantity: '', price: '', other: '' };
     for (const { key } of QF_FIELDS) if (form.fields[key] == null) form.fields[key] = '';
     return form.fields;
   }
@@ -189,8 +190,8 @@
       x: Math.max(16, Math.min(PAGE_W - FORM_W - 8, x)),
       y: Math.max(16, Math.min(PAGE_H - formHeight({}), y)),
       w: FORM_W,
-      fields: { distb: '', product: '', size: '', quantity: '', other: '' },
-      inkIds: { distb: [], product: [], size: [], quantity: [], other: [] },
+      fields: { distb: '', product: '', size: '', quantity: '', price: '', other: '' },
+      inkIds: { distb: [], product: [], size: [], quantity: [], price: [], other: [] },
       v: 4
     };
     (pg.quoteForms ||= []).push(form);
@@ -232,16 +233,23 @@
     for (const { key } of QF_FIELDS) vals[key] = await resolveFieldValue(pg, form, key);
 
     const distb = vals.distb, product = vals.product, size = vals.size, quantity = vals.quantity, other = vals.other;
+    const priceF = vals.price || { text: '', hasInk: false };
     const qtyRaw = (quantity.text || '').replace(/,/g, '');
     const qty = parseFloat(qtyRaw);
+    const price = (typeof parseMoneyText === 'function' ? parseMoneyText : function (s) {
+      if (s == null || s === '') return NaN;
+      const t = String(s).replace(/[^\d.,\-]/g, '').replace(/,/g, '');
+      const n = parseFloat(t); return isFinite(n) ? n : NaN;
+    })(priceF.text || '');
     // Product → item desc only; Size goes only to specs (no duplicate on card)
     let itemDesc = '';
     if (product.text) itemDesc = product.text;
     else if (product.hasInk) itemDesc = '✍︎ Product';
-    const items = (itemDesc || quantity.text || quantity.hasInk) ? [{
+    const items = (itemDesc || quantity.text || quantity.hasInk || priceF.text || priceF.hasInk) ? [{
       desc: itemDesc || (quantity.hasInk ? '✍︎ Item' : 'Item'),
       qty: isFinite(qty) ? qty : null,
-      unit: null
+      unit: null,
+      price: isFinite(price) ? price : null
     }] : [];
 
     const customer = distb.text || (distb.hasInk ? '✍︎ Distb' : '');
@@ -249,14 +257,17 @@
     if (other.text) notesParts.push(other.text);
     else if (other.hasInk) notesParts.push('✍︎ Other (handwritten on card)');
     // Note which fields came from ink without text (iPad Safari)
-    const inkOnly = QF_FIELDS.filter(({ key }) => vals[key].hasInk && !vals[key].text).map(f => f.label);
+    const inkOnly = QF_FIELDS.filter(({ key }) => vals[key] && vals[key].hasInk && !vals[key].text).map(f => f.label);
     if (inkOnly.length && !other.text) notesParts.push('Ink fields: ' + inkOnly.join(', '));
+    const totalVal = (isFinite(qty) && isFinite(price)) ? Math.round(qty * price * 100) / 100 : null;
 
     const fields = {
       customer,
       notes: notesParts.join('\n'),
       specs: size.text ? [size.text] : (size.hasInk ? ['✍︎ Size'] : []),
-      items: items.map(it => ({ desc: it.desc, qty: it.qty, unit: it.unit })),
+      items: items.map(it => ({ desc: it.desc, qty: it.qty, unit: it.unit, price: it.price })),
+      price: isFinite(price) ? price : null,
+      value: totalVal,
       source: 'quote-form',
       subject: product.text ? ('Quote · ' + product.text) : (product.hasInk ? 'Quote · ✍︎' : 'Quote form'),
       date: Date.now()
@@ -474,7 +485,7 @@
         }
       } catch (_) {}
       const y = (((pages && pages.scrollTop) || 0) / (S.scale || 1)) + 160;
-      insertQuoteFormV4(best, 48, Math.min(PAGE_H - 420, Math.max(60, y)));
+      insertQuoteFormV4(best, 48, Math.min(PAGE_H - 600, Math.max(60, y)));
     };
   }
 

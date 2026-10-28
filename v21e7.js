@@ -6,6 +6,7 @@
     { key: 'product', label: 'Product' },
     { key: 'size', label: 'Size' },
     { key: 'quantity', label: 'Quantity' },
+    { key: 'price', label: 'Price' },
     { key: 'other', label: 'Other' }
   ];
 
@@ -84,31 +85,45 @@
     return null;
   }
 
-  /** Build card fields without duplicating Size into the product/item line. */
+  /** Build card fields without duplicating Size into the product/item line; Total = qty × price. */
   function mapFormToQuoteFields(vals) {
     const distb = vals.distb || {}, product = vals.product || {}, size = vals.size || {};
-    const quantity = vals.quantity || {}, other = vals.other || {};
+    const quantity = vals.quantity || {}, priceF = vals.price || {}, other = vals.other || {};
     const qtyRaw = String(quantity.text || '').replace(/,/g, '');
     const qty = parseFloat(qtyRaw);
+    const price = (typeof parseMoneyText === 'function' ? parseMoneyText : function (s) {
+      if (s == null || s === '') return NaN;
+      const raw = String(s).replace(/[^\d.,\-]/g, '').replace(/,/g, '');
+      const n = parseFloat(raw); return isFinite(n) ? n : NaN;
+    })(priceF.text || '');
     let itemDesc = '';
     if (product.text) itemDesc = product.text;
     else if (product.hasInk) itemDesc = '✍︎ Product';
-    const items = (itemDesc || quantity.text || quantity.hasInk) ? [{
+    const items = (itemDesc || quantity.text || quantity.hasInk || priceF.text || priceF.hasInk) ? [{
       desc: itemDesc || (quantity.hasInk ? '✍︎ Item' : 'Item'),
       qty: isFinite(qty) ? qty : null,
-      unit: null
+      unit: null,
+      price: isFinite(price) ? price : null
     }] : [];
     const customer = distb.text || (distb.hasInk ? '✍︎ Distb' : '');
     const notesParts = [];
     if (other.text) notesParts.push(other.text);
     else if (other.hasInk) notesParts.push('✍︎ Other (handwritten on card)');
-    const inkOnly = QF_FIELDS.filter(({ key }) => vals[key] && vals[key].hasInk && !vals[key].text).map(f => f.label);
+    const fieldsList = (window.V21e3 && V21e3.QUOTE_FIELDS) || [
+      { key: 'distb', label: 'Distb' }, { key: 'product', label: 'Product' },
+      { key: 'size', label: 'Size' }, { key: 'quantity', label: 'Quantity' },
+      { key: 'price', label: 'Price' }, { key: 'other', label: 'Other' }
+    ];
+    const inkOnly = fieldsList.filter(({ key }) => vals[key] && vals[key].hasInk && !vals[key].text).map(f => f.label);
     if (inkOnly.length && !other.text) notesParts.push('Ink fields: ' + inkOnly.join(', '));
+    const totalVal = (isFinite(qty) && isFinite(price)) ? Math.round(qty * price * 100) / 100 : null;
     return {
       customer,
       notes: notesParts.join('\n'),
       specs: size.text ? [size.text] : (size.hasInk ? ['✍︎ Size'] : []),
-      items: items.map(it => ({ desc: it.desc, qty: it.qty, unit: it.unit })),
+      items: items.map(it => ({ desc: it.desc, qty: it.qty, unit: it.unit, price: it.price })),
+      price: isFinite(price) ? price : null,
+      value: totalVal,
       source: 'quote-form',
       subject: product.text ? ('Quote · ' + product.text) : (product.hasInk ? 'Quote · ✍︎' : 'Quote form'),
       date: Date.now()

@@ -9,7 +9,7 @@
    board.compact (collapsed cards). */
 const LABELS = { red: '#ef4444', orange: '#f97316', yellow: '#eab308', green: '#22c55e', blue: '#3b82f6', purple: '#a855f7' };
 const PRIO = ['None', 'Low', 'Medium', 'High'], ITEM_H = 46, SOON_MS = 864e5;
-const INK_W = 300, INK_H = 240, TITLE_H = 58, H_MIN = 90, H_MAX = 760, B_LIFT = 420, B_SLOP = 8, CW_MIN = 0.75, CW_MAX = 3;
+const INK_W = 300, INK_H = 240, TITLE_H = 58, H_MIN = 90, H_MAX = 760, B_LIFT = 420, B_SLOP = 8, CW_MIN = 0.75, CW_MAX = 4;
 /* v12: t.h = body ink height (ink units; 300 units = card width), t.tstrokes = handwritten title, t.typed = typed title on;
    column.w = width factor (1 = a third of the board). */
 const cardH = t => Math.max(H_MIN, Math.min(H_MAX, +t.h || INK_H));
@@ -104,7 +104,7 @@ function cardHTML(t, now, pg) {
       <canvas class="bc-ink" data-ink="body" aria-label="Write here"></canvas></div>
       <div class="bc-resize" aria-label="Drag to resize the card"></div></div></div>`;
 }
-function colStyle(w) { w = Math.max(CW_MIN, Math.min(CW_MAX, +w || 1)); return w === 1 ? '' : `flex-basis: calc((100% - 24px) / 3 * ${w}); min-width: ${Math.round(228 * w)}px`; }
+function colStyle(w) { w = Math.max(CW_MIN, Math.min(CW_MAX, +w || 1)); if (Math.abs(w - 1) < 0.03) return ''; const px = Math.round(260 * w); return `flex: 0 0 ${px}px; min-width: ${px}px; max-width: none; width: ${px}px;`; }
 function layoutCard(w, t) {
   const body = w.querySelector('.bc-ink'), k = (w.querySelector('.bc-main').clientWidth || 200) / INK_W;
   body.style.height = Math.round(cardH(t) * k) + 'px';

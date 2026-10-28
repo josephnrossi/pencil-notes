@@ -6,6 +6,7 @@
     { key: 'product', label: 'Product' },
     { key: 'size', label: 'Size' },
     { key: 'quantity', label: 'Quantity' },
+    { key: 'price', label: 'Price' },
     { key: 'other', label: 'Other' }
   ];
   const QUOTE_RE = /^\s*[Qq]\s*:?\s*$/;
