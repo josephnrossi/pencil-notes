@@ -1,9 +1,8 @@
-/* Pencil Notes v21e5 — write “quote” with Apple Pencil on iPad Safari opens Quote form.
-   Recognition: on-device HW → Grok/transcribe (V21e4.recognizeStrokes) → compact-word toast fallback.
+/* Pencil Notes v21e5 — write “Q” with Apple Pencil opens Quote form (v21e6 keeps this).
+   Recognition: on-device HW → Grok/transcribe (V21e4.recognizeStrokes) → letter-sized toast fallback.
    Builds on v21e4. Mock only. */
 (function () {
-  const QUOTE_WORD_RE = /^\s*quotes?\s*:?\s*$/i;
-  const QUOTE_HAS_RE = /\bquotes?\b/i;
+  const Q_RE = /^\s*[Qq]\s*:?\s*$/;
   const SETTLE_MS = 1150;
   const RECENT_MS = 5000;
   const Q = { timer: null, recent: [], probing: false, lastToastSig: '', lastToastAt: 0, lastAcceptSig: '' };
@@ -47,7 +46,7 @@
     return [x0, y0, x1, y1];
   }
 
-  /** Compact recent stroke group that looks like a single short word (e.g. “quote”). */
+  /** Compact recent stroke group that looks like a single letter (e.g. “Q”). */
   function findWordCluster(pg, pi) {
     const now = Date.now();
     const recent = Q.recent
@@ -56,7 +55,6 @@
       .filter(s => s && s.tool === 'pen' && !s.qf && s.tool !== 'highlighter');
     if (!recent.length) return null;
 
-    // Seed from newest; grow by proximity (same “word”)
     const seed = recent[recent.length - 1];
     const cluster = [seed];
     const ids = new Set([seed.id]);
@@ -70,7 +68,7 @@
         const b = strokeBB(s); if (!b) continue;
         const gapX = Math.max(0, b[0] - bb[2], bb[0] - b[2]);
         const gapY = Math.max(0, b[1] - bb[3], bb[1] - b[3]);
-        if (gapX < href * 0.9 && gapY < href * 0.6) {
+        if (gapX < href * 0.75 && gapY < href * 0.55) {
           ids.add(s.id); cluster.push(s); grew = true;
         }
       }
@@ -78,12 +76,12 @@
 
     const bb = clusterBB(cluster); if (!bb) return null;
     const w = bb[2] - bb[0], h = bb[3] - bb[1];
-    // Single short word — not a digit badge, not a paragraph
-    if (cluster.length < 1 || cluster.length > 12) return null;
-    if (h < 16 || h > 110 || w < 36 || w > 300) return null;
-    if (w / Math.max(h, 1) > 7.5 || h / Math.max(w, 1) > 2.0) return null;
-    // Skip left-margin lone digit-ish (number→badge territory): very narrow + far left
-    if (w < 55 && bb[0] < 160 && cluster.length <= 2) return null;
+    // Single letter — not a word, not a paragraph
+    if (cluster.length < 1 || cluster.length > 5) return null;
+    if (h < 18 || h > 120 || w < 16 || w > 110) return null;
+    if (w / Math.max(h, 1) > 1.6 || h / Math.max(w, 1) > 2.4) return null;
+    // Skip left-margin digit-ish marks (number→badge territory)
+    if (bb[0] < 140 && w < 48 && cluster.length <= 2 && w / Math.max(h, 1) < 0.9) return null;
 
     return {
       strokes: cluster,
@@ -93,24 +91,27 @@
     };
   }
 
+  /** Letter-sized cluster suitable for confirm toast when OCR is unavailable. */
   function looksQuoteSized(cluster) {
     if (!cluster) return false;
     const w = cluster.bb[2] - cluster.bb[0], h = cluster.bb[3] - cluster.bb[1];
-    // “quote” / “quotes” / “quote:” — roughly 4–7 letters
-    return w >= 55 && w <= 260 && h >= 18 && h <= 100 && cluster.strokes.length >= 2 && cluster.strokes.length <= 10;
+    // Capital “Q” / “q” — roughly one letter, 1–4 strokes
+    return w >= 22 && w <= 95 && h >= 24 && h <= 110
+      && cluster.strokes.length >= 1 && cluster.strokes.length <= 4
+      && w / Math.max(h, 1) >= 0.45 && w / Math.max(h, 1) <= 1.35;
   }
 
   function textLooksLikeQuote(text) {
     const t = String(text || '').trim();
     if (!t) return false;
-    if (QUOTE_WORD_RE.test(t)) return true;
-    if (!QUOTE_HAS_RE.test(t)) return false;
-    // Short phrase containing quote — treat as hit
-    return t.split(/\s+/).length <= 3;
+    // Lone Q / q / Q:  (not the word “quote”)
+    if (Q_RE.test(t)) return true;
+    // OCR sometimes returns a single glyph with punctuation
+    if (/^[Qq][.．。]?$/.test(t)) return true;
+    return false;
   }
 
   async function recognizeCluster(strokes) {
-    // 1) Prefer stroke-level HW / Grok via v21e4
     const rec = recognizeFn();
     if (rec) {
       try {
@@ -118,7 +119,6 @@
         if (t && String(t).trim()) return String(t).trim();
       } catch (_) {}
     }
-    // 2) Legacy whole-page HW (Chrome) — only if stroke API unavailable
     try {
       if (typeof HW !== 'undefined' && HW.state === 'ready' && HW.recognizePage) {
         const fake = { strokes: strokes.filter(s => s.tool !== 'highlighter') };
@@ -149,7 +149,6 @@
     pushHistory();
     const keep = S.undo.length;
     const idset = new Set(cluster.ids);
-    // Consume the “quote” ink like lasso / typed path
     pg.strokes = (pg.strokes || []).filter(s => !idset.has(s.id));
     const x = Math.max(16, cluster.bb[0]);
     const y = Math.max(16, cluster.bb[1]);
@@ -171,7 +170,6 @@
     }
     const n = curNote(); if (!n || noteSealed(n)) return;
     const pg = n.pages[pi]; if (!pg) return;
-    // Don't auto-stack another form on a page that already has one
     if ((pg.quoteForms || []).length) return;
 
     const cluster = findWordCluster(pg, pi);
@@ -180,7 +178,6 @@
     Q.probing = true;
     let text = '';
     try {
-      // Call through V21e5 so tests (and future hooks) can stub recognition
       const rec = (window.V21e5 && typeof V21e5.recognizeCluster === 'function')
         ? V21e5.recognizeCluster : recognizeCluster;
       text = await rec(cluster.strokes);
@@ -188,7 +185,6 @@
       Q.probing = false;
     }
 
-    // Cluster may have been erased/converted while we waited
     const still = cluster.ids.every(id => (pg.strokes || []).some(s => s.id === id));
     if (!still) return;
     if ((pg.quoteForms || []).length) return;
@@ -198,21 +194,20 @@
       return;
     }
 
-    // iPad fallback: no HW / no Grok — offer one-tap Insert for quote-sized word clusters
+    // iPad fallback: no OCR — confirm toast only for letter-sized clusters (not every scribble)
     if (!text && !ocrAvailable() && looksQuoteSized(cluster)) {
       const now = Date.now();
       if (cluster.sig === Q.lastToastSig && now - Q.lastToastAt < 8000) return;
-      if (now - Q.lastToastAt < 2500) return; // global debounce
+      if (now - Q.lastToastAt < 2500) return;
       Q.lastToastSig = cluster.sig;
       Q.lastToastAt = now;
       if (typeof actionToast === 'function') {
         actionToast(
-          'Looks like a short word — open Quote form?',
+          'Looks like a “Q” — open Quote form?',
           'Insert Quote form',
           () => {
             const n2 = curNote(); if (!n2) return;
             const pg2 = n2.pages[pi]; if (!pg2) return;
-            // Rebuild cluster from surviving ids
             const strokes = cluster.ids.map(id => (pg2.strokes || []).find(s => s.id === id)).filter(Boolean);
             if (!strokes.length) {
               const ins = insertFn();
@@ -228,7 +223,6 @@
     }
   }
 
-  // Track strokes for clustering (v21e3 already schedules via onStrokeAdded)
   const _prev = window.onStrokeAdded;
   window.onStrokeAdded = function (pi, st) {
     if (typeof _prev === 'function') _prev(pi, st);

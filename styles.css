@@ -1317,7 +1317,7 @@ body.rc-replaying .page canvas { cursor: pointer; }
 .qf-rows { position: absolute; left: 0; right: 0; top: 44px; bottom: 0; }
 .qf-row { position: absolute; left: 0; right: 0; display: flex; align-items: stretch; gap: 6px; padding: 0 10px; box-sizing: border-box; }
 .qf-lab { flex: none; width: 5.6em; align-self: center; font-weight: 800; padding-left: 4px; }
-.qf-pad { position: relative; flex: 1; min-width: 0; margin: 8px 0; border: 1.5px dashed rgba(165,180,252,.55); border-radius: 12px; background: rgba(99,102,241,.07); pointer-events: none; display: flex; align-items: flex-end; padding: 6px 10px; }
+.qf-pad { position: relative; flex: 1; min-width: 0; margin: 8px 0; border: 1.5px dashed rgba(165,180,252,.55); border-radius: 12px; background: #2a2a30; pointer-events: none; display: flex; align-items: flex-end; padding: 6px 10px; overflow: hidden; }
 .qf-pad::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 14px; height: 1px; background: rgba(148,163,184,.35); pointer-events: none; }
 .qf-pad-hint { font-size: 12px; font-weight: 650; color: var(--muted); opacity: .85; pointer-events: none; }
 .qf-type { position: absolute; left: 8px; right: 8px; top: 8px; bottom: 8px; border: 0; border-radius: 8px; background: var(--bg); color: inherit; padding: 6px 10px; font: 650 16px/1.3 system-ui, -apple-system, sans-serif; pointer-events: auto; }
@@ -1326,4 +1326,10 @@ body.rc-replaying .page canvas { cursor: pointer; }
 .qf-convert { flex: none; align-self: center; min-height: 44px; min-width: 96px; padding: 0 14px; border: 0; border-radius: 12px; background: #4f46e5; color: #fff; font-weight: 800; font-size: 14px; }
 .qf-convert:active { filter: brightness(1.08); }
 :root[data-theme="light"] .qf-block { background: rgba(255,255,255,.88); }
-:root[data-theme="light"] .qf-pad { background: rgba(79,70,229,.05); }
+:root[data-theme="light"] .qf-pad { background: #fffdf8; }
+
+/* v21e6 — ink visible inside Quote form pads */
+.qf-ink-cv { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; border-radius: 11px; }
+.qf-pad-hint { position: relative; z-index: 2; }
+.qf-pad .qf-type { z-index: 3; }
+

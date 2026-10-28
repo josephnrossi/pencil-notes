@@ -1,4 +1,4 @@
-/* Pencil Notes v21e4 — reliable handwritten numbers → badges; write “quote” → intake form → Quote Board.
+/* Pencil Notes v21e4 — reliable handwritten numbers → badges; write “Q” → intake form → Quote Board.
    Builds on v21e2. Mock only. */
 (function () {
   const QF_FIELDS = [
@@ -8,8 +8,8 @@
     { key: 'quantity', label: 'Quantity' },
     { key: 'other', label: 'Other' }
   ];
-  const QUOTE_RE = /^\s*quote\s*:?\s*$/i;
-  const QUOTE_LINE_RE = /^\s*quote\s*:?\s*$/im;
+  const QUOTE_RE = /^\s*[Qq]\s*:?\s*$/;
+  const QUOTE_LINE_RE = /^\s*[Qq]\s*:?\s*$/m;
 
   function noteSealed(n) {
     try { return typeof isSealed === 'function' && isSealed(n); } catch (_) { return false; }
@@ -212,7 +212,7 @@
   /* ============================================================
      2. Write “quote” → Quote intake form → Convert → Quote Board
      Triggers shipped:
-       A) Typed text block that is (or becomes) just “quote” / “Quote:”
+       A) Typed text block that is (or becomes) just “Q” / “q” / “Q:”
        B) Lasso → “💲 Quote form” (handwriting of the word — no OCR required)
        C) ＋ Insert → “Quote form”
        D) After ink settles: recognize a compact stroke cluster as “quote”
@@ -409,7 +409,7 @@
       $('#lassoMenu').hidden = true;
       const pg = n.pages[s.pi];
       const bb = s.bb || (s.ids.length && strokesBB(pg, s.ids)) || [80, 160, 200, 220];
-      // Consume the selected ink (the word “quote”) into the form
+      // Consume the selected ink (the “Q”) into the form
       pushHistory(); const keep = S.undo.length;
       if (s.ids && s.ids.length) pg.strokes = pg.strokes.filter(st => !s.ids.includes(st.id));
       if (s.texts && s.texts.length) pg.texts = pg.texts.filter(t => !s.texts.includes(t.id));
