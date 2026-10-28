@@ -1,5 +1,5 @@
-const CACHE = 'pencil-notes-v21e9';
-const ASSETS = ['./', 'index.html', 'styles.css', 'db.js', 'app.js', 'v7.js', 'board.js', 'assist-engine.js', 'assistant.js', 'assistant2.js', 'lock.js', 'record.js', 'audit.js', 'quotes.js', 'graph.js', 'v21.js', 'inbox.js', 'v21d.js', 'v21e.js', 'v21e2.js', 'v21e3.js', 'v21e4.js', 'v21e5.js', 'v21e6.js', 'v21e7.js', 'v21e8.js', 'v21e9.js', 'authcap.js', 'vendor/msal/msal-browser.min.js', 'vendor/pdfjs/pdf.min.mjs', 'vendor/pdfjs/pdf.worker.min.mjs', 'manifest.json',
+const CACHE = 'pencil-notes-v21ea';
+const ASSETS = ['./', 'index.html', 'styles.css', 'db.js', 'app.js', 'v7.js', 'board.js', 'assist-engine.js', 'assistant.js', 'assistant2.js', 'lock.js', 'record.js', 'audit.js', 'quotes.js', 'graph.js', 'v21.js', 'inbox.js', 'v21d.js', 'v21e.js', 'v21e2.js', 'v21e3.js', 'v21e4.js', 'v21e5.js', 'v21e6.js', 'v21e7.js', 'v21e8.js', 'v21e9.js', 'v21ea.js', 'authcap.js', 'vendor/msal/msal-browser.min.js', 'vendor/pdfjs/pdf.min.mjs', 'vendor/pdfjs/pdf.worker.min.mjs', 'manifest.json',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/favicon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
