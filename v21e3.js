@@ -273,10 +273,9 @@
 
     const qtyRaw = f.quantity.replace(/,/g, '');
     const qty = parseFloat(qtyRaw);
-    const descParts = [f.product, f.size].filter(Boolean);
-    const itemDesc = descParts.join(' · ') || f.product || 'Item';
-    const items = (f.product || f.size || f.quantity) ? [{
-      desc: itemDesc,
+    const itemDesc = f.product || '';
+    const items = (itemDesc || f.quantity) ? [{
+      desc: itemDesc || 'Item',
       quantity: isFinite(qty) ? qty : null,
       unit: null
     }] : [];

@@ -37,10 +37,12 @@
   function fieldPadRect(form, key) {
     const i = QF_FIELDS.findIndex(f => f.key === key); if (i < 0) return null;
     const isOther = key === 'other';
-    const top = form.y + HEAD_H + i * ROW_H + 6;
+    // .qf-rows starts at HEAD_H; row i is ROW_H tall; pad has ~8px CSS margin
+    const m = 8 / (typeof S !== 'undefined' && S.scale ? S.scale : 1);
+    const top = form.y + HEAD_H + i * ROW_H + m;
     const left = form.x + LAB_W;
     const right = form.x + (form.w || FORM_W) - (isOther ? CONVERT_W + 8 : 10);
-    const bottom = top + ROW_H - 14;
+    const bottom = form.y + HEAD_H + (i + 1) * ROW_H - m;
     return [left, top, right, bottom];
   }
 
@@ -232,12 +234,10 @@
     const distb = vals.distb, product = vals.product, size = vals.size, quantity = vals.quantity, other = vals.other;
     const qtyRaw = (quantity.text || '').replace(/,/g, '');
     const qty = parseFloat(qtyRaw);
-    const descParts = [];
-    if (product.text) descParts.push(product.text);
-    else if (product.hasInk) descParts.push('✍︎ Product');
-    if (size.text) descParts.push(size.text);
-    else if (size.hasInk && !size.text) descParts.push('✍︎ Size');
-    let itemDesc = descParts.join(' · ');
+    // Product → item desc only; Size goes only to specs (no duplicate on card)
+    let itemDesc = '';
+    if (product.text) itemDesc = product.text;
+    else if (product.hasInk) itemDesc = '✍︎ Product';
     const items = (itemDesc || quantity.text || quantity.hasInk) ? [{
       desc: itemDesc || (quantity.hasInk ? '✍︎ Item' : 'Item'),
       qty: isFinite(qty) ? qty : null,
@@ -333,7 +333,7 @@
         const inkN = (form.inkIds[key] || []).length;
         const typed = form.fields[key] || '';
         const showType = !!form._typeOpen && form._typeOpen[key];
-        return `<div class="qf-row" data-field="${key}" style="top:${(HEAD_H + i * ROW_H) * s}px;height:${ROW_H * s}px">
+        return `<div class="qf-row" data-field="${key}" style="top:${(i * ROW_H) * s}px;height:${ROW_H * s}px">
           <span class="qf-lab qf-hit">${label}:</span>
           <div class="qf-pad" aria-label="${label} — write here with Pencil">
             <span class="qf-pad-hint">${inkN ? '✍︎ ' + inkN + ' stroke' + (inkN > 1 ? 's' : '') : (typed ? '' : 'Write here')}</span>
