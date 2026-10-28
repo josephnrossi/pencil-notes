@@ -215,9 +215,8 @@
        A) Typed text block that is (or becomes) just “quote” / “Quote:”
        B) Lasso → “💲 Quote form” (handwriting of the word — no OCR required)
        C) ＋ Insert → “Quote form”
-       D) On-device handwriting recognition (Chrome Handwriting Recognition API)
-          after ink settles — if recognized text matches /\bquote\b/i
-       iPad Safari has no on-device HW API, so A–C are the reliable paths there.
+       D) After ink settles: recognize a compact stroke cluster as “quote”
+          (HW → Grok/V21e4.recognizeStrokes → iPad toast fallback). See v21e5.js.
      ============================================================ */
   function ensureForms(pg) { return (pg.quoteForms ||= []); }
 
@@ -437,9 +436,13 @@
   if (document.getElementById('insertMenu')) addInsertQuoteItem();
   else setTimeout(addInsertQuoteItem, 200);
 
-  /* ---- Trigger D: on-device HW recognition after ink settles ---- */
+  /* ---- Trigger D: handwriting “quote” after ink settles ----
+     v21e5 replaces this when loaded (iPad Safari has no HW API). */
   let qInkTimer = null;
   function scheduleQuoteInkProbe(pi) {
+    if (window.V21e5 && typeof V21e5.scheduleQuoteInkProbe === 'function') {
+      return V21e5.scheduleQuoteInkProbe(pi);
+    }
     clearTimeout(qInkTimer);
     qInkTimer = setTimeout(() => probeQuoteInk(pi), 1100);
   }
