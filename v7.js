@@ -1199,12 +1199,10 @@ function checkNumber(pg, glyph, term, kind) {
   return { digit: c.digit, style: kind === 'dot' ? '.' : ')', gb };
 }
 const NUM = { timer: null, recent: [] };
-window.onStrokeAdded = (pi, st) => {
-  if (st.tool !== 'pen' || localStorage.getItem('autoNumber') === '0') return;
-  NUM.recent.push({ pi, id: st.id, t: Date.now() }); if (NUM.recent.length > 12) NUM.recent.shift();
-  clearTimeout(NUM.timer); NUM.timer = setTimeout(detectNumbers, 650);
-};
+// v21eb: handwritten digits always stay ink — numbered badges come from ＋ Insert → Number (or lasso → Make section number).
+window.onStrokeAdded = () => {};
 function detectNumbers() {
+  NUM.recent = []; return;   // v21eb: auto-conversion removed
   if (drawing) { NUM.timer = setTimeout(detectNumbers, 400); return; }
   const n = curNote(), now = Date.now(), recent = NUM.recent.filter(r => now - r.t < 10000); NUM.recent = [];
   if (!n) return;

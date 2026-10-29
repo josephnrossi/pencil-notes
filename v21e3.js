@@ -120,6 +120,8 @@
   }
 
   function detectNumbersV3() {
+    if (typeof NUM !== 'undefined') NUM.recent = [];
+    return; // v21eb: handwritten numbers never auto-convert to badges
     if (typeof drawing !== 'undefined' && drawing) { NUM.timer = setTimeout(detectNumbersV3, 400); return; }
     const n = curNote(); if (!n || noteSealed(n)) return;
     if (localStorage.getItem('autoNumber') === '0') return;
@@ -197,15 +199,7 @@
   window.onStrokeAdded = function (pi, st) {
     if (typeof _onStroke === 'function') {
       // Call original but replace its detectNumbers timer by clearing and using ours
-      const prev = NUM.timer;
-      _onStroke(pi, st);
-      if (st && st.tool === 'pen' && localStorage.getItem('autoNumber') !== '0') {
-        clearTimeout(NUM.timer); clearTimeout(prev);
-        NUM.timer = setTimeout(detectNumbersV3, 780);
-      }
-    } else if (st && st.tool === 'pen' && localStorage.getItem('autoNumber') !== '0') {
-      NUM.recent.push({ pi, id: st.id, t: Date.now() }); if (NUM.recent.length > 16) NUM.recent.shift();
-      clearTimeout(NUM.timer); NUM.timer = setTimeout(detectNumbersV3, 780);
+      _onStroke(pi, st);   // v21eb: no handwritten-number detection timer
     }
     if (st && st.tool === 'pen') scheduleQuoteInkProbe(pi);
   };

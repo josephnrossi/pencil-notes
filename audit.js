@@ -156,7 +156,7 @@ setTimeout(() => { if (!localStorage.getItem('persistAsked') && S.notes.length) 
 /* ======================= UI: one ＋ Insert menu ======================= */
 const INSERT_ITEMS = [
   { tool: 'task', ic: '☑️', l: 'Task', s: 'Tap the page to drop a checkbox' },
-  { tool: 'section', ic: '1.', l: 'Number', s: 'Numbered section — tap the start of a line; drag the number to move the section' },
+  { tool: 'section', ic: '1.', l: 'Number', s: 'Tap the start of a line to place the next number (1. 2. 3.) — drag it to move the section' },
   { id: 'photoBtn', ic: '🖼', l: 'Photo', s: 'From Photos or the camera' },
   { id: 'stickerBtn', ic: '⭐', l: 'Sticker', s: 'Stars, arrows, tabs…' },
   { id: 'remindNoteBtn', ic: '⏰', l: 'Reminder', s: 'Remind me about this note' },
@@ -166,7 +166,7 @@ const INSERT_ITEMS = [
 ];
 function buildInsert() {
   const misc = $('#toolbar .group.misc');
-  $('#toolbar .group.tools [data-tool="task"]')?.remove();   // v20: the 1. Number tool stays visible in the toolbar (and is in ＋ Insert too)
+  $('#toolbar .group.tools [data-tool="task"]')?.remove();   // v21eb: 1. Number lives only in ＋ Insert (no toolbar button, no handwritten auto-convert)
   const btn = document.createElement('button');
   Object.assign(btn, { id: 'insertBtn', className: 'ins-btn', title: 'Insert a task, section number, photo, sticker, reminder, recording, page or PDF' });
   btn.setAttribute('aria-haspopup', 'menu'); btn.setAttribute('aria-expanded', 'false'); btn.innerHTML = '<b>＋</b><span>Insert</span>';

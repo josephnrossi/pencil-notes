@@ -1333,3 +1333,6 @@ body.rc-replaying .page canvas { cursor: pointer; }
 .qf-pad-hint { position: relative; z-index: 2; }
 .qf-pad .qf-type { z-index: 3; }
 
+/* v21eb: Insert menu titles read as normal labels (not the muted toolbar-tool caption) */
+#insertMenu .ins-item.tool span { font-size: 15px; font-weight: 650; margin-top: 0; color: var(--text); }
+#insertMenu .ins-item.on span { color: #fff; }

@@ -383,8 +383,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') MM.hidden = 
 /* Settings: handwritten 1. 2. 3. detection moves here; Gestures listed once (Help) */
 { const _ss = settingsSections; settingsSections = function () {
     const secs = _ss(), w = secs.find(s => s.id === 'writing');
-    if (w) { w.rows = w.rows.filter(r => !/Gestures/.test(r.label)); const on = localStorage.getItem('autoNumber') !== '0';
-      w.rows.push({ label: 'Handwritten 1. 2. 3. → section numbers: ' + (on ? 'On' : 'Off'), sub: 'Turns a handwritten “1.” at the start of a line into a numbered section badge', fn: () => { localStorage.setItem('autoNumber', on ? '0' : '1'); toast(on ? 'Handwritten numbers stay as ink' : 'Handwritten numbers become section badges'); openSettings('writing'); } }); }
+    if (w) { w.rows = w.rows.filter(r => !/Gestures/.test(r.label)); }   // v21eb: handwritten-number auto-convert removed (use ＋ Insert → Number)
     const ai = secs.find(s => s.id === 'ai'); if (ai) { ai.h = 'AI — ✨ Ask Grok'; ai.note = 'Lasso ink or text, then tap ✨ Ask Grok. Works offline in a basic built-in mode; connect your own xAI key for Grok. The key stays on this iPad and is never saved in notes or backups.'; }
     return secs; }; }
 /* tour mentions the new doors */

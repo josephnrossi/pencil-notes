@@ -580,7 +580,7 @@ function selectTool(tool) {
   if (S.tool === 'task') hint('Tap anywhere on the page to add a task');
   if (S.tool === 'lasso') hint('Circle handwriting, then tap "Make task"');
   if (S.tool === 'text') hint('Tap the page to type');
-  if (S.tool === 'section') hint('Tap at the start of a line to add the next section number');
+  if (S.tool === 'section') hint('Number: tap the start of a line to place the next number — drag a number to move its section');
 }
 $('#focusBar').addEventListener('click', e => {
   const t = e.target.closest('.tool'); if (t) return selectTool(t.dataset.tool);
@@ -963,7 +963,6 @@ $('#noteMenuBtn').onclick = () => {
     ...(onPlanner ? [{ label: '🗓 This planner page…', sub: 'Times & slot length for the open page', fn: plannerSettings }] : []),
     { label: '📄 Import PDF…', fn: () => { pdfTargetNb = n.notebookId; $('#pdfFile').click(); } }, { label: '⬇︎ Export note as PDF', fn: () => exportNotePdf(n) },
     ...(clip ? [{ label: '📋 Paste', fn: pasteClip }] : []),
-    { label: (localStorage.getItem('autoNumber') === '0' ? 'Turn on' : 'Turn off') + ' handwritten 1. 2. 3. detection', fn: () => { const on = localStorage.getItem('autoNumber') === '0'; localStorage.setItem('autoNumber', on ? '1' : '0'); toast(on ? 'Handwritten numbers become section badges' : 'Handwritten numbers stay as ink'); } },
     { label: 'Rename / move / delete…', fn: () => noteMenu(n) }]);
 };
 function themeMenu() {
