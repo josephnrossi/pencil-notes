@@ -1336,3 +1336,17 @@ body.rc-replaying .page canvas { cursor: pointer; }
 /* v21eb: Insert menu titles read as normal labels (not the muted toolbar-tool caption) */
 #insertMenu .ins-item.tool span { font-size: 15px; font-weight: 650; margin-top: 0; color: var(--text); }
 #insertMenu .ins-item.on span { color: #fff; }
+/* v21ec: hold-drag whole pages + ＋ Add page beside Delete page */
+.page-foot { align-items: center; left: 50%; right: auto !important; transform: translateX(-50%); white-space: nowrap; z-index: 2; }
+.page-foot .pg-grip { padding: 4px 8px; margin: -4px 0; border-radius: 8px; pointer-events: auto; touch-action: none; cursor: grab; }
+.page-foot .pg-grip b { font-weight: 900; letter-spacing: -1px; opacity: .8; }
+.page-foot .pg-grip:active { background: var(--surface2); }
+.page-foot [data-addafter] { color: var(--accent); font-weight: 700; text-decoration: none; }
+.page.pg-lifted { opacity: .35; outline: 3px dashed var(--accent); outline-offset: 4px; transition: opacity .15s; }
+.pg-ghost { position: fixed; left: 0; top: 0; z-index: 400; pointer-events: none; border-radius: 10px; overflow: hidden; background: var(--paper);
+  box-shadow: 0 22px 50px rgba(0,0,0,.5), 0 0 0 3px var(--accent); opacity: .96; }
+.pg-ghost canvas { display: block; }
+.pg-ghost-lab { position: absolute; left: 8px; bottom: 8px; padding: 3px 8px; border-radius: 8px; background: var(--accent); color: #fff; font: 700 13px system-ui; }
+.pg-dropbar { position: fixed; z-index: 399; height: 6px; border-radius: 3px; background: var(--accent); pointer-events: none; box-shadow: 0 0 14px var(--accent); }
+.pg-dropbar span { position: absolute; left: 14px; top: -15px; white-space: nowrap; padding: 6px 12px; border-radius: 18px; background: var(--accent); color: #fff; font: 700 14px system-ui; }
+body.pg-dragging, body.pg-dragging * { cursor: grabbing !important; }
