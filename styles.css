@@ -1350,3 +1350,13 @@ body.rc-replaying .page canvas { cursor: pointer; }
 .pg-dropbar { position: fixed; z-index: 399; height: 6px; border-radius: 3px; background: var(--accent); pointer-events: none; box-shadow: 0 0 14px var(--accent); }
 .pg-dropbar span { position: absolute; left: 14px; top: -15px; white-space: nowrap; padding: 6px 12px; border-radius: 18px; background: var(--accent); color: #fff; font: 700 14px system-ui; }
 body.pg-dragging, body.pg-dragging * { cursor: grabbing !important; }
+
+/* v21ed — Quote sheet controls (the sheet itself is painted into the page canvas) */
+.page .overlay .qs-ui { position: absolute; pointer-events: auto; z-index: 3; font: 600 13px -apple-system, system-ui, sans-serif; white-space: nowrap;
+  height: 28px; line-height: 26px; padding: 0 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+  box-shadow: 0 1px 3px rgba(0,0,0,.10); touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+.page .overlay .qs-addline { color: var(--accent); border-style: dashed; background: transparent; box-shadow: none; }
+.page .overlay .qs-delq { transform: translateX(-100%); height: 24px; line-height: 22px; padding: 0 7px; font-size: 12px; }
+.page .overlay .qs-delrow { transform: translate(-100%, -50%); width: 24px; height: 24px; padding: 0; line-height: 22px; font-size: 15px; opacity: .75; }
+.page .overlay .qs-addq { transform: translateX(-50%); height: 34px; line-height: 32px; padding: 0 18px; font-size: 14px; color: #fff; background: var(--accent); border-color: transparent; }
+.page .overlay .qs-addq.top { transform: translateX(-100%); }
