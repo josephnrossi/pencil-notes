@@ -1,0 +1,72 @@
+/* Pencil Notes — 🛰 Satellite assistant (v21ee part C, mock). Pairs with satellite.js. */
+#satOrb { position: fixed; z-index: 75; width: 56px; height: 56px; border-radius: 50%; border: 0; padding: 0; display: grid; place-items: center; cursor: grab;
+  background: radial-gradient(circle at 35% 30%, #a5a0ff 0%, #6d64f5 42%, #3b2fc9 100%); color: #fff; box-shadow: 0 6px 22px rgba(60,40,200,.45), 0 0 0 1px rgba(255,255,255,.14) inset;
+  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: opacity .25s, transform .2s, box-shadow .2s; }
+#satOrb .sat-core { font-size: 24px; line-height: 1; text-shadow: 0 1px 6px rgba(0,0,0,.35); }
+#satOrb .sat-ring { position: absolute; inset: -5px; border-radius: 50%; border: 1.5px solid rgba(139,133,255,.55); animation: satOrbit 7s linear infinite; }
+#satOrb .sat-moon { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: #fff; top: -6px; left: 50%; margin-left: -4.5px; transform-origin: 4.5px 34px; animation: satOrbit 7s linear infinite; box-shadow: 0 0 8px #fff; }
+@keyframes satOrbit { to { transform: rotate(360deg); } }
+#satOrb.on { box-shadow: 0 0 0 4px rgba(139,133,255,.35), 0 6px 22px rgba(60,40,200,.5); }
+#satOrb.dragging { cursor: grabbing; transform: scale(1.12); transition: none; }
+#satOrb.ghost { opacity: .18; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { #satOrb .sat-ring, #satOrb .sat-moon { animation: none; } }
+#satPanel { position: fixed; z-index: 76; display: flex; flex-direction: column; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow), 0 18px 60px rgba(0,0,0,.35); overflow: hidden; }
+#satPanel[hidden] { display: none; }
+#satPanel.sheet { left: 0; right: 0; bottom: 0; top: auto; height: min(78vh, 620px); width: auto; border-radius: 20px 20px 0 0; padding-bottom: var(--sab); }
+.sat-head { display: flex; align-items: center; gap: 4px; padding: 10px 10px 6px 14px; }
+.sat-title { flex: 1; display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+.sat-title i { font-style: normal; color: var(--accent); font-size: 18px; }
+.sat-title b { font-size: 17px; }
+.sat-title small { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sat-ib { width: 36px; height: 36px; border-radius: 10px; border: 0; background: none; color: var(--text); font-size: 17px; }
+.sat-ib:hover { background: var(--surface2); }
+.sat-ctx { margin: 0 10px 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; text-align: left; border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); background: var(--accent-soft); color: var(--text); border-radius: 14px; padding: 6px 10px; font: inherit; }
+.sat-eye { font-size: 13px; }
+.sat-cbit { display: inline-flex; flex-direction: column; line-height: 1.2; padding-right: 8px; border-right: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
+.sat-cbit:last-child { border-right: 0; }
+.sat-cbit b { font-size: 12.5px; font-weight: 700; }
+.sat-cbit small { font-size: 11px; color: var(--muted); }
+.sat-selb { color: var(--accent); }
+.sat-ctxd { margin: 0 10px 6px; padding: 8px 10px; border-radius: 12px; background: var(--surface2); max-height: 160px; overflow: auto; }
+.sat-ctxd[hidden] { display: none; }
+.sat-ctxh { font-size: 12px; font-weight: 700; margin-bottom: 4px; } .sat-ctxh small { font-weight: 500; color: var(--muted); }
+.sat-ctxd pre { margin: 0; white-space: pre-wrap; font: 12px/1.4 ui-monospace, Menlo, monospace; color: var(--muted); }
+.sat-msgs { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 12px 10px; display: flex; flex-direction: column; gap: 8px; -webkit-overflow-scrolling: touch; }
+.sat-hello { color: var(--muted); font-size: 14px; padding: 8px 2px; } .sat-hello b { color: var(--text); font-size: 15px; } .sat-hello i { font-style: normal; color: var(--accent); font-weight: 600; }
+.sat-m { display: flex; flex-direction: column; gap: 6px; max-width: 92%; }
+.sat-m.user { align-self: flex-end; align-items: flex-end; }
+.sat-b { padding: 8px 12px; border-radius: 16px; font-size: 14.5px; line-height: 1.4; background: var(--surface2); }
+.sat-m.user .sat-b { background: var(--accent); color: #fff; border-bottom-right-radius: 5px; }
+.sat-m.bot .sat-b { border-bottom-left-radius: 5px; }
+.sat-b p, .sat-card p { margin: 0 0 4px; } .sat-b p:last-child { margin: 0; }
+.sat-b ul, .sat-card ul { margin: 2px 0; padding-left: 18px; } .sat-b li, .sat-card li { margin: 2px 0; }
+.sat-typing { display: inline-flex; gap: 4px; padding: 12px 14px; } .sat-typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: satDot 1s infinite; } .sat-typing i:nth-child(2) { animation-delay: .15s; } .sat-typing i:nth-child(3) { animation-delay: .3s; }
+@keyframes satDot { 50% { opacity: .25; transform: translateY(-2px); } }
+.sat-card { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; background: var(--surface); font-size: 14px; line-height: 1.4; width: 100%; box-sizing: border-box; }
+.sat-ch { font-weight: 750; margin-bottom: 4px; }
+.sat-card.summary { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+.sat-card.action.ok { border-color: color-mix(in srgb, var(--ok) 50%, transparent); } .sat-card.action.ok .sat-ch { color: var(--ok); }
+.sat-card.action.err .sat-ch, .sat-card.confirm .sat-ch { color: var(--warn); }
+.sat-card.nokey { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.sat-card button, .sat-acts button { min-height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface2); color: var(--text); font-weight: 650; font-size: 13.5px; }
+.sat-card.nokey button { background: var(--accent); color: #fff; border-color: transparent; margin-top: 4px; }
+.sat-acts { display: flex; gap: 6px; justify-content: flex-end; align-items: center; margin-top: 6px; flex-wrap: wrap; } .sat-acts small { color: var(--ok); margin-right: auto; font-weight: 650; }
+.sat-acts .danger { background: var(--danger); color: #fff; border-color: transparent; }
+.sat-card small { color: var(--muted); }
+.sat-hit { display: grid !important; grid-template-columns: 1fr auto; gap: 1px 8px; width: 100%; text-align: left; margin-top: 5px; padding: 7px 10px !important; height: auto; }
+.sat-hit b { font-size: 13.5px; } .sat-hit small { font-size: 11.5px; } .sat-hit span { grid-column: 1 / -1; color: var(--muted); font-weight: 500; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sat-row { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-bottom: 1px dashed var(--line); } .sat-row code { font: 13px ui-monospace, Menlo, monospace; } .sat-row b { color: var(--accent); white-space: nowrap; } .sat-row.err b { color: var(--danger); font-size: 12.5px; }
+.sat-chips, .sat-ins { display: flex; gap: 6px; padding: 6px 10px 2px; overflow-x: auto; scrollbar-width: none; flex: none; }
+.sat-chips::-webkit-scrollbar, .sat-ins::-webkit-scrollbar { display: none; }
+.sat-ins[hidden] { display: none; }
+.sat-chips button, .sat-ins button { flex: none; min-height: 34px; padding: 0 12px; border-radius: 17px; border: 1px solid var(--line); background: var(--surface2); color: var(--text); font-weight: 650; font-size: 13.5px; white-space: nowrap; }
+.sat-ins button { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.sat-form { display: flex; gap: 6px; padding: 8px 10px 10px; flex: none; }
+.sat-in { flex: 1; min-width: 0; min-height: 42px; border-radius: 21px; border: 1px solid var(--line); background: var(--surface2); color: var(--text); padding: 0 14px; font-size: 16px; }
+.sat-send { width: 42px; height: 42px; border-radius: 50%; border: 0; background: var(--accent); color: #fff; font-size: 19px; font-weight: 800; }
+.sat-mic.on { background: var(--danger); color: #fff; animation: satDot 1s infinite; }
+.sat-mic[hidden] { display: none; }
+.sat-menu { position: absolute; right: 50px; top: 46px; z-index: 2; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 4px; display: flex; flex-direction: column; }
+.sat-menu[hidden] { display: none; }
+.sat-menu button { text-align: left; padding: 9px 12px; border: 0; background: none; color: var(--text); border-radius: 8px; font-size: 14px; } .sat-menu button:hover { background: var(--surface2); }
+.sat-hit mark { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text); border-radius: 3px; padding: 0 1px; }

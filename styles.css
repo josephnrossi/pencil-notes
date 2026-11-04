@@ -1360,3 +1360,65 @@ body.pg-dragging, body.pg-dragging * { cursor: grabbing !important; }
 .page .overlay .qs-delrow { transform: translate(-100%, -50%); width: 24px; height: 24px; padding: 0; line-height: 22px; font-size: 15px; opacity: .75; }
 .page .overlay .qs-addq { transform: translateX(-50%); height: 34px; line-height: 32px; padding: 0 18px; font-size: 14px; color: #fff; background: var(--accent); border-color: transparent; }
 .page .overlay .qs-addq.top { transform: translateX(-100%); }
+
+/* v21ee — Quote sheet totals · handwriting search · Daily To-Do · iPad polish */
+.page .overlay .qt-ui { position: absolute; pointer-events: auto; z-index: 3; transform: translate(-100%, -50%); white-space: nowrap; border: 1px solid transparent; border-radius: 11px;
+  height: 18px; line-height: 16px; padding: 0 7px; font: 700 11px -apple-system, system-ui, sans-serif; color: var(--accent); background: color-mix(in srgb, color-mix(in srgb, var(--accent) 10%, var(--surface)) 82%, transparent);
+  touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+.page .overlay .qt-line.flag { color: #b45309; background: rgba(245,158,11,.14); border-color: rgba(245,158,11,.45); }
+.page .overlay .qt-line.flag.reading { color: var(--muted); background: var(--surface2); border-color: transparent; }
+.page .overlay .qt-total { transform: translateX(-100%); height: 28px; line-height: 26px; padding: 0 12px; font-size: 14px; color: var(--text); background: var(--surface); border-color: var(--line); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.page .overlay .qt-total small { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+.page .overlay .qt-total em { font-style: normal; font-weight: 600; color: #b45309; font-size: 12px; }
+.qt-fix-wrap { position: fixed; inset: 0; height: 100dvh; z-index: 95; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; padding: 16px; padding-bottom: calc(16px + var(--sab)); }
+.qt-fix { width: min(560px, 100%); }
+.qt-fix h3 { margin: 0; } .qt-fix .fine { margin: 0; }
+.qt-rows { display: flex; flex-direction: column; gap: 8px; max-height: 50dvh; overflow: auto; }
+.qt-row { display: grid; grid-template-columns: 54px 1fr 14px 1fr 96px; align-items: start; gap: 6px; padding: 8px; border-radius: 12px; background: var(--surface2); }
+.qt-row b { padding-top: 26px; font-size: 13px; color: var(--muted); }
+.qt-row label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; font-weight: 700; color: var(--muted); }
+.qt-row input { height: 40px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); padding: 0 10px; font-size: 16px; color: var(--text); min-width: 0; }
+.qt-row small { font-weight: 500; font-size: 11.5px; overflow-wrap: anywhere; }
+.qt-x { padding-top: 30px; color: var(--muted); text-align: center; } .qt-eq { padding-top: 30px; font-weight: 700; text-align: right; font-size: 14px; }
+.qt-sum { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 8px; font-weight: 700; } .qt-sum b { font-size: 20px; }
+
+.page .overlay .td-ui { position: absolute; pointer-events: auto; z-index: 3; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+.page .overlay .td-check { width: 44px; height: 44px; transform: translate(-50%, -50%); border: 0; background: transparent; padding: 0; display: flex; align-items: center; justify-content: center;
+  color: #fff; font: 900 calc(var(--box) * .72) system-ui; isolation: isolate; }
+.page .overlay .td-check::before { content: ''; position: absolute; left: 50%; top: 50%; width: var(--box); height: var(--box); transform: translate(-50%, -50%); border-radius: 22%; z-index: -1; }
+.page .overlay .td-check.on::before { background: #22a55a; }
+.page .overlay .td-strike { height: 2px; background: rgba(34,165,90,.55); pointer-events: none; border-radius: 1px; }
+.page .overlay .td-addline, .page .overlay .td-delrow, .page .overlay .td-tmr { font: 600 13px -apple-system, system-ui, sans-serif; white-space: nowrap; height: 28px; line-height: 26px; padding: 0 12px; border-radius: 14px;
+  border: 1px dashed var(--accent); background: transparent; color: var(--accent); }
+.page .overlay .td-delrow { transform: translate(-100%, -50%); width: 24px; height: 24px; padding: 0; line-height: 22px; font-size: 15px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); opacity: .75; }
+.page .overlay .td-tmr { transform: translateX(-100%); height: 24px; line-height: 22px; font-size: 12px; border-style: solid; border-color: var(--line); color: var(--muted); background: var(--surface); }
+
+#hwResults { display: flex; flex-direction: column; gap: 4px; max-height: 46dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; margin: -4px -4px 0; padding: 0 4px 6px; border-bottom: 1px solid var(--line); }
+.hw-head { font-size: 13px; color: var(--muted); padding: 2px 2px 0; } .hw-status { margin: 0 2px 2px; font-size: 11.5px; }
+.hw-res { display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left; border: 0; border-radius: 10px; padding: 6px; background: var(--surface2); min-height: 44px; touch-action: manipulation; }
+.hw-res img { flex: none; width: 44px; height: 63px; border-radius: 4px; background: var(--paper); box-shadow: 0 0 0 1px var(--line); object-fit: cover; -webkit-touch-callout: none; pointer-events: none; }
+.hw-meta { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.hw-t { font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hw-k { font-size: 11.5px; color: var(--muted); } .hw-s { font-size: 13px; overflow-wrap: anywhere; }
+.hw-s mark, .hw-res mark { background: color-mix(in srgb, #facc15 55%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+.page .overlay .hw-hit { position: absolute; pointer-events: none; z-index: 2; border-radius: 10px; border: 3px solid #facc15; background: rgba(250,204,21,.18); animation: hwpulse 1.2s ease-in-out 3; }
+@keyframes hwpulse { 50% { box-shadow: 0 0 0 8px rgba(250,204,21,.25); } }
+
+/* ---- iPad polish ---- */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; touch-action: manipulation; }          /* no landscape font inflation; no double-tap zoom on UI */
+@media (pointer: coarse) {                                                                                /* inputs under 16px make iPad Safari zoom on focus */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), select, textarea { font-size: max(16px, 1em) !important; }
+}
+@supports (height: 100dvh) {                                                                              /* 100vh hides content under Safari's toolbars */
+  .sheet { max-height: 90dvh; } .qb-edit, .qb-gsheet { max-height: calc(100dvh - 40px); } #lockTrail { height: 100dvh; }
+}
+@media (hover: none) {                                                                                    /* hover states stuck after a finger / Pencil tap */
+  .bcard-wrap:not(.resizing) .bc-resize:hover { opacity: .55; background-color: transparent; }
+  .bcol:not(.bcol-sizing) .bcol-resize:hover i { background: var(--line); height: 46px; }
+  #qbDrawer:not(.resizing) #qbResize:hover i { background: var(--line); height: 64px; }
+}
+#actionWrap, #sheetWrap { padding-bottom: calc(16px + var(--sab)); padding-top: calc(16px + var(--sat)); }
+.float-menu { max-width: calc(100vw - 24px - var(--sal) - var(--sar)); }
+#insertMenu { max-height: calc(100dvh - 24px - var(--sat) - var(--sab)); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.page canvas { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }              /* no magnifier / callout on a long finger hold */
+.page .overlay .qt-line.last { transform: translate(-100%, -100%); margin-top: -2px; }
