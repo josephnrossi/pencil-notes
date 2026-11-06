@@ -75,6 +75,10 @@
   const X = 40, BW = 920, TOP = 96, GAP = 16, LIMIT = PAGE_H - 24;
   const BAND = 30, PARTY = 70, THEAD = 24, LINE = 52, ADD = 36, NOTES = 104, NOTE_LH = 41, PAD = 10, DEF_LINES = 2, DEF_QUOTES = 2;
   const COLS = [['product', 'Product', .44], ['size', 'Size', .22], ['qty', 'Qty', .12], ['price', 'Price', .22]];
+  /* v21ei: wider Size column (room for 4x8, 48x96, 12 x 18…). Widths are stored per quote (q.cw); new quotes get CW_WIDE.
+     An existing quote is widened only when none of its handwriting sits where a column divider would move, so old ink is never split. */
+  const CW_OLD = [.44, .22, .12, .22], CW_WIDE = [.36, .32, .12, .20];
+  const colsOf = q => COLS.map(([k, l], i) => [k, l, (q && Array.isArray(q.cw) && q.cw.length === 4 ? q.cw : CW_OLD)[i]]);
   const nH = q => NOTES + NOTE_LH * Math.max(0, q.nlines || 0);   // v21eg: ＋ note line adds NOTE_LH to the Notes box
   const qH = q => BAND + PARTY + 8 + THEAD + LINE * q.lines + ADD + nH(q) + PAD;
   const MAXL = Math.floor((LIMIT - TOP - qH({ lines: 0 })) / LINE);
@@ -83,7 +87,7 @@
     const y = q.y, x = X + 12, w = BW - 24, half = (w - 12) / 2;
     const party = [{ key: 'distributor', label: 'Distributor', x, y: y + BAND, w: half, h: PARTY }, { key: 'customer', label: 'Customer', x: x + half + 12, y: y + BAND, w: half, h: PARTY }];
     const ty = y + BAND + PARTY + 8, rows = [];
-    for (let r = 0; r < q.lines; r++) { let cx = x; rows.push(COLS.map(([k, l, f]) => { const c = { key: k, label: l, row: r, x: cx, y: ty + THEAD + r * LINE, w: w * f, h: LINE }; cx += w * f; return c; })); }
+    for (let r = 0; r < q.lines; r++) { let cx = x; rows.push(colsOf(q).map(([k, l, f]) => { const c = { key: k, label: l, row: r, x: cx, y: ty + THEAD + r * LINE, w: w * f, h: LINE }; cx += w * f; return c; })); }
     const rowsBottom = ty + THEAD + q.lines * LINE;
     return { x: X, y, w: BW, h: qH(q), party, table: { x, y: ty, w, h: THEAD + q.lines * LINE }, rows, rowsBottom, add: { x, y: rowsBottom, h: ADD },
       notes: { key: 'notes', label: 'Notes', x, y: rowsBottom + ADD, w, h: nH(q) } };
@@ -119,7 +123,7 @@
       const T = L.table;
       rr(ctx, T.x, T.y, T.w, T.h, 8); ctx.fillStyle = c.box; ctx.fill(); ctx.strokeStyle = c.edge; ctx.lineWidth = 1; ctx.stroke();
       ctx.strokeStyle = c.edge; ctx.beginPath(); ctx.moveTo(T.x, T.y + THEAD); ctx.lineTo(T.x + T.w, T.y + THEAD); ctx.stroke();
-      let cx = T.x; COLS.forEach(([, l, f], k) => { lab(ctx, c, l, cx + 12, T.y + 17); cx += T.w * f; if (k < COLS.length - 1) { ctx.strokeStyle = c.rule; ctx.beginPath(); ctx.moveTo(cx, T.y + 4); ctx.lineTo(cx, T.y + T.h - 4); ctx.stroke(); } });
+      let cx = T.x; colsOf(q).forEach(([, l, f], k) => { lab(ctx, c, l, cx + 12, T.y + 17); cx += T.w * f; if (k < COLS.length - 1) { ctx.strokeStyle = c.rule; ctx.beginPath(); ctx.moveTo(cx, T.y + 4); ctx.lineTo(cx, T.y + T.h - 4); ctx.stroke(); } });
       ctx.strokeStyle = c.rule; ctx.lineWidth = 1; ctx.beginPath();
       for (let r = 1; r < q.lines; r++) { const yy = T.y + THEAD + r * LINE; ctx.moveTo(T.x + 8, yy); ctx.lineTo(T.x + T.w - 8, yy); }
       ctx.stroke();
@@ -127,7 +131,22 @@
     ctx.restore();
   }
   const _dpb = drawPageBackground;
-  drawPageBackground = function (ctx, note, pg) { const r = _dpb.apply(this, arguments); if (pg && pg.qsheet) try { drawSheet(ctx, pg); } catch (e) { console.warn('qsheet', e); } return r; };
+  /** v21ei: give pre-v21ei quotes the wide Size column unless their ink would straddle a moved divider. */
+  function widenSize(pg) {
+    let changed = false;
+    for (const q of pg.qsheet.quotes || []) {
+      if (Array.isArray(q.cw)) continue;
+      const L0 = qLayout(q), x = L0.table.x, w = L0.table.w, y0 = L0.table.y + THEAD, y1 = L0.rowsBottom;
+      const edges = (cw) => { let a = x; return cw.slice(0, 3).map(f => (a += w * f)); };
+      const eo = edges(CW_OLD), en = edges(CW_WIDE);
+      const bands = eo.map((e, i) => [Math.min(e, en[i]) - 2, Math.max(e, en[i]) + 2]).filter(([a, b]) => b - a > 4.5);
+      const hit = (pg.strokes || []).some(s => { const b = sbb(s); return b[3] >= y0 && b[1] <= y1 && bands.some(([a, c]) => b[2] >= a && b[0] <= c); })
+        || (pg.texts || []).some(t => { const [tx, ty] = tc(t); return ty >= y0 && ty <= y1 && bands.some(([a, c]) => tx >= a - 60 && tx <= c); });
+      q.cw = hit ? CW_OLD.slice() : CW_WIDE.slice(); changed = true;
+    }
+    return changed;
+  }
+  drawPageBackground = function (ctx, note, pg) { const r = _dpb.apply(this, arguments); if (pg && pg.qsheet) try { if (widenSize(pg) && note && note.pages && note.pages.includes(pg)) setTimeout(() => { try { DB.put('notes', note); } catch (_) {} }, 0); /* quiet save: no updatedAt bump */ drawSheet(ctx, pg); } catch (e) { console.warn('qsheet', e); } return r; };
 
   /* ---------- ink helpers ---------- */
   const sbb = s => s.bb || (s.bb = bbox(s.points));
@@ -146,7 +165,7 @@
   }
   const lastBottom = pg => { const Q = pg.qsheet.quotes; return Q.length ? Q[Q.length - 1].y + qH(Q[Q.length - 1]) : TOP - GAP; };
   const isBlank = pg => !pg.qsheet && !pg.bg && !(pg.strokes || []).length && !(pg.texts || []).length && !(pg.tasks || []).length && !(pg.images || []).length && !(pg.sections || []).length && !(pg.quoteForms || []).length;
-  const newQ = y => ({ id: uid('q'), y, lines: DEF_LINES });
+  const newQ = y => ({ id: uid('q'), y, lines: DEF_LINES, cw: CW_WIDE.slice() });
   function sheetPage(n, likePi) {
     const p = newPage(); p.paper = 'blank'; p.qsheet = { v: 2, quotes: [] };
     let y = TOP; for (let i = 0; i < DEF_QUOTES; i++) { p.qsheet.quotes.push(newQ(y)); y += qH(p.qsheet.quotes[i]) + GAP; }
@@ -317,5 +336,5 @@
 
   if (curNote()) { try { buildPages(); } catch (_) {} }
   try { renderSidebar(); } catch (_) {}
-  window.V21ed = { version: 'v21ed', insertSheet, addLine, removeLine, addNoteLine, removeNoteLine, NOTE_LH, addQuote, deleteQuote, qLayout, qH, MAXL, TOP, GAP, LIMIT, LINE };
+  window.V21ed = { version: 'v21ed', insertSheet, addLine, removeLine, addNoteLine, removeNoteLine, NOTE_LH, addQuote, deleteQuote, qLayout, qH, MAXL, TOP, GAP, LIMIT, LINE, CW_OLD, CW_WIDE, widenSize };
 })();
