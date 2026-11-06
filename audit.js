@@ -2,7 +2,7 @@
    One ＋ Insert menu, one grouped Settings screen, a Gestures sheet, a short first-run tour,
    Undo for every delete, a safe importer, storage-full handling and lock hardening.
    Nothing is removed — features are only reached through fewer, more consistent doors. */
-const APP_VERSION = 'v21e4';
+const APP_VERSION = 'v21eh';   // v21eh: was stuck at v21e4
 
 /* ---------- import sanitizer: hostile backups must not inject markup ----------
    Rendering escapes free text, but ids/enums/colors are interpolated into attributes, so they are
@@ -239,8 +239,7 @@ function settingsSections() {
       { label: '⬆︎ Import backup…', sub: 'Merge keeps whichever copy is newer', fn: () => $('#importBtn').click() },
       { label: '📌 Keep my notes on this device', sub: 'Asks Safari not to clear storage when space is low', fn: () => askPersist(true).then(() => openSettings('storage')) }] },
     { id: 'help', h: 'Help', rows: [
-      { label: '✋ Gestures…', sub: 'Every swipe, hold and pinch — one place', fn: gesturesSheet },
-      { label: '👋 Show the quick tour', fn: () => startTour(true) }] },
+      { label: '✋ Gestures…', sub: 'Every swipe, hold and pinch — one place', fn: gesturesSheet }] },   // v21eh: quick tour removed
   ];
 }
 async function openSettings(focus) {
@@ -288,6 +287,7 @@ const TOUR = [
   ['#toggleSidebar', '☰ Notes', 'Notebooks, 📁 Archive for recordings, search, and ⚙︎ Settings (Gestures & Planner live there).'],
 ];
 function startTour(force) {
+  return;   // v21eh: the quick tour is gone — never shows, not even from a link or Settings
   if (!force && (localStorage.getItem('tourDone') || navigator.webdriver)) return;
   let i = 0; const w = modalWrap('tourWrap'); w.classList.add('tour-wrap');
   const done = () => { w.hidden = true; localStorage.setItem('tourDone', '1'); };

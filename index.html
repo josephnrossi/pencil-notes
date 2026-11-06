@@ -7,7 +7,7 @@
 <title>Pencil Notes</title>
 <meta name="description" content="Handwritten notes with tasks and reminders">
 <meta name="theme-color" content="#111114">
-<script>/* v21eg: default = Match iPad (system) */try{var t=localStorage.getItem("theme");if(t!=="light"&&t!=="dark")t="system";document.documentElement.dataset.theme=t==="light"||(t==="system"&&!matchMedia("(prefers-color-scheme: dark)").matches)?"light":"dark";}catch(e){document.documentElement.dataset.theme="dark";}</script>
+<script>/* v21eg/v21eh: default = Match iPad (system); one-time: an old implicit/saved Dark → system (Light kept) */try{if(!localStorage.getItem("themeV21eh")){var o=localStorage.getItem("theme");if(!o||o==="dark")localStorage.setItem("theme","system");localStorage.setItem("themeV21eh","1");}localStorage.setItem("tourDone","1");var t=localStorage.getItem("theme");if(t!=="light"&&t!=="dark")t="system";document.documentElement.dataset.theme=t==="light"||(t==="system"&&!matchMedia("(prefers-color-scheme: dark)").matches)?"light":"dark";}catch(e){document.documentElement.dataset.theme="dark";}</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -207,5 +207,6 @@
   <script src="calcrecog.js"></script>
   <script src="calcboard.js"></script>
   <script src="v21eg.js"></script>
+  <script src="v21eh.js"></script>
 </body>
 </html>

@@ -101,11 +101,17 @@
   const up = e => {
     activeTouches.delete(e.pointerId);
     if (pend && e.pointerId === pend.pid) cancelPend();
-    if (D && e.pointerId === D.pid) drop(e.type === 'pointercancel');
+    // v21eh: iPad Safari can send pointercancel mid-drag (e.g. when the notebook drawer slides in under the finger) while the
+    // finger is still down — keep the drag alive and follow the touch events instead; touchend drops, touchcancel cancels.
+    if (D && e.pointerId === D.pid) { if (e.type === 'pointercancel' && (e.pointerType === 'touch' || D.touch) && D.fingerDown) { D.pointerLost = true; return; } drop(e.type === 'pointercancel'); }
   };
   addEventListener('pointerup', up, true); addEventListener('pointercancel', up, true);
   PAGES.addEventListener('scroll', () => { if (pend && !pend.grip) cancelPend(); }, { passive: true });
-  document.addEventListener('touchmove', e => { if (D) e.preventDefault(); }, { passive: false });      // lifted: finger drags the page, not the scroll
+  document.addEventListener('touchmove', e => { if (!D) return; e.preventDefault();      // lifted: finger drags the page, not the scroll
+    if (D.pointerLost && e.touches[0]) { D.x = e.touches[0].clientX; D.y = e.touches[0].clientY; track(); } }, { passive: false });
+  document.addEventListener('touchstart', e => { if (D) D.fingerDown = true; }, { capture: true, passive: true });
+  document.addEventListener('touchend', e => { if (D && !e.touches.length) { D.fingerDown = false; if (D.pointerLost) drop(false); } }, { capture: true, passive: true });
+  document.addEventListener('touchcancel', e => { if (D && !e.touches.length) { D.fingerDown = false; if (D.pointerLost) drop(true); } }, { capture: true, passive: true });
   document.addEventListener('contextmenu', e => { if (pend || D) e.preventDefault(); }, true);
   document.addEventListener('click', e => { if (swallowClick) { swallowClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
   addEventListener('keydown', e => { if (e.key === 'Escape' && D) drop(true); });
@@ -130,7 +136,8 @@
     ghost.append(thumbOf(n, n.pages[p.pi], W)); ghost.insertAdjacentHTML('beforeend', `<div class="pg-ghost-lab">⠿ Page ${p.pi + 1}</div>`);
     const bar = document.createElement('div'); bar.className = 'pg-dropbar'; bar.hidden = true; bar.innerHTML = '<span></span>';
     document.body.append(ghost, bar); document.body.classList.add('pg-dragging'); rec.el.classList.add('pg-lifted');
-    D = { pid: p.pid, from: p.pi, x: p.x, y: p.y, ghost, bar, W, ins: null, raf: 0 };
+    D = { pid: p.pid, from: p.pi, x: p.x, y: p.y, ghost, bar, W, ins: null, raf: 0, touch: p.type === 'touch', fingerDown: p.type === 'touch' };
+    if (HOOKS.start) try { HOOKS.start(D); } catch (e) { console.warn(e); }
     track(); D.raf = requestAnimationFrame(autoScroll);
   }
   function track() {
@@ -166,6 +173,11 @@
     if (!cancel && d.ins != null) movePage(d.from, d.ins > d.from ? d.ins - 1 : d.ins);
   }
 
+  /** v21eh: start a page drag from outside (e.g. a long-press on the drawer scrim over a page). */
+  function startAt(pid, pi, x, y, type) {
+    const n = curNote(); if (D || !n || !n.pages[pi] || n.pages.length < 2 || sealed(n)) return false;
+    cancelPend(); pend = { pid, pi, x0: x, y0: y, x, y, type, grip: true }; lift(pend); return !!D;
+  }
   if (curNote()) buildPages();
-  window.V21ec = { version: 'v21ec', insertPage, insertPageAt, movePage, pageLike, hooks: HOOKS, get dragging() { return !!D; }, get pending() { return !!pend; }, HOLD_TOUCH, HOLD_GRIP };
+  window.V21ec = { startAt, get drag() { return D && { pid: D.pid, from: D.from, lost: !!D.pointerLost }; }, version: 'v21ec', insertPage, insertPageAt, movePage, pageLike, hooks: HOOKS, get dragging() { return !!D; }, get pending() { return !!pend; }, HOLD_TOUCH, HOLD_GRIP };
 })();

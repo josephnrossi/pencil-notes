@@ -244,7 +244,24 @@
   /* ==================== 5. drag a page onto another notebook / note in the sidebar ==================== */
   const DROP = { opened: false, hint: null };
   const sideVisible = () => { const sb = $('#sidebar'), r = sb.getBoundingClientRect(); return r.right > 40 && getComputedStyle(sb).display !== 'none'; };
-  function openSide() { if (sideVisible()) return; setSidebar(true); DROP.opened = true; }
+  function openSide() { if (sideVisible()) return; DROP.forceOpen = true; setSidebar(true); DROP.opened = true; }
+  /* v21eh: the notebook list opens the moment a page is lifted and stays open for the whole drag —
+     nothing may close it (scrim tap, note open, re-layout) until the drop or cancel. */
+  const _ssb = setSidebar;
+  setSidebar = function (open) { if (!open && (window.V21ec && V21ec.dragging || DROP.hold)) return; return _ssb.apply(this, arguments); };
+  const _rl = relayout;
+  relayout = function () { if (window.V21ec && V21ec.dragging) { DROP.relayout = true; return; } return _rl.apply(this, arguments); };   // a rebuild mid-drag would drop the finger's target
+  { const sc = $('#scrim'); const _oc = sc.onclick; sc.onclick = function (e) { if ((window.V21ec && V21ec.dragging) || DROP.hold || Date.now() - (DROP.endAt || 0) < 500) return; return _oc && _oc.call(this, e); }; }
+  /* v21eh: notebooks already slid out (portrait drawer)? press and hold the page next to them → that page lifts right there */
+  { const sc = $('#scrim'); let h = null;
+    sc.addEventListener('pointerdown', e => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      const els = document.elementsFromPoint(e.clientX, e.clientY), pe = els.map(x => x.closest && x.closest('#pages .page[data-pi]')).find(Boolean); if (!pe) return;
+      h = { pid: e.pointerId, x0: e.clientX, y0: e.clientY, pi: +pe.dataset.pi, type: e.pointerType };
+      h.t = setTimeout(() => { const g = h; h = null; if (!g) return; DROP.hold = true; DROP.opened = false; if (window.V21ec && V21ec.startAt(g.pid, g.pi, g.x0, g.y0, g.type)) { try { navigator.vibrate && navigator.vibrate(15); } catch (_) {} } DROP.hold = false; }, 450);
+    });
+    const off = e => { if (h && e.pointerId === h.pid && (e.type !== 'pointermove' || Math.hypot(e.clientX - h.x0, e.clientY - h.y0) > 10)) { clearTimeout(h.t); h = null; } };
+    addEventListener('pointermove', off, true); addEventListener('pointerup', off, true); addEventListener('pointercancel', off, true); }
   function targetAt(x, y) {
     const els = document.elementsFromPoint(x, y); if (!els.some(e => e.id === 'sidebar' || e.closest && e.closest('#sidebar'))) return null;
     for (const el of els) {
@@ -277,7 +294,8 @@
       if (lab) lab.textContent = L.ok || L.bad;
       return L.ok ? t : { type: 'none', why: L.bad };
     };
-    H.end = (D, cancel) => { clearHl(); if (DROP.hint) { DROP.hint.remove(); DROP.hint = null; } if (DROP.opened && (cancel || !D.tgt || D.tgt.type === 'none') && isDrawer()) setSidebar(false); if (cancel || !D.tgt) DROP.opened = false; };
+    H.start = () => { openSide(); };
+    H.end = (D, cancel) => { DROP.endAt = Date.now(); if (DROP.relayout) { DROP.relayout = false; setTimeout(() => { try { _rl(); } catch (_) {} }, 0); } clearHl(); if (DROP.hint) { DROP.hint.remove(); DROP.hint = null; } if (DROP.opened && (cancel || !D.tgt || D.tgt.type === 'none') && isDrawer()) setSidebar(false); if (cancel || !D.tgt) DROP.opened = false; };
     H.drop = D => { const t = D.tgt; const opened = DROP.opened; DROP.opened = false;
       if (!t || t.type === 'none') { toast(t && t.why ? t.why : 'Drop on a notebook or a note', 1600); return; }
       movePageTo(D.from, t); if (opened && isDrawer()) setSidebar(false); };
