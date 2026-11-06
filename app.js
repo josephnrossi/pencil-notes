@@ -11,7 +11,7 @@ const drawerMQ = matchMedia('(max-width: 1100px), (orientation: portrait)');
 const isDrawer = () => drawerMQ.matches; // portrait iPad & phones: sidebar/panel are overlay drawers, page is edge-to-edge
 const uid = p => (p || '') + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const sysDarkMQ = matchMedia('(prefers-color-scheme: dark)');
-const themePref = () => { const t = localStorage.getItem('theme'); return ['light', 'dark', 'system'].includes(t) ? t : 'dark'; };
+const themePref = () => { const t = localStorage.getItem('theme'); return ['light', 'dark', 'system'].includes(t) ? t : 'system'; };   // v21eg: never chosen → Match iPad (system)
 const isDark = () => { if (typeof renderLight !== 'undefined' && renderLight) return false; const p = themePref(); return p === 'system' ? sysDarkMQ.matches : p === 'dark'; };
 function applyTheme() {
   const dark = isDark();
@@ -60,19 +60,15 @@ function makeNote(notebookId, title) {
 async function load() {
   S.notebooks = await DB.all('notebooks');
   S.notes = await DB.all('notes');
-  if (!S.notebooks.length) {
+  if (!S.notebooks.filter(b => b.id !== 'archive').length) {   // v21eg: the 📁 Archive notebook can be saved first (race) — it doesn't count
     const firstLaunch = !S.notes.length && !localStorage.getItem('seeded');
     if (firstLaunch) {
       const t = new Date(); t.setDate(t.getDate() + 1); t.setHours(9, 0, 0, 0);
-      const seeds = [['Work', 'Work — start here', 'Prep notes for Monday standup'], ['Personal', 'Personal — start here', 'Call the dentist']];
-      seeds.forEach(([name, title, task], i) => {
+      // v21eg: no sample / demo content — two empty notebooks and one blank note to write on
+      ['Work', 'Personal'].forEach((name, i) => {
         const nb = { id: uid('b'), name, createdAt: Date.now() + i, order: i };
-        const n = makeNote(nb.id, title); n.updatedAt = Date.now() - i; n.order = 0;
-        const pg = n.pages[0];
-        pg.texts.push({ id: uid('x'), x: 100, y: 112, text: 'Welcome to Pencil Notes ✍️', size: 34, color: INK });
-        pg.texts.push({ id: uid('x'), x: 100, y: 190, text: 'Circle handwriting with ➰ Lasso, then tap "Make task".\nTap ☑️ Task to drop a checkbox anywhere on the page.\nTasks with a time show up in 🔔 Reminders.', size: 24, color: INK });
-        pg.tasks.push({ id: uid('t'), kind: 'typed', x: 100, y: 330, text: task, done: false, due: t.toISOString(), repeat: '', notified: false, createdAt: Date.now() });
-        S.notebooks.push(nb); S.notes.push(n);
+        S.notebooks.push(nb);
+        if (i === 0) { const n = makeNote(nb.id); n.order = 0; S.notes.push(n); }
       });
       for (const nb of S.notebooks) await saveNotebook(nb);
       for (const n of S.notes) await DB.put('notes', n);

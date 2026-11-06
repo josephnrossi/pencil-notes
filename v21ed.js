@@ -75,7 +75,8 @@
   const X = 40, BW = 920, TOP = 96, GAP = 16, LIMIT = PAGE_H - 24;
   const BAND = 30, PARTY = 70, THEAD = 24, LINE = 52, ADD = 36, NOTES = 104, NOTE_LH = 41, PAD = 10, DEF_LINES = 2, DEF_QUOTES = 2;
   const COLS = [['product', 'Product', .44], ['size', 'Size', .22], ['qty', 'Qty', .12], ['price', 'Price', .22]];
-  const qH = q => BAND + PARTY + 8 + THEAD + LINE * q.lines + ADD + NOTES + PAD;
+  const nH = q => NOTES + NOTE_LH * Math.max(0, q.nlines || 0);   // v21eg: ＋ note line adds NOTE_LH to the Notes box
+  const qH = q => BAND + PARTY + 8 + THEAD + LINE * q.lines + ADD + nH(q) + PAD;
   const MAXL = Math.floor((LIMIT - TOP - qH({ lines: 0 })) / LINE);
   /** Every box of one quote block, in page units. */
   function qLayout(q) {
@@ -85,7 +86,7 @@
     for (let r = 0; r < q.lines; r++) { let cx = x; rows.push(COLS.map(([k, l, f]) => { const c = { key: k, label: l, row: r, x: cx, y: ty + THEAD + r * LINE, w: w * f, h: LINE }; cx += w * f; return c; })); }
     const rowsBottom = ty + THEAD + q.lines * LINE;
     return { x: X, y, w: BW, h: qH(q), party, table: { x, y: ty, w, h: THEAD + q.lines * LINE }, rows, rowsBottom, add: { x, y: rowsBottom, h: ADD },
-      notes: { key: 'notes', label: 'Notes', x, y: rowsBottom + ADD, w, h: NOTES } };
+      notes: { key: 'notes', label: 'Notes', x, y: rowsBottom + ADD, w, h: nH(q) } };
   }
   const rr = (ctx, x, y, w, h, r) => { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); };
   function pal() {
@@ -111,7 +112,7 @@
         rr(ctx, f.x, f.y, f.w, f.h, 8); ctx.fillStyle = c.box; ctx.fill(); ctx.strokeStyle = c.edge; ctx.lineWidth = 1; ctx.stroke();
         lab(ctx, c, f.label, f.x + 12, f.y + 20);
         ctx.strokeStyle = c.rule; ctx.lineWidth = 1.2; ctx.beginPath();
-        if (f.key === 'notes') for (let k = 1; k <= 2; k++) { const yy = f.y + 22 + k * NOTE_LH - 4; ctx.moveTo(f.x + 12, yy); ctx.lineTo(f.x + f.w - 12, yy); }
+        if (f.key === 'notes') for (let k = 1; k <= 2 + Math.max(0, q.nlines || 0); k++) { const yy = f.y + 22 + k * NOTE_LH - 4; ctx.moveTo(f.x + 12, yy); ctx.lineTo(f.x + f.w - 12, yy); }
         else { ctx.moveTo(f.x + 12, f.y + f.h - 16); ctx.lineTo(f.x + f.w - 12, f.y + f.h - 16); }
         ctx.stroke();
       }
@@ -223,6 +224,31 @@
     commit(n, [pi], '－ Line removed');
     return true;
   }
+  /* v21eg: ＋ / － note lines in the Notes box (same pattern as product lines: quotes + ink below shift, overflow to next sheet) */
+  function addNoteLine(pi, id) {
+    const n = guard(); if (!n) return false; const pg = n.pages[pi], qi = findQ(pg, id); if (qi < 0) return false;
+    const q = pg.qsheet.quotes[qi], y0 = qLayout(q).notes.y + qLayout(q).notes.h;
+    if (q.y + qH(q) + NOTE_LH > LIMIT && qi === 0) { toast('This quote already fills a page — add another quote to continue'); return false; }
+    pushHistory();
+    q.nlines = (q.nlines || 0) + 1;
+    pg.qsheet.quotes.slice(qi + 1).forEach(o => { o.y += NOTE_LH; }); shiftBelow(pg, y0, NOTE_LH);
+    const moved = overflow(n, pi);
+    commit(n, moved ? 'all' : [pi], moved ? '＋ Note line added — the quotes below moved to the next page' : null);
+    return true;
+  }
+  function removeNoteLine(pi, id, force) {
+    const n = guard(); if (!n) return false; const pg = n.pages[pi], qi = findQ(pg, id); if (qi < 0) return false;
+    const q = pg.qsheet.quotes[qi]; if (!(q.nlines > 0)) { toast('Notes keep their first two lines'); return false; }
+    const N = qLayout(q).notes, row = { x: N.x, y: N.y + N.h - NOTE_LH, w: N.w, h: NOTE_LH }, G = inkIn(pg, row);
+    if ((G.strokes.length || G.texts.length) && !force) {
+      actionSheet('The last note line has handwriting', [{ label: '🗑 Remove the line and its handwriting', danger: true, fn: () => removeNoteLine(pi, id, true) }]);
+      return false;
+    }
+    pushHistory(); takeInk(pg, row);
+    q.nlines--; pg.qsheet.quotes.slice(qi + 1).forEach(o => { o.y -= NOTE_LH; }); shiftBelow(pg, row.y + NOTE_LH, -NOTE_LH);
+    commit(n, [pi], '－ Note line removed');
+    return true;
+  }
   function addQuote(pi) {
     const n = guard(); if (!n) return null; let pg = n.pages[pi]; if (!pg || !pg.qsheet) return null;
     pushHistory();
@@ -258,6 +284,8 @@
       const L = qLayout(q);
       el('qs-addline', L.add.x, L.add.y + 5, '＋ line', { 'data-q': q.id, title: 'Add another Product / Size / Qty / Price line', 'aria-label': `Add a line to quote ${i + 1}` });
       el('qs-delq', L.x + L.w - 12, L.y + 4, '🗑', { 'data-q': q.id, title: 'Delete this quote', 'aria-label': `Delete quote ${i + 1}` });
+      el('qs-addnote', L.notes.x + 86, L.notes.y + 5, '＋ line', { 'data-q': q.id, title: 'Add another note line', 'aria-label': `Add a note line to quote ${i + 1}` });
+      if (q.nlines > 0) el('qs-delnote', L.notes.x + 156, L.notes.y + 5, '－', { 'data-q': q.id, title: 'Remove the last note line', 'aria-label': `Remove a note line from quote ${i + 1}` });
       if (q.lines > 1) L.rows.forEach((row, r) => el('qs-delrow', L.x - 5, row[0].y + LINE / 2, '－', { 'data-q': q.id, 'data-row': r, title: 'Remove this line', 'aria-label': `Remove line ${r + 1} of quote ${i + 1}` }));
     });
     const lb = lastBottom(pg), room = lb + GAP + 44 <= PAGE_H - 8;
@@ -268,6 +296,8 @@
     const b = e.target.closest('.qs-ui'); if (!b) return; e.stopPropagation(); e.preventDefault();
     const pi = +b.closest('.page[data-pi]').dataset.pi, id = b.dataset.q;
     if (b.classList.contains('qs-addline')) addLine(pi, id);
+    else if (b.classList.contains('qs-addnote')) addNoteLine(pi, id);
+    else if (b.classList.contains('qs-delnote')) removeNoteLine(pi, id);
     else if (b.classList.contains('qs-delrow')) removeLine(pi, id, +b.dataset.row);
     else if (b.classList.contains('qs-delq')) askDeleteQuote(pi, id);
     else if (b.classList.contains('qs-addq')) addQuote(pi);
@@ -287,5 +317,5 @@
 
   if (curNote()) { try { buildPages(); } catch (_) {} }
   try { renderSidebar(); } catch (_) {}
-  window.V21ed = { version: 'v21ed', insertSheet, addLine, removeLine, addQuote, deleteQuote, qLayout, qH, MAXL, TOP, GAP, LIMIT, LINE };
+  window.V21ed = { version: 'v21ed', insertSheet, addLine, removeLine, addNoteLine, removeNoteLine, NOTE_LH, addQuote, deleteQuote, qLayout, qH, MAXL, TOP, GAP, LIMIT, LINE };
 })();

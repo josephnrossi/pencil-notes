@@ -11,7 +11,8 @@
    Builds on v21eb. Mock only. */
 (function () {
   const sealed = n => { try { return typeof isSealed === 'function' && isSealed(n); } catch (_) { return false; } };
-  const TPL_COPY = ['planner', 'meeting', 'board', 'assistant'];
+  const TPL_COPY = ['meeting', 'board', 'assistant'];   // v21eg: Daily Planner retired — a page added after an old planner page is plain paper
+  const HOOKS = {};   // v21eg: drop a page on another notebook / note in the sidebar (see v21eg.js)
   const HOLD_TOUCH = 450, HOLD_GRIP = 300, SLOP = 10, EDGE = 90;
 
   /** A blank page that matches its neighbour's paper / template. */
@@ -136,6 +137,7 @@
     if (!D) return;
     const gh = D.ghost.offsetHeight || D.W * 1.43, left = D.x + 28 + D.W > innerWidth - 8 ? D.x - D.W - 28 : D.x + 28;   // beside the finger, never under it
     D.ghost.style.transform = `translate(${left}px, ${Math.max(8, Math.min(innerHeight - gh - 8, D.y - gh * .35))}px) rotate(-2deg)`;
+    if (HOOKS.track) { let t = null; try { t = HOOKS.track(D); } catch (e) { console.warn(e); } D.tgt = t || null; if (t) { D.ins = null; D.bar.hidden = true; return; } }
     const rects = pageEls.map(r => r.el.getBoundingClientRect());
     let ins = rects.filter(r => r.top + r.height / 2 < D.y).length;
     if (ins === D.from || ins === D.from + 1) ins = null;              // dropping where it already is → no move
@@ -151,7 +153,7 @@
     const r = PAGES.getBoundingClientRect(); let v = 0;
     if (D.y < r.top + EDGE) v = -Math.ceil(36 * Math.min(1, (r.top + EDGE - D.y) / EDGE));
     else if (D.y > r.bottom - EDGE) v = Math.ceil(36 * Math.min(1, (D.y - (r.bottom - EDGE)) / EDGE));
-    if (v) { PAGES.scrollTop += v; track(); }
+    if (v && !D.tgt) { PAGES.scrollTop += v; track(); }
     D.raf = requestAnimationFrame(autoScroll);
   }
   function drop(cancel) {
@@ -159,9 +161,11 @@
     d.ghost.remove(); d.bar.remove(); document.body.classList.remove('pg-dragging');
     document.querySelectorAll('.pg-lifted').forEach(x => x.classList.remove('pg-lifted'));
     swallowClick = true; setTimeout(() => { swallowClick = false; }, 350);
+    if (HOOKS.end) try { HOOKS.end(d, cancel); } catch (e) { console.warn(e); }
+    if (!cancel && d.tgt && HOOKS.drop) { HOOKS.drop(d); return; }
     if (!cancel && d.ins != null) movePage(d.from, d.ins > d.from ? d.ins - 1 : d.ins);
   }
 
   if (curNote()) buildPages();
-  window.V21ec = { version: 'v21ec', insertPage, insertPageAt, movePage, pageLike, get dragging() { return !!D; }, get pending() { return !!pend; }, HOLD_TOUCH, HOLD_GRIP };
+  window.V21ec = { version: 'v21ec', insertPage, insertPageAt, movePage, pageLike, hooks: HOOKS, get dragging() { return !!D; }, get pending() { return !!pend; }, HOLD_TOUCH, HOLD_GRIP };
 })();

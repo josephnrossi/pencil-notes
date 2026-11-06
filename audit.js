@@ -301,7 +301,7 @@ function startTour(force) {
   w.onclick = e => { const a = e.target.closest('[data-t]'); if (!a) return; if (a.dataset.t === 'skip') return done(); if (a.dataset.t === 'back') i--; else if (++i >= TOUR.length) return done(); show(); };
   w.hidden = false; show();
 }
-setTimeout(() => startTour(new URLSearchParams(location.search).has('tour')), 900);
+// v21eg: no quick tour on launch (first run or ?tour) — the app opens straight to a blank page
 
 /* ======================= gestures: unify swipe-left in Reminders ======================= */
 // Board cards: swipe left = delete (Undo). Reminders rows now match: a short swipe reveals Snooze/Delete,

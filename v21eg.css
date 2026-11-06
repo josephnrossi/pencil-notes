@@ -1,0 +1,41 @@
+/* Pencil Notes v21eg — clean-up pass (MOCK) */
+.eg-moved { display: none !important; }
+#quotesBtn.eg-ideas { width: auto; padding: 0 12px; gap: 6px; display: inline-flex; align-items: center; border-radius: 18px; font-size: 17px; }
+#quotesBtn.eg-ideas .eg-lab { font: 600 14px -apple-system, system-ui, sans-serif; }
+#dbSwitch:disabled { opacity: 1; cursor: default; color: inherit; }
+/* Calculate sheet */
+#egCalcWrap { z-index: 96; }
+.eg-calc { width: min(520px, 100%); gap: 10px; }
+.eg-head { display: flex; align-items: center; justify-content: space-between; }
+.eg-head h3 { margin: 0; }
+.eg-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.eg-items li { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 8px; }
+.eg-let { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--accent); color: #fff; font: 700 14px system-ui; }
+.eg-items input { min-width: 0; height: 38px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface2); color: inherit; font: 500 16px ui-monospace, Menlo, monospace; }
+.eg-val { font: 700 16px system-ui; white-space: nowrap; }
+.eg-val.err { color: var(--muted); font-weight: 500; font-size: 13px; max-width: 150px; white-space: normal; }
+.eg-cands { grid-column: 2 / 4; display: flex; gap: 6px; flex-wrap: wrap; }
+.eg-in { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 8px; font-size: 14px; }
+.eg-in > span { color: var(--muted); font-weight: 600; }
+.eg-in select { height: 38px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface2); color: inherit; font: 500 15px system-ui; padding: 0 8px; }
+.eg-fn { margin-top: 4px; }
+.eg-formula { margin: -4px 0 0 118px; }
+.eg-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.eg-chip { height: 32px; min-width: 36px; padding: 0 10px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface2); color: inherit; font: 600 14px system-ui; }
+.eg-chip.on { background: var(--accent); border-color: transparent; color: #fff; }
+.eg-result { min-height: 44px; padding: 10px 14px; border-radius: 14px; background: var(--surface2); color: var(--muted); font-size: 14px; }
+.eg-result.ok { color: inherit; }
+.eg-result b { font-size: 24px; display: block; }
+.eg-result small { display: block; color: var(--muted); margin-top: 2px; }
+.eg-cmp div { font: 600 16px system-ui; } .eg-cmp em { color: var(--accent); font-style: normal; } .eg-cmp p { margin: 6px 0 0; }
+/* page → notebook drop */
+#sidebar .eg-droptgt { outline: 3px solid var(--accent); outline-offset: -3px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 18%, transparent) !important; }
+#sidebar .eg-dropbad { outline: 2px dashed var(--muted); outline-offset: -2px; border-radius: 10px; }
+#egSideHint { position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 398; pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  width: 64px; padding: 14px 6px; border-radius: 0 16px 16px 0; background: var(--accent); color: #fff; text-align: center; box-shadow: var(--shadow); }
+#egSideHint[hidden] { display: none; }
+#egSideHint span { font-size: 22px; } #egSideHint b { font: 700 11px system-ui; } #egSideHint small { font: 500 10px/1.2 system-ui; opacity: .9; }
+/* quote sheet note lines */
+.page .overlay .qs-addnote { color: var(--accent); border-style: dashed; background: transparent; box-shadow: none; height: 24px; line-height: 22px; padding: 0 10px; font-size: 12px; }
+.page .overlay .qs-delnote { height: 24px; line-height: 22px; padding: 0 8px; font-size: 14px; opacity: .8; }
+#lassoMenu #lassoMore { width: auto; padding: 0 12px; font-size: 15px; white-space: nowrap; }
