@@ -34,10 +34,10 @@
     return null;
   }
   const engineLabel = () => { const e = engine(); return !e ? '' : e.name === 'device' ? 'on-device handwriting recognition' : e.name === 'grok' ? (typeof aiModel === 'function' ? aiModel() : 'Grok') : 'test recognizer'; };
-  async function recognize(strokes) {
+  async function recognize(strokes, context = {}) {
     const e = engine(); if (!e) throw Object.assign(new Error('no recognizer'), { none: true });
     stats.calls++;
-    try { return String((await e.fn(strokes)) || '').replace(/\s+/g, ' ').trim(); } catch (err) { stats.errors++; throw err; }
+    try { return String((await e.fn(strokes, context)) || '').replace(/\s+/g, ' ').trim(); } catch (err) { stats.errors++; throw err; }
   }
   const BB = new WeakMap();   // never write .bb onto strokes (page data must stay byte-identical)
   const sbb = s => { if (s.bb) return s.bb; let b = BB.get(s); if (!b || b.n !== s.points.length || b.p !== s.points) { b = bbox(s.points); b.n = s.points.length; b.p = s.points; BB.set(s, b); } return b; };
@@ -111,7 +111,7 @@
     for (const q of pg.qsheet.quotes) for (let r = 0; r < q.lines; r++) for (const f of ['qty', 'price']) {
       const L = Q.qLayout(q), cell = L.rows[r][QF[f]], ink = strokesIn(pg, cell); if (!ink.length) continue;
       const sig = sigOf(ink); if (sig in pg.hwc) continue;
-      try { pg.hwc[sig] = await recognize(ink); failed.delete(sig); changed = true; } catch (e) { if (!e.none) failed.add(sig); }
+      try { pg.hwc[sig] = await recognize(ink, { field: f }); failed.delete(sig); changed = true; } catch (e) { if (!e.none) failed.add(sig); }
       if (curNote() === n) refreshOverlay(pi);
     }
     return changed;
@@ -385,7 +385,7 @@
     for (const g of groups) {
       if (g.sig in pg.hwc) continue;
       if (!have) { partial = true; continue; }
-      try { pg.hwc[g.sig] = await recognize(g.strokes); failed.delete(g.sig); } catch (e) { partial = true; if (!e.none) failed.add(g.sig); }
+      try { pg.hwc[g.sig] = await recognize(g.strokes, { field: g.box && g.box.key || 'text' }); failed.delete(g.sig); } catch (e) { partial = true; if (!e.none) failed.add(g.sig); }
       if (pageSig(pg) !== sig) return indexPage(n, pg);      // edited while reading → start that page over
     }
     const keep = new Set(groups.map(g => g.sig)), hwc = {};

@@ -73,6 +73,15 @@ function drawPageImages(ctx, pg) {
 const MEET = { fields: [['Title', 150], ['Date', 215], ['Attendees', 280]], notesTop: 360, notesBottom: 990, actionsTop: 1050, rowH: 56 };
 function drawMeeting(ctx, bg) {
   const c = tcol(); ctx.save();
+  if (bg.actionContinuation) {
+    ctx.fillStyle = c.accent; ctx.font = `700 36px ${FONT}`; ctx.fillText('Meeting · Action Items (continued)', 60, 88);
+    ctx.fillStyle = c.band; ctx.fillRect(40, 130, 920, PAGE_H - 150);
+    for (let y = 180 + MEET.rowH; y < PAGE_H - 20; y += MEET.rowH) {
+      ctx.strokeStyle = c.line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(60, y); ctx.lineTo(940, y); ctx.stroke();
+      ctx.strokeStyle = c.muted; ctx.lineWidth = 1.6; ctx.strokeRect(64, y - 40, 26, 26);
+    }
+    ctx.restore(); return;
+  }
   ctx.fillStyle = c.accent; ctx.font = `700 40px ${FONT}`; ctx.fillText('Meeting Notes', 60, 88);
   for (const [label, y] of MEET.fields) {
     ctx.fillStyle = c.muted; ctx.font = `700 19px ${FONT}`; ctx.fillText(label.toUpperCase(), 60, y - 10);
@@ -90,7 +99,7 @@ function drawMeeting(ctx, bg) {
   }
   ctx.restore();
 }
-function meetingActionRowY(y) { if (y < MEET.actionsTop) return null; const i = Math.floor((y - MEET.actionsTop) / MEET.rowH); return MEET.actionsTop + (i + 1) * MEET.rowH - 44; }
+function meetingActionRowY(y, pg) { const top = pg?.bg?.actionContinuation ? 180 : MEET.actionsTop; if (y < top) return null; const i = Math.floor((y - top) / MEET.rowH); return top + (i + 1) * MEET.rowH - 44; }
 
 /* Daily Planner */
 const PLAN_TOP = 180, PLAN_BOTTOM = PAGE_H - 30, TIME_COL = 150;

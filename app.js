@@ -520,7 +520,7 @@ function placeAt(pi, p) {
     const t = { id: uid('t'), kind: 'typed', x: Math.max(4, Math.min(p[0] - 14, PAGE_W - 200)), y: Math.max(4, p[1] - 18), text: '', color: S.penColor, done: false, due: null, repeat: '', notified: false, createdAt: Date.now() };
     const bg = pg.bg;
     if (bg && bg.name === 'planner') { const sl = slotAtY(bg, p[1]); if (sl) placeTaskInSlot(pg, t, sl, bg); }        // snaps + reminder = slot time
-    else if (bg && bg.name === 'meeting') { const ry = meetingActionRowY(p[1]); if (ry !== null) { t.x = 62; t.y = ry; } }
+    else if (bg && bg.name === 'meeting') { const ry = meetingActionRowY(p[1], pg); if (ry !== null) { t.x = 62; t.y = ry; } }
     openEditor({ type: 'task', note: n, obj: t, page: pi }, true);
   } else if (S.tool === 'text') {
     const tb = { id: uid('x'), x: Math.max(4, p[0] - 4), y: Math.max(4, p[1] - 18), text: '', size: 24, color: S.penColor };

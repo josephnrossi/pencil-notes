@@ -2,7 +2,7 @@
    One ＋ Insert menu, one grouped Settings screen, a Gestures sheet, a short first-run tour,
    Undo for every delete, a safe importer, storage-full handling and lock hardening.
    Nothing is removed — features are only reached through fewer, more consistent doors. */
-const APP_VERSION = 'v21ei';   // v21ei: palm no longer shifts ink above the Pencil tip; wider Quote Size
+const APP_VERSION = 'v21ej';   // v21ej: template cleanup, meeting actions, recognition prep and 5-digit code locks
 
 /* ---------- import sanitizer: hostile backups must not inject markup ----------
    Rendering escapes free text, but ids/enums/colors are interpolated into attributes, so they are
@@ -226,8 +226,8 @@ function settingsSections() {
       { label: '☝️ Draw with finger: ' + (finger ? 'On' : 'Off'), sub: 'Off = finger scrolls, Pencil writes (recommended)', fn: () => { $('#fingerBtn').click(); openSettings('writing'); } }] },
     { id: 'planner', h: 'Planner', rows: [
       { label: '🗓 Planner defaults…', sub: `${plan.start}–${plan.end} · ${plan.slot}-min slots` + (typeof plannerSettings === 'function' ? ' · open a planner page to edit that page' : ''), fn: () => typeof plannerSettings === 'function' && plannerSettings() }] },
-    { id: 'lock', h: 'Privacy & Pencil Lock', rows: [
-      { label: cfg ? '🔒 Pencil Lock: set up again (new shape & PIN)…' : '🔒 Set up Pencil Lock…', fn: setupPencilLock },
+    { id: 'lock', h: 'Privacy & code lock', rows: [
+      { label: cfg ? '🔒 Change 5-digit code…' : '🔒 Set up 5-digit code…', fn: setupPencilLock },
       { label: '⏱ Auto-relock: ' + RELOCK_LABEL[relockPref()] + '…', fn: () => actionSheet('Auto-relock', Object.entries(RELOCK_LABEL).map(([k, l]) => ({ label: (relockPref() === k ? '✓ ' : '') + l, fn: () => localStorage.setItem('lockRelock', k) }))) }] },
     { id: 'ai', h: 'AI & Assistant', note: 'Your AI key stays on this iPad and is only sent to the provider you choose. It is never saved in notes or backups.', rows: aiOnly },
     { id: 'recording', h: 'Recording', rows: [

@@ -355,7 +355,7 @@ function moreItems() {
       { ic: '＋', l: 'Add page…', s: 'Lined, grid, meeting, planner, recording', fn: () => addPage() },
       ...(hasPlanner ? [{ ic: '🗓', l: 'This planner page…', s: 'Times & slots for the open page — defaults live in ⚙︎ Settings', fn: plannerSettings }] : [])] },
     { h: 'Note', rows: [
-      { ic: locked ? '🔓' : '🔒', l: locked ? 'Unlocked — lock again…' : 'Lock note…', s: 'Pencil Lock with your secret shape', fn: () => lockMenu() },
+      { ic: locked ? '🔓' : '🔒', l: locked ? 'Unlocked — lock again…' : 'Lock note…', s: 'Lock with a simple 5-digit code', fn: () => lockMenu() },
       { ic: '⬇︎', l: 'Export as PDF', fn: () => exportNotePdf(n) },
       ...(clip ? [{ ic: '📋', l: 'Paste', fn: pasteClip }] : []),
       { ic: '✏️', l: 'Rename, move or delete…', fn: () => noteMenu(n) }] },
@@ -376,7 +376,7 @@ function openMore() {
   MM.onclick = e => { const p = e.target.closest('[data-paper]'); if (p) { const n = curNote(); n.paper = p.dataset.paper; saveNote(n); for (let i = 0; i < pageEls.length; i++) renderPageInk(i); MM.querySelectorAll('[data-paper]').forEach(x => x.classList.toggle('on', x === p)); return; }
     const r = e.target.closest('[data-mi]'); if (!r) return; MM.hidden = true; flat[+r.dataset.mi].fn(); };
 }
-$('#noteMenuBtn').onclick = e => { e.stopPropagation(); const n = curNote(); if (isSealed(n)) return actionSheet('🔒 Locked note', [{ label: '🔢 Unlock with PIN…', primary: true, fn: () => pinUnlockFlow(n) }, { label: 'Move / delete…', fn: () => noteMenu(n) }]); MM.hidden ? openMore() : (MM.hidden = true); };
+$('#noteMenuBtn').onclick = e => { e.stopPropagation(); const n = curNote(); if (isSealed(n)) return actionSheet('🔒 Locked note', [{ label: '🔢 Unlock with code…', primary: true, fn: () => pinUnlockFlow(n) }, { label: 'Move / delete…', fn: () => noteMenu(n) }]); MM.hidden ? openMore() : (MM.hidden = true); };
 document.addEventListener('pointerdown', e => { if (!MM.hidden && !MM.contains(e.target) && !e.target.closest('#noteMenuBtn')) MM.hidden = true; }, true);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') MM.hidden = true; });
 

@@ -115,7 +115,7 @@
     }
   }
 
-  async function recognizeStrokes(strokes) {
+  async function recognizeStrokes(strokes, context = {}) {
     if (!strokes || !strokes.length) return '';
     // 1) On-device Handwriting Recognition API (not on iPad Safari)
     try {
@@ -130,13 +130,13 @@
         const preds = await d.getPrediction();
         if (d.clear) d.clear();
         const text = (preds && preds[0] && preds[0].text) || '';
-        if (text.trim()) return text.trim();
+        if (text.trim()) return window.V21ej ? V21ej.numericFix(text.trim(), context.field) : text.trim();
       }
     } catch (_) {}
     // 2) Existing Grok / AI vision path when connected
     try {
       if (typeof aiReady === 'function' && aiReady() && typeof transcribe === 'function') {
-        const t = await transcribe(strokes);
+        const t = await transcribe(strokes, context);
         if (t && t.trim()) return t.trim();
       }
     } catch (_) {}
@@ -165,7 +165,7 @@
     const typed = String(form.fields[key] || '').trim();
     const strokes = strokesForField(pg, form, key);
     let recognized = '';
-    if (strokes.length) recognized = await recognizeStrokes(strokes);
+    if (strokes.length) recognized = await recognizeStrokes(strokes, { field: key });
     return {
       text: typed || recognized || '',
       typed,
