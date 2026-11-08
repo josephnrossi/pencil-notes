@@ -7,21 +7,34 @@
   if (pageItem) pageItem.s = 'Lined, grid, quote sheet, to-do, meeting…';
   document.querySelectorAll('#insPage small').forEach(e => e.textContent = 'Lined, grid, quote sheet, to-do, meeting…');
 
-  /* Meeting action rows are genuine tasks: the existing task editor supplies dates and reminders. */
+  /* Meeting action rows are genuine tasks: the existing task editor supplies dates and reminders.
+     + Action task adds exactly one visible line (and one task) per tap. */
   const rowCount = Math.floor((PAGE_H - 21 - MEET.actionsTop) / MEET.rowH);
   const actionTop = pg => pg?.bg?.actionContinuation ? 180 : MEET.actionsTop;
-  const countRows = pg => Math.floor((PAGE_H - 21 - actionTop(pg)) / MEET.rowH);
+  const maxRows = pg => Math.floor((PAGE_H - 21 - actionTop(pg)) / MEET.rowH);
   const rowY = (i, pg) => actionTop(pg) + (i + 1) * MEET.rowH - 44;
   const isMeeting = pg => pg && pg.bg && pg.bg.name === 'meeting';
   const taskAt = (pg, i) => (pg.tasks || []).find(t => Math.abs(t.y - rowY(i, pg)) < 25);
+  const countRows = pg => ensureMeetingActionLines(pg);
   function addAction(pi, row = null) {
     const n = curNote(), pg = n && n.pages[pi]; if (!isMeeting(pg) || isSealed(n)) return null;
-    if (row == null) row = Array.from({ length: countRows(pg) }, (_, i) => i).find(i => !taskAt(pg, i));
+    ensureMeetingActionLines(pg);
     if (row == null) {
-      pushHistory(); const next = makeTemplatePage('meeting', n, pg.bg.date); delete next.rec;
-      next.bg.actionContinuation = true; n.pages.splice(pi + 1, 0, next); saveNote(n, true); buildPages();
-      const t = addAction(pi + 1, 0); pageEls[pi + 1]?.el.scrollIntoView({ block: 'end' }); return t;
+      if (pg.bg.actionLines >= maxRows(pg)) {
+        pushHistory(); const next = makeTemplatePage('meeting', n, pg.bg.date); delete next.rec;
+        next.bg.actionContinuation = true; next.bg.actionLines = 1;
+        n.pages.splice(pi + 1, 0, next); saveNote(n, true); buildPages();
+        const t = addAction(pi + 1, 0); pageEls[pi + 1]?.el.scrollIntoView({ block: 'end' }); return t;
+      }
+      pushHistory();
+      pg.bg.actionLines += 1;
+      row = pg.bg.actionLines - 1;
+      const y = rowY(row, pg);
+      const t = { id: uid('t'), kind: 'typed', x: 62, y, w: 800, h: 36, fs: 26,
+        strokeIds: [], text: 'Action task', meetingRow: row, done: false, due: null, repeat: '', notified: false, createdAt: Date.now() };
+      pg.tasks.push(t); saveNote(n, true); renderPageInk(pi); renderOverlay(pi); renderSidebar(); return t;
     }
+    if (row < 0 || row >= pg.bg.actionLines) return null;
     const existing = taskAt(pg, row);
     if (existing) { pushHistory(); toggleDone({ type: 'task', note: n, obj: existing, page: pi }); return existing; }
     pushHistory();
@@ -67,7 +80,9 @@
   openEditor = function (item, isNew) {
     const pg = item?.note?.pages[item.page], t = item?.obj;
     if (isNew && item.type === 'task' && isMeeting(pg) && t.y >= actionTop(pg)) {
-      const i = Math.min(countRows(pg) - 1, Math.max(0, Math.floor((t.y - actionTop(pg)) / MEET.rowH)));
+      const i = Math.max(0, Math.min(maxRows(pg) - 1, Math.floor((t.y - actionTop(pg)) / MEET.rowH)));
+      ensureMeetingActionLines(pg);
+      if (pg.bg.actionLines < i + 1) { pg.bg.actionLines = i + 1; if (item.page != null) renderPageInk(item.page); }
       const y = rowY(i, pg);
       // Anchor the task region/checkbox to the row; never shift the user's original ink.
       if (t.kind === 'ink') { const right = t.x + t.w, bottom = t.y + t.h; t.x = 108; t.w = Math.max(80, right - 108); t.h = Math.max(36, bottom - y + 4); }
@@ -239,7 +254,7 @@
   const oldSetup = setupPencilLock;
   setupPencilLock = async function (...args) { const ok = await oldSetup(...args); if (ok) { const cfg = lockCfg(), kek = await LockDB.get('pinkek'); for (const nb of S.notebooks) if (nb.codeLock?.salt === cfg.salt) await LockDB.put('nbk:' + nb.id, kek); } return ok; };
   PencilLock.setupPencilLock = setupPencilLock;
-  window.V21ej = { version: 'v21ej', addAction, rowY, rowCount, countRows, prepareInk, fieldPrompt, numericFix, lockNotebook, unlockNotebook, nbOpen };
+  window.V21ej = { version: 'v21ej', addAction, rowY, rowCount, countRows, maxRows, prepareInk, fieldPrompt, numericFix, lockNotebook, unlockNotebook, nbOpen };
   const ready = () => { for (const n of S.notes) if (n.lock) LockDB.del('dk:' + n.id); renderSidebar(); if (curNote()) { buildPages(); syncLockUI(); } };
   if (window.__ready) ready(); else { const t = setInterval(() => { if (window.__ready) { clearInterval(t); ready(); } }, 100); }
 })();

@@ -53,7 +53,7 @@ function drawPageBackground(ctx, note, pg) {
     if (im) ctx.drawImage(im, x, 0, w, h); else { ctx.fillStyle = '#888'; ctx.font = `24px ${FONT}`; ctx.fillText('Loading PDF page…', 40, 60); }
     return;
   }
-  if (bg && bg.type === 'template') { drawPaper(ctx, bg.name === 'recording' ? 'lined' : 'blank'); if (bg.name === 'meeting') drawMeeting(ctx, bg); else if (bg.name === 'planner') drawPlanner(ctx, bg); else if (bg.name === 'assistant') drawAssistBg(ctx); return; }
+  if (bg && bg.type === 'template') { drawPaper(ctx, bg.name === 'recording' ? 'lined' : 'blank'); if (bg.name === 'meeting') drawMeeting(ctx, bg, pg); else if (bg.name === 'planner') drawPlanner(ctx, bg); else if (bg.name === 'assistant') drawAssistBg(ctx); return; }
   drawPaper(ctx, pg.paper || note.paper);
 }
 function drawPageImages(ctx, pg) {
@@ -71,31 +71,60 @@ function drawPageImages(ctx, pg) {
 
 /* Meeting Notes */
 const MEET = { fields: [['Title', 150], ['Date', 215], ['Attendees', 280]], notesTop: 360, notesBottom: 990, actionsTop: 1050, rowH: 56 };
-function drawMeeting(ctx, bg) {
+function meetingUsedRows(pg) {
+  if (!pg) return 0;
+  const top = pg.bg?.actionContinuation ? 180 : MEET.actionsTop;
+  const cap = Math.floor((PAGE_H - 21 - top) / MEET.rowH);
+  let n = 0;
+  for (const t of pg.tasks || []) {
+    if (t.meetingRow != null) n = Math.max(n, t.meetingRow + 1);
+    else if (t.y >= top) n = Math.max(n, Math.min(cap, Math.floor((t.y - top) / MEET.rowH) + 1));
+  }
+  for (const s of pg.strokes || []) {
+    if (s.tool === 'highlighter') continue;
+    for (const pt of s.points || []) {
+      if (pt[1] >= top) {
+        const i = Math.floor((pt[1] - top) / MEET.rowH);
+        if (i >= 0 && i < cap) n = Math.max(n, i + 1);
+      }
+    }
+  }
+  return n;
+}
+function ensureMeetingActionLines(pg) {
+  if (!pg?.bg || pg.bg.name !== 'meeting') return 0;
+  if (!Number.isInteger(pg.bg.actionLines)) pg.bg.actionLines = meetingUsedRows(pg);
+  const top = pg.bg.actionContinuation ? 180 : MEET.actionsTop;
+  const cap = Math.floor((PAGE_H - 21 - top) / MEET.rowH);
+  return pg.bg.actionLines = Math.max(0, Math.min(cap, pg.bg.actionLines));
+}
+function drawMeeting(ctx, bg, pg) {
   const c = tcol(); ctx.save();
+  if (pg) ensureMeetingActionLines(pg);
+  const top = bg.actionContinuation ? 180 : MEET.actionsTop;
+  const cap = Math.floor((PAGE_H - 21 - top) / MEET.rowH);
+  const n = Number.isInteger(bg.actionLines) ? Math.max(0, Math.min(bg.actionLines, cap)) : cap;
   if (bg.actionContinuation) {
     ctx.fillStyle = c.accent; ctx.font = `700 36px ${FONT}`; ctx.fillText('Meeting · Action Items (continued)', 60, 88);
-    ctx.fillStyle = c.band; ctx.fillRect(40, 130, 920, PAGE_H - 150);
-    for (let y = 180 + MEET.rowH; y < PAGE_H - 20; y += MEET.rowH) {
-      ctx.strokeStyle = c.line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(60, y); ctx.lineTo(940, y); ctx.stroke();
-      ctx.strokeStyle = c.muted; ctx.lineWidth = 1.6; ctx.strokeRect(64, y - 40, 26, 26);
+  } else {
+    ctx.fillStyle = c.accent; ctx.font = `700 40px ${FONT}`; ctx.fillText('Meeting Notes', 60, 88);
+    for (const [label, y] of MEET.fields) {
+      ctx.fillStyle = c.muted; ctx.font = `700 19px ${FONT}`; ctx.fillText(label.toUpperCase(), 60, y - 10);
+      ctx.strokeStyle = c.strong; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(210, y); ctx.lineTo(940, y); ctx.stroke();
     }
-    ctx.restore(); return;
+    if (bg.date) { ctx.fillStyle = c.ink; ctx.font = `26px ${FONT}`; ctx.fillText(longDate(bg.date), 222, 215 - 10); }
+    ctx.fillStyle = c.accent; ctx.font = `700 26px ${FONT}`; ctx.fillText('Notes', 60, MEET.notesTop - 12);
+    ctx.strokeStyle = c.line; ctx.lineWidth = 1;
+    for (let y = MEET.notesTop + 44; y <= MEET.notesBottom; y += 44) { ctx.beginPath(); ctx.moveTo(60, y); ctx.lineTo(940, y); ctx.stroke(); }
   }
-  ctx.fillStyle = c.accent; ctx.font = `700 40px ${FONT}`; ctx.fillText('Meeting Notes', 60, 88);
-  for (const [label, y] of MEET.fields) {
-    ctx.fillStyle = c.muted; ctx.font = `700 19px ${FONT}`; ctx.fillText(label.toUpperCase(), 60, y - 10);
-    ctx.strokeStyle = c.strong; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(210, y); ctx.lineTo(940, y); ctx.stroke();
+  ctx.fillStyle = c.band; ctx.fillRect(40, top - 50, 920, Math.max(70, 50 + n * MEET.rowH + 30));
+  if (!bg.actionContinuation) {
+    ctx.fillStyle = c.accent; ctx.font = `700 26px ${FONT}`; ctx.fillText('Action Items', 60, top - 12);
   }
-  if (bg.date) { ctx.fillStyle = c.ink; ctx.font = `26px ${FONT}`; ctx.fillText(longDate(bg.date), 222, 215 - 10); }
-  ctx.fillStyle = c.accent; ctx.font = `700 26px ${FONT}`; ctx.fillText('Notes', 60, MEET.notesTop - 12);
-  ctx.strokeStyle = c.line; ctx.lineWidth = 1;
-  for (let y = MEET.notesTop + 44; y <= MEET.notesBottom; y += 44) { ctx.beginPath(); ctx.moveTo(60, y); ctx.lineTo(940, y); ctx.stroke(); }
-  ctx.fillStyle = c.band; ctx.fillRect(40, MEET.actionsTop - 50, 920, PAGE_H - MEET.actionsTop + 30);
-  ctx.fillStyle = c.accent; ctx.font = `700 26px ${FONT}`; ctx.fillText('Action Items', 60, MEET.actionsTop - 12);
-  for (let y = MEET.actionsTop + MEET.rowH; y < PAGE_H - 20; y += MEET.rowH) {
-    ctx.strokeStyle = c.line; ctx.beginPath(); ctx.moveTo(60, y); ctx.lineTo(940, y); ctx.stroke();
-    ctx.strokeStyle = c.muted; ctx.lineWidth = 1.6; ctx.strokeRect(64, y - 40, 26, 26); ctx.lineWidth = 1;
+  for (let i = 0; i < n; i++) {
+    const y = top + (i + 1) * MEET.rowH;
+    ctx.strokeStyle = c.line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(60, y); ctx.lineTo(940, y); ctx.stroke();
+    ctx.strokeStyle = c.muted; ctx.lineWidth = 1.6; ctx.strokeRect(64, y - 40, 26, 26);
   }
   ctx.restore();
 }
@@ -161,7 +190,7 @@ function makeTemplatePage(kind, note, date) {
   const p = newPage();
   if (['blank', 'lined', 'grid'].includes(kind)) { p.paper = kind; return p; }
   p.paper = 'blank';
-  if (kind === 'meeting') { p.bg = { type: 'template', name: 'meeting', date: date || todayISO() }; if (typeof newRec === 'function') p.rec = newRec(); }
+  if (kind === 'meeting') { p.bg = { type: 'template', name: 'meeting', date: date || todayISO(), actionLines: 0 }; if (typeof newRec === 'function') p.rec = newRec(); }
   if (kind === 'recording') { p.bg = { type: 'template', name: 'recording', date: date || todayISO() }; p.rec = newRec(); }
   if (kind === 'board') { p.bg = { type: 'template', name: 'board' }; p.board = newBoard(); }
   if (kind === 'assistant') { p.bg = { type: 'template', name: 'assistant' }; p.assist = { cards: [] }; }
