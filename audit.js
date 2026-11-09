@@ -2,7 +2,7 @@
    One ＋ Insert menu, one grouped Settings screen, a Gestures sheet, a short first-run tour,
    Undo for every delete, a safe importer, storage-full handling and lock hardening.
    Nothing is removed — features are only reached through fewer, more consistent doors. */
-const APP_VERSION = 'v21ek';   // v21ek: + Action task adds one meeting line per tap
+const APP_VERSION = 'v21el';   // v21el: handwriting reads tuned to the owner's writing (caps, run-together words, 6/G, sizes, $, trade words, learns fixes)
 
 /* ---------- import sanitizer: hostile backups must not inject markup ----------
    Rendering escapes free text, but ids/enums/colors are interpolated into attributes, so they are
