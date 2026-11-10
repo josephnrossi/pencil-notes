@@ -35,6 +35,7 @@
     return EP.shrinkLast(pi, t);
   }
   function lineButtons(pi) {
+    if (window.V21es) return;   // v21es: the "＋ | −" pair (v21es.js pairButtons) replaces "＋ line" / "−"
     const n = curNote(), pg = n && n.pages[pi], rec = pageEls[pi];
     if (!rec) return;
     rec.ov.querySelectorAll('.meet-addline, .meet-delline').forEach(b => b.remove());

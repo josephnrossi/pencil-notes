@@ -11,6 +11,7 @@
    v21er: "+ line" / "−" live in the right-hand bell column (v21er.js) — items keep their original line heights, so
    there is no extra row and no layout migration. One shared layout() places, draws and overflows items in the same
    order as v21ep's rowY (checkbox slots, then continuation fragments); moved items carry their own ink.
+   v21es: exports its layout internals for the +/− pair in v21es.js (no behaviour change here).
    IndexedDB data is never deleted. */
 (function () {
   'use strict';
@@ -655,7 +656,9 @@
     version: 'v21ep', addAction, rowY, maxRows, visualRows, linesOf, hasInk, growTask, maybeGrow,
     shrinkNote, meetTasks, INK_LEFT, INK_RIGHT, BELL_X, BELL_W, migrateMeet, relayout,
     shrinkLast, lastLineEmpty, lastUsedLine, isMeeting, AUTO_GROW, SHRINK_ON_OPEN,
-    layout
+    layout,
+    /* v21es: internals the +/− pair (remove a line / an item, pull items back from a continuation page) builds on */
+    reindex, relayoutKeepInk, takeItemStrokes, shiftBelow, itemBand, actionTop, yOfRow, ensureContPage, ROW
   };
 
   const ready = () => {

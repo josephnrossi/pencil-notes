@@ -1,0 +1,111 @@
+/* Pencil Notes v21es — Idea Board cards with a handwritten title strip, items inside cards, groups (cards in cards), drag & drop;
+   Meeting action items: a +/− pair per item. Loads after v21er.css. */
+
+/* ---------- cards: [title strip] [body: items + ink] [folder strip of child cards] ---------- */
+.eo-card.es-card { display: flex; flex-direction: column; }
+.eo-card.es-card > .es-title { position: relative; flex: none; box-sizing: border-box; overflow: hidden; border-radius: 11px 11px 0 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent); touch-action: none; }
+.eo-card.es-card > .es-title > canvas.es-title-ink { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 2; }
+.eo-card.es-card > .es-title > .es-title-ph { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); pointer-events: none;
+  font: 600 13px/1 -apple-system, system-ui, sans-serif; color: var(--muted); opacity: .5; letter-spacing: .01em; }
+.eo-card.es-card > .es-title > .eo-card-title { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 30px; padding: 4px 10px 0; pointer-events: none; }
+.eo-card.es-card > .es-title > .eo-card-title.es-under { opacity: .3; }
+.eo-card.es-card > .eo-card-body { position: relative; flex: none; overflow: hidden; border-radius: 0; }
+.eo-card.es-card:not(.es-master) > .eo-card-body { border-radius: 0 0 11px 11px; }
+.eo-card.es-card > .eo-card-body > canvas.eo-card-ink { position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none; }
+.eo-card.es-card > .eo-card-body > .es-child { z-index: 1; position: absolute; }
+.eo-card-body > .eo-link.es-child { min-width: 120px; min-height: 44px; padding: 6px 8px; gap: 8px; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+.eo-card-body > .eo-link.es-child .eo-fav { width: 24px; height: 24px; }
+.eo-card-body > .eo-img.es-child { box-shadow: 0 2px 6px rgba(0,0,0,.12); }
+.eo-card-body > .es-child.selected { z-index: 3; }
+
+/* master (group) card: folder strip with mini previews of its cards */
+.eo-card.es-master { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); box-shadow: 0 2px 0 -1px var(--surface2, #fff), 0 4px 0 -1px color-mix(in srgb, var(--accent) 30%, var(--line)), 0 6px 14px rgba(0,0,0,.08); }
+.es-folder { flex: none; box-sizing: border-box; padding: 0 8px 8px; border-top: 1px dashed color-mix(in srgb, var(--accent) 35%, var(--line)); background: color-mix(in srgb, var(--accent) 5%, transparent); border-radius: 0 0 11px 11px; }
+.es-folder-h { height: 22px; line-height: 22px; font: 700 11px/22px -apple-system, system-ui, sans-serif; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.es-tiles { display: grid; gap: 8px; }
+.es-tile { position: relative; width: 84px; height: 64px; box-sizing: border-box; border: 1px solid var(--line); border-radius: 8px; background: var(--surface2, #fff); overflow: hidden; touch-action: none; color: var(--text); }
+:root[data-theme="dark"] .es-tile { background: #2b2b33; }
+.es-tile > canvas { position: absolute; left: 1px; top: 1px; pointer-events: none; }
+.es-tile-n { position: absolute; right: 3px; bottom: 3px; min-width: 16px; height: 16px; border-radius: 8px; background: var(--accent); color: #fff; font: 800 10px/16px -apple-system, system-ui, sans-serif; text-align: center; font-style: normal; padding: 0 3px; }
+
+/* drag & drop */
+.es-src-drag { opacity: .22 !important; pointer-events: none !important; }
+.eo-card.es-drop { outline: 3px solid var(--accent) !important; outline-offset: 3px; box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 22%, transparent), 0 10px 26px rgba(0,0,0,.18) !important; }
+.eo-card.es-drop::after { content: 'Drop to put it inside'; position: absolute; left: 50%; top: -34px; transform: translateX(-50%); white-space: nowrap; z-index: 9;
+  background: var(--accent); color: #fff; border-radius: 10px; padding: 5px 10px; font: 700 12px/1.2 -apple-system, system-ui, sans-serif; box-shadow: 0 4px 12px rgba(0,0,0,.18); }
+.eo-card.es-drop-bad { outline: 3px dashed #dc2626 !important; outline-offset: 3px; }
+#esGhost { position: fixed; left: 0; top: 0; z-index: 3000; pointer-events: none; transform-origin: 0 0; display: none; }
+#esGhost.on { display: block; }
+#esGhost .es-ghost-box { position: relative; }
+#esGhost .es-ghost-box > * { position: absolute; }
+#esGhost .es-ghost-box > .eo-img, #esGhost .es-ghost-box > .eo-link { box-shadow: 0 14px 30px rgba(0,0,0,.28); }
+#esGhost .es-ghost-ink { position: absolute; }
+#esGhost .es-ghost-card { position: relative !important; left: auto !important; top: auto !important; box-shadow: 0 18px 40px rgba(0,0,0,.3) !important; opacity: .95; }
+
+/* ---------- open card / group sheet ---------- */
+.es-sheet-wrap .es-sheet { width: min(980px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+.es-sheet .eo-full-tools strong { font: 800 17px/1.2 -apple-system, system-ui, sans-serif; }
+.es-sheet .eo-full-tools .eo-chip { min-height: 32px; }
+.es-sheet-main.eo-full-body { min-height: 0; display: flex; justify-content: center; align-items: flex-start; padding: 14px; overflow: auto; }
+.eo-card.es-in-sheet { position: relative !important; left: auto !important; top: auto !important; flex: none; touch-action: none; }
+.es-kids-h { margin: 16px 2px 4px; font: 800 13px -apple-system, system-ui, sans-serif; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.es-kids { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; padding: 6px 2px 16px; min-height: 90px; border-radius: 14px; }
+.es-kid { position: relative; padding-top: 48px; }
+.es-kid-tools { position: absolute; right: 0; top: 0; display: flex; gap: 6px; }
+.es-kid-tools .eo-icon { width: 44px; height: 44px; min-width: 44px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); color: var(--text); font: 800 17px/1 -apple-system, system-ui, sans-serif; display: flex; align-items: center; justify-content: center; }
+.es-hint { margin: 10px 2px 0; color: var(--muted); font: 500 13px/1.4 -apple-system, system-ui, sans-serif; }
+.es-sheet .eo-full-tools button { min-width: 44px; }
+
+/* ---------- Meeting action items: +/− pair (right side, never over the writing lines) ---------- */
+.page .overlay .es-pm { position: absolute; display: flex; pointer-events: none; z-index: 3; }
+.page .overlay .es-pm > button { pointer-events: auto; position: relative; flex: none; width: 44px; height: 100%; min-height: 44px; padding: 0; border: 0; background: transparent;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; isolation: isolate; display: flex; align-items: center; justify-content: center;
+  font: 700 19px/1 -apple-system, system-ui, sans-serif; color: var(--accent); -webkit-user-select: none; user-select: none; }
+.page .overlay .es-pm > button::before { content: ''; position: absolute; left: 4px; right: 4px; top: 50%; height: 30px; transform: translateY(-50%); z-index: -1;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+.page .overlay .es-pm > .es-plus::before { border-radius: 15px 0 0 15px; right: 0; }
+.page .overlay .es-pm > .es-minus::before { border-radius: 0 15px 15px 0; left: 0; border-left-color: color-mix(in srgb, var(--accent) 25%, transparent); }
+.page .overlay .es-pm > .es-minus { color: var(--muted); }
+.page .overlay .es-pm > .es-minus.es-item { color: #c2410c; }
+:root[data-theme="dark"] .page .overlay .es-pm > .es-minus.es-item { color: #fdba74; }
+.page .overlay .es-pm > button:active::before { background: var(--accent-soft, color-mix(in srgb, var(--accent) 20%, var(--surface))); }
+.page .overlay .es-pm > button:focus-visible { outline: 3px solid #5477c6; outline-offset: -3px; border-radius: 12px; }
+.page .overlay .meet-addline, .page .overlay .meet-delline { display: none !important; }
+.page .overlay .meet-bell.es-compact { min-width: 44px; }
+.page .overlay .meet-bell.es-compact .mb-time { display: none; }
+
+/* remove-item confirm */
+#esConfirm { position: fixed; inset: 0; z-index: 4000; display: flex; align-items: center; justify-content: center; background: rgba(20,20,28,.4); padding: 16px; }
+#esConfirm[hidden] { display: none; }
+#esConfirm .es-c-card { width: min(420px, calc(100vw - 32px)); background: var(--surface); color: var(--text); border-radius: 18px; padding: 18px; box-shadow: 0 18px 50px rgba(0,0,0,.3); }
+#esConfirm h3 { margin: 0 0 6px; font: 800 18px/1.25 -apple-system, system-ui, sans-serif; }
+#esConfirm p { margin: 0 0 14px; color: var(--muted); font: 500 14px/1.4 -apple-system, system-ui, sans-serif; }
+#esConfirm .es-c-acts { display: flex; gap: 8px; justify-content: flex-end; }
+#esConfirm button { min-height: 44px; min-width: 88px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface2, #f3f3f6); color: var(--text); font: 650 15px -apple-system, system-ui, sans-serif; }
+#esConfirm button.danger { background: #dc2626; border-color: #dc2626; color: #fff; }
+
+/* Idea Board full width: the resize strip is only its grip (it used to cover the whole left edge, where Pencil couldn't write) */
+#qbDrawer.full[data-board="ideas"] #qbResize { top: 50%; bottom: auto; height: 96px; transform: translateY(-50%); width: 24px; }
+
+/* Idea Board layers (vanishing-ink fix): board ink is drawn ABOVE the cards. Before, the part of a stroke that crossed a card
+   was drawn under that card and vanished. (Ink written on a card goes into the card itself; this is for strokes that only
+   pass over a card.) Canvases never take pointer events, so cards and their buttons work as before. */
+#qbDrawer .eo-world > canvas.eo-ink { z-index: 3; }
+#qbDrawer .eo-world > .eo-cards { z-index: 2; }
+#qbDrawer .eo-world > canvas.eo-live { z-index: 4; }
+/* card canvases span the whole card (title + body + group strip): ink is never cut at the title/body line */
+.eo-card.es-card > .es-title, .eo-card.es-card > .eo-card-body { overflow: visible; }
+.eo-card.es-card > .es-title > canvas.es-title-ink, .eo-card.es-card > .eo-card-body > canvas.eo-card-ink { position: absolute; left: 0; pointer-events: none; z-index: 2; }
+
+/* ---- v21es item 6: Quote sheet — what was read, next to the ink (tap to correct) ---- */
+.page .overlay .qt-wrapui { position: absolute; z-index: 3; transform: translate(-100%, -50%); display: flex; align-items: center; gap: 3px; white-space: nowrap; pointer-events: none; }
+.page .overlay .qt-wrapui.last { transform: translate(-100%, -100%); margin-top: -2px; }
+.page .overlay .qt-wrapui .qt-ui { position: relative; left: auto; top: auto; transform: none; margin: 0; pointer-events: auto; }
+.page .overlay .qt-wrapui .qt-ui::before { content: ''; position: absolute; left: -2px; right: -2px; top: 50%; height: 44px; transform: translateY(-50%); }   /* 44px tap target */
+.page .overlay .qt-val { min-width: 44px; text-align: center; color: var(--text); font-weight: 600; background: color-mix(in srgb, var(--surface) 88%, transparent); border-color: var(--line); }
+.page .overlay .qt-val.flag { color: #b45309; background: rgba(245,158,11,.14); border-color: rgba(245,158,11,.45); font-weight: 800; }
+.page .overlay .qt-val.manual { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.page .overlay .qt-times { font: 700 11px -apple-system, system-ui, sans-serif; color: var(--muted); pointer-events: none; }
+.qt-row.flagged { box-shadow: inset 0 0 0 1.5px rgba(245,158,11,.55); }
+

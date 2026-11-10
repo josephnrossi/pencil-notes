@@ -53,133 +53,244 @@
   const fmtMoney = v => { try { return v.toLocaleString('en-US', { style: 'currency', currency: 'USD' }); } catch (_) { return '$' + v.toFixed(2); } };
   const fmtNum = v => (Math.round(v * 1000) / 1000).toLocaleString('en-US');
 
-  /* ---------- number parsing (handwriting reads are messy) ---------- */
-  function fixDigits(s) {   // common recognizer letter/digit confusions, only inside tokens that already contain a digit
-    return String(s).replace(/[\w.,$/]+/g, tok => /\d/.test(tok) ? tok.replace(/[Oo]/g, '0').replace(/[lI|]/g, '1').replace(/S/g, '5') : tok);
+  /* ---------- number parsing (handwriting reads are messy) ----------
+     v21es: rewritten. Money is integer math end to end — a quantity is held in thousandths (qm), a price in 1/10000 dollar
+     (pu) plus its unit (per 1, per C = 100, per M = 1000) — and a line total is round-half-up integer cents. Before v21es the
+     totals were float products (and "per M" was stripped, so 25,000 @ 74.26/M came out as $1,856,500). */
+  const CONF = { O: '0', o: '0', D: '0', Q: '0', l: '1', I: '1', i: '1', '|': '1', '!': '1', S: '5', s: '5', G: '6', b: '6', B: '8', Z: '2', z: '2', g: '9', q: '9' };
+  function fixDigits(s, field) {   // letter/digit confusions, only in a letter run glued to a digit (or a , . $ next to one) and made only of confusable letters
+    let t = String(s == null ? '' : s).replace(/§/g, '$').replace(/[×✕]/g, 'x').replace(/\u00a0/g, ' ');
+    if (field === 'price') t = t.replace(/(^|[\s(@])[S5]\$?(?=\s?[\d.OolI|][\d.,OolI|GSsBZ]*(?![\d.,]))/, (m, a) => m.length && /S/.test(m) ? a + '$' : m);   // "S74.26" → "$74.26" (a leading S is the dollar sign)
+    return t.replace(/[0-9A-Za-z|!.,$]+/g, tok => {
+      if (!/\d/.test(tok) && !/^[$.]?[OolI|SGBZ][OolI|SGBZ.,]*$/.test(tok)) return tok;
+      const runs = tok.match(/\d+|[A-Za-z|!]+|[^A-Za-z\d|!]+/g) || [];
+      return runs.map((r, i) => {
+        if (!/^[A-Za-z|!]+$/.test(r) || ![...r].every(ch => CONF[ch])) return r;
+        const prev = runs[i - 1] || '', next = runs[i + 1] || '';
+        const near = /\d$|[.,$]$/.test(prev) || /^\d|^[.,]\d/.test(next) || (runs.length === 1) || (!prev && /^[.,]/.test(next));
+        if (!near) return r;
+        if (r.length >= 2 && /^(ea|pcs?|ft|lb|sf|box)$/i.test(r)) return r;
+        return [...r].map(ch => CONF[ch]).join('');
+      }).join('');
+    });
   }
-  function parseQty(s) {
-    if (s == null) return null; let t = fixDigits(String(s)).toLowerCase().replace(/,/g, '').trim(); if (!t) return null;
-    let m = t.match(/(\d+)\s*\/\s*(\d+)/); if (m && !/\d\s*\/\s*\d+\s*(ea|pc)/.test(t) && +m[2]) return +m[1] / +m[2];
-    m = t.match(/-?\d*\.?\d+/); if (!m) return null; const v = parseFloat(m[0]); return isFinite(v) ? v : null;
+  const SIZE_RE = /(\d|\.\d)\s*x\s*[\d.]|\d\s*\/\s*\d|\d\s*(?:"|''|in\b|ft\b|mm\b|cm\b)/i;
+  /** "3,725" / "1,250.50" / "2,10" / ".85" → {n: Number, s: canonical string} or null. */
+  function numTok(tok) {
+    let t = tok.replace(/^\./, '0.');
+    if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) t = t.replace(/,/g, '');           // thousands commas
+    else if (/^\d+,\d{1,2}$/.test(t)) t = t.replace(',', '.');                   // decimal comma (2,10)
+    else if (/,/.test(t)) t = t.replace(/,/g, '');
+    if ((t.match(/\./g) || []).length > 1) return null;                          // 74.2.6 — don't guess
+    const n = Number(t); return isFinite(n) ? { n, s: t } : null;
   }
-  function parsePrice(s) {
-    if (s == null) return null; let t = fixDigits(String(s)).toLowerCase().trim(); if (!t || !/\d/.test(t)) return null;
-    const k = /\d\s*k\b/.test(t) ? 1000 : 1;
-    t = t.replace(/^(usd|us\$|\$)\s*/, '').replace(/\s*(\/\s*)?(ea|each|pcs?|pc|per\s*\w+)\.?$/, '');
-    let v = typeof parseMoneyText === 'function' ? parseMoneyText(t) : NaN;
-    if (!isFinite(v)) { const m = t.replace(/,/g, '').match(/-?\d*\.?\d+/); v = m ? parseFloat(m[0]) : NaN; }
-    return isFinite(v) ? v * k : null;
+  const NUM_RE = /\d[\d,]*(?:\.\d+)?|\.\d+/g;
+  /** Quantity → { ok, v, qm (thousandths), why } */
+  function qtyOf(s) {
+    if (s == null) return { ok: false, why: 'empty' };
+    let t = fixDigits(s, 'qty').toLowerCase().trim(); if (!t) return { ok: false, why: 'empty' };
+    t = t.replace(/@.*$/, '').replace(/\b(qty|quantity|pcs?|pieces?|ea|each|units?|sheets?|shts?|sht|nos?|no\.)\b\.?/g, ' ').replace(/[#=:]/g, ' ').replace(/^\s*[x*]\s*(?=[\d.])/, '').trim();
+    if (!t) return { ok: false, why: 'empty' };
+    if (SIZE_RE.test(t)) return { ok: false, why: 'size' };
+    let mult = 1; if (/\d\s*k$/.test(t)) { mult = 1000; t = t.replace(/\s*k$/, ''); } else if (/\d\s*m$/.test(t)) { mult = 1000; t = t.replace(/\s*m$/, ''); }
+    let nums = t.match(NUM_RE) || [];
+    if (nums.length === 2 && /^\d{1,3}$/.test(nums[0]) && /^\d{3}(\.\d+)?$/.test(nums[1]) && /^\d{1,3}\s+\d{3}/.test(t)) nums = [nums[0] + nums[1]];   // "3 725" (comma read as a gap)
+    if (!nums.length) return { ok: false, why: 'nonum' };
+    if (nums.length > 1) return { ok: false, why: 'two' };
+    if (/[a-z]/.test(t.replace(NUM_RE, ''))) return { ok: false, why: 'text' };
+    const p = numTok(nums[0]); if (!p) return { ok: false, why: 'nonum' };
+    const v = p.n * mult; return { ok: true, v, qm: Math.round(v * 1000) };
   }
+  /** Price → { ok, v (the written number), pu (v in 1/10000 $), per (1 | 100 | 1000), why } */
+  function priceOf(s) {
+    if (s == null) return { ok: false, why: 'empty' };
+    let t = fixDigits(s, 'price').toLowerCase().trim(); if (!t) return { ok: false, why: 'empty' };
+    let per = 1;
+    const PERM = /\s*(?:\/|per\b|@)\s*(?:m|mil|thousand|1,?000)\b\.?|\s+m\b\.?|(?<=\d)m\b\.?/, PERC = /\s*(?:\/|per\b)\s*(?:c|cwt|hundred|100)\b\.?/, PERK = /\s*(?:\/|per\b)\s*k\b\.?/;
+    if (PERM.test(t)) { per = 1000; t = t.replace(PERM, ' '); } else if (PERK.test(t)) { per = 1000; t = t.replace(PERK, ' '); } else if (PERC.test(t)) { per = 100; t = t.replace(PERC, ' '); }
+    t = t.replace(/\s*(?:\/|per\b)\s*(?:ea|each|pcs?|pieces?|sheets?|shts?|unit|sf|sq\.?\s*ft|ft|lb|box|roll)\b\.?/g, ' ').replace(/\b(ea|each|pcs?|usd)\b\.?/g, ' ').replace(/us\$|\$/g, ' ').replace(/@/g, ' ').trim();
+    if (!t) return { ok: false, why: 'empty' };
+    if (SIZE_RE.test(t)) return { ok: false, why: 'size' };
+    let mult = 1; if (/\d\s*k$/.test(t)) { mult = 1000; t = t.replace(/\s*k$/, ''); }
+    const nums = t.match(NUM_RE) || [];
+    if (!nums.length) return { ok: false, why: 'nonum' };
+    if (nums.length > 1) return { ok: false, why: 'two' };
+    if (/[a-z]/.test(t.replace(NUM_RE, ''))) return { ok: false, why: 'text' };
+    const p = numTok(nums[0]); if (!p) return { ok: false, why: 'nonum' };
+    const v = p.n * mult; return { ok: true, v, pu: Math.round(v * 10000), per };
+  }
+  function parseQty(s) { const r = qtyOf(s); return r.ok ? r.v : null; }
+  function parsePrice(s) { const r = priceOf(s); return r.ok ? r.v : null; }
+  /** integer cents for qty × price (per unit, per C or per M), round half up — BigInt so no float ever touches money */
+  function lineCents(q, p) {
+    const num = BigInt(q.qm) * BigInt(p.pu), den = BigInt(1000 * 100 * p.per);
+    const neg = num < 0n, a = neg ? -num : num, c = (a * 2n + den) / (2n * den);
+    return Number(neg ? -c : c);
+  }
+  const fmtCents = c => { const neg = c < 0, a = Math.abs(c), d = Math.floor(a / 100), r = a % 100; return (neg ? '-' : '') + '$' + d.toLocaleString('en-US') + '.' + String(r).padStart(2, '0'); };
+  const perTxt = p => p.per === 1000 ? '/M' : p.per === 100 ? '/C' : '';
+  const fmtPrice = p => { const s = p.v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 }); return '$' + s + perTxt(p); };
 
   /* ==================== 1. Quote sheet totals ==================== */
   const QF = { qty: 2, price: 3 };
   const fixKey = (f, r, sig) => f + '|' + (sig ? 's:' + sig : 'e:' + r);
-  /** One field (qty|price) of one line: typed text > correction > cached read > state. */
+  /* v21es: which ink belongs to which cell of a product line. Before, a stroke went to the cell holding its centre, so a
+     quantity written past the narrow Qty column lost its last digit to Price (3725 read as "372", and the 5 joined the price).
+     Now, at the Size|Qty and Qty|Price dividers, writing that runs over the divider stays with the cell it started in: a stroke
+     that crosses the divider, and every stroke chained to it (gap < CHAIN_GAP), belongs to the left cell — unless it is far from
+     the left cell's ink (then it is the next cell's writing that began a little early). Ink that does not cross a divider is
+     assigned exactly as before, so cached reads (keyed by the cell's ink) stay valid. */
+  const CHAIN_GAP = 9, WORD_GAP = 16;
+  function rowInk(pg, q, r) {
+    const L = Q.qLayout(q), row = L.rows[r]; if (!row) return [[], [], [], []];
+    const out = row.map(() => []);
+    const y0 = row[0].y, y1 = y0 + row[0].h, x0 = row[0].x, x1 = row[row.length - 1].x + row[row.length - 1].w;
+    const col = x => { for (let k = row.length - 1; k >= 0; k--) if (x >= row[k].x) return k; return 0; };
+    for (const s of inkOf(pg)) { const x = ccx(s), y = ccy(s); if (x >= x0 && x <= x1 && y >= y0 && y <= y1) out[col(x)].push(s); }
+    for (let k = 2; k < row.length; k++) {
+      const D = row[k].x, left = out[k - 1]; if (!left.length || !out[k].length) continue;
+      const cand = out[k].slice().sort((a, b) => sbb(a)[0] - sbb(b)[0]);
+      let R = Math.max(...left.map(s => sbb(s)[2])), crossed = R > D;
+      const move = [];
+      for (const s of cand) { const b = sbb(s);
+        if (b[0] > R + CHAIN_GAP) break;                                   // a real gap: the rest is this cell's own writing
+        if (!crossed && b[0] >= D) break;                                  // nothing runs over the divider: keep the old split
+        if (b[0] < D) crossed = true;
+        move.push(s); R = Math.max(R, b[2]); }
+      if (move.length && crossed) { left.push(...move); out[k] = out[k].filter(s => !move.includes(s)); continue; }
+      // the run-over glyph(s) may also land wholly past the divider: a leading run chained to the left cell's ink, then a real
+      // gap, then this cell's own writing → the run belongs to the left cell (3725 | 74.26, not 372 | 5 74.26)
+      R = Math.max(...left.map(s => sbb(s)[2])); const run = []; let rr = R, i = 0;
+      for (; i < cand.length; i++) { const b = sbb(cand[i]); if (b[0] > rr + CHAIN_GAP || b[0] > D + 2 * CHAIN_GAP && !run.length) break; run.push(cand[i]); rr = Math.max(rr, b[2]); }
+      if (run.length && i < cand.length && sbb(cand[i])[0] > rr + WORD_GAP) { left.push(...run); out[k] = out[k].filter(s => !run.includes(s)); }
+    }
+    return out;
+  }
+  /** One field (qty|price) of one line: correction > typed text > cached read > state. */
   function cellVal(pg, q, r, f) {
-    const L = Q.qLayout(q), cell = L.rows[r][QF[f]], ink = strokesIn(pg, cell), sig = sigOf(ink), typed = textsIn(pg, cell).map(t => t.text).join(' ').trim();
-    const parse = f === 'qty' ? parseQty : parsePrice, fx = q.fix && q.fix[fixKey(f, r, sig)];
-    const base = { cell, sig, has: !!(ink.length || typed) };
-    if (fx != null && fx !== '') return { ...base, v: parse(fx), text: String(fx), src: 'manual' };
-    if (typed) { const v = parse(typed); return { ...base, v, text: typed, src: v == null ? 'unreadable' : 'typed' }; }
-    if (!ink.length) return { ...base, v: null, text: '', src: 'empty' };
+    const L = Q.qLayout(q), cell = L.rows[r][QF[f]], ink = rowInk(pg, q, r)[QF[f]], sig = sigOf(ink), typed = textsIn(pg, cell).map(t => t.text).join(' ').trim();
+    const parse = f === 'qty' ? qtyOf : priceOf, fx = q.fix && q.fix[fixKey(f, r, sig)];
+    const base = { cell, sig, ink, has: !!(ink.length || typed) };
+    const val = (text, src) => { const p = parse(text); return { ...base, v: p.ok ? p.v : null, p: p.ok ? p : null, why: p.ok ? null : p.why, text: String(text), src: p.ok || src === 'manual' ? src : 'unreadable' }; };
+    if (fx != null && fx !== '') return val(fx, 'manual');
+    if (typed) return val(typed, 'typed');
+    if (!ink.length) return { ...base, v: null, p: null, text: '', src: 'empty' };
     const hwc = pg.hwc || {};
-    if (sig in hwc) { const v = parse(hwc[sig]); return { ...base, v, text: hwc[sig], src: v == null ? 'unreadable' : 'read' }; }
-    return { ...base, v: null, text: '', src: engine() ? (failed.has(sig) ? 'error' : 'pending') : 'noengine' };
+    if (sig in hwc) return val(hwc[sig], 'read');
+    return { ...base, v: null, p: null, text: '', src: engine() ? (failed.has(sig) ? 'error' : 'pending') : 'noengine' };
   }
   const failed = new Set();
-  /** Totals for one quote: lines [{r, qty, price, total, flag}], total, flagged count. */
+  /** Totals for one quote: lines [{r, qty, price, cents, total, flag}], totalCents, total, flagged count. Blank or unread
+      fields are never 0: the line is flagged and left out of the total. */
   function quoteTotals(pg, q) {
-    const lines = []; let total = 0, any = false, flagged = 0, pending = 0;
+    const lines = []; let cents = 0, any = false, flagged = 0, pending = 0;
     for (let r = 0; r < q.lines; r++) {
       const qty = cellVal(pg, q, r, 'qty'), price = cellVal(pg, q, r, 'price');
-      if (!qty.has && !price.has && qty.src !== 'manual' && price.src !== 'manual') { lines.push({ r, qty, price, total: null, flag: null }); continue; }
+      if (!qty.has && !price.has && qty.src !== 'manual' && price.src !== 'manual') { lines.push({ r, qty, price, total: null, cents: null, flag: null }); continue; }
       let flag = null;
-      const bad = c => c.src === 'unreadable' || c.src === 'error' || c.src === 'noengine';
+      const bad = c => c.src === 'unreadable' || c.src === 'error' || c.src === 'noengine' || (c.src === 'manual' && !c.p);
       if (qty.src === 'pending' || price.src === 'pending') { flag = 'reading'; pending++; }
+      else if (qty.why === 'size' || price.why === 'size') flag = 'size';
       else if (bad(qty) || bad(price)) flag = qty.src === 'noengine' || price.src === 'noengine' ? 'noengine' : 'unreadable';
-      else if (qty.v == null) flag = 'noqty'; else if (price.v == null) flag = 'noprice';
-      const t = flag ? null : qty.v * price.v;
-      if (t != null) { total += t; any = true; } else if (flag !== 'reading') flagged++;
-      lines.push({ r, qty, price, total: t, flag });
+      else if (!qty.p) flag = 'noqty'; else if (!price.p) flag = 'noprice';
+      const c = flag ? null : lineCents(qty.p, price.p);
+      if (c != null) { cents += c; any = true; } else if (flag !== 'reading') flagged++;
+      lines.push({ r, qty, price, cents: c, total: c == null ? null : c / 100, flag });
     }
-    return { lines, total: any ? Math.round(total * 100) / 100 : null, flagged, pending };
+    return { lines, totalCents: any ? cents : null, total: any ? cents / 100 : null, flagged, pending };
   }
   /** Read every qty/price cell whose ink changed (one recognizer call per cell, cached by ink signature). */
   async function readTotals(n, pi) {
     const pg = n.pages[pi]; if (!pg || !pg.qsheet || !engine() || locked(n)) return false;
     let changed = false; pg.hwc = pg.hwc || {};
     for (const q of pg.qsheet.quotes) for (let r = 0; r < q.lines; r++) for (const f of ['qty', 'price']) {
-      const L = Q.qLayout(q), cell = L.rows[r][QF[f]], ink = strokesIn(pg, cell); if (!ink.length) continue;
+      const ink = rowInk(pg, q, r)[QF[f]]; if (!ink.length) continue;
       const sig = sigOf(ink); if (sig in pg.hwc) continue;
-      try { pg.hwc[sig] = await recognize(ink, { field: f }); failed.delete(sig); changed = true; } catch (e) { if (!e.none) failed.add(sig); }
+      try { let t = await recognize(ink, { field: f });
+        // v21es: the decimal point comes from the ink on every reader (it used to be put back only on the Grok path)
+        if (f === 'price' && window.V21el && V21el.enabled && V21el.HWClean) { const H = V21el.HWClean, d = H.dotInfo(ink); if (d) { const o = H.applyDot(t, d); if (o !== t) { V21el.dotFixes.push({ read: t, fixed: o, dot: d }); t = o; } } }
+        pg.hwc[sig] = t; failed.delete(sig); changed = true; } catch (e) { if (!e.none) failed.add(sig); }
       if (curNote() === n) refreshOverlay(pi);
     }
     return changed;
   }
   const refreshOverlay = pi => { const n = curNote(); if (n && pageEls[pi]) try { renderOverlay(pi); } catch (_) {} };
 
-  const FLAG_TXT = { reading: 'reading…', unreadable: '? can’t read', noengine: 'tap to enter', noqty: '? no qty', noprice: '? no price' };
+  const FLAG_TXT = { reading: 'reading…', unreadable: '? can’t read', noengine: 'tap to enter', noqty: '? no qty', noprice: '? no price', size: '? size, not a number' };
+  const valTxt = (c, f) => c.src === 'pending' ? '…' : !c.p ? '?' : (c.src === 'manual' ? '✎ ' : '') + (f === 'qty' ? fmtNum(c.v) : fmtPrice(c.p));
   function drawTotalsUI(pi, pg, rec) {
     const s = S.scale;
     pg.qsheet.quotes.forEach((q, qi) => {
       const L = Q.qLayout(q), T = quoteTotals(pg, q);
       T.lines.forEach(ln => {
         if (!ln.flag && ln.total == null) return;
-        const c = L.rows[ln.r][3], b = document.createElement('button');
-        b.className = 'qt-ui qt-line' + (ln.flag ? ' flag ' + ln.flag : '') + (ln.r === q.lines - 1 ? ' last' : '');   // last row: sit inside, clear of the Total pill
-        b.style.left = (c.x + c.w - 4) * s + 'px'; b.style.top = (c.y + c.h) * s + 'px';   // straddles the row's bottom rule at the right edge: below the baseline, above the next row's capitals
-        b.textContent = ln.flag ? FLAG_TXT[ln.flag] : '= ' + fmtMoney(ln.total);
+        const c = L.rows[ln.r][3], wrap = document.createElement('div');
+        wrap.className = 'qt-wrapui' + (ln.r === q.lines - 1 ? ' last' : '');   // last row: sit inside, clear of the Total pill
+        wrap.style.left = (c.x + c.w - 4) * s + 'px'; wrap.style.top = (c.y + c.h) * s + 'px';   // straddles the row's bottom rule, right under the writing
+        // v21es: what was read, next to the ink — tap either to correct it
+        for (const f of ['qty', 'price']) {
+          const v = ln[f], b = document.createElement('button');
+          b.className = 'qt-ui qt-val qt-' + f + (v.p ? '' : ' flag') + (v.src === 'manual' ? ' manual' : '');
+          b.textContent = valTxt(v, f); b.dataset.q = q.id; b.dataset.vrow = ln.r; b.dataset.f = f;
+          b.setAttribute('aria-label', `Line ${ln.r + 1} ${f === 'qty' ? 'quantity' : 'price'}: ${v.p ? valTxt(v, f) : 'not read'} — tap to correct`);
+          wrap.append(b); if (f === 'qty') { const x = document.createElement('span'); x.className = 'qt-times'; x.textContent = '×'; wrap.append(x); }
+        }
+        const b = document.createElement('button');
+        b.className = 'qt-ui qt-line' + (ln.flag ? ' flag ' + ln.flag : '') + (ln.r === q.lines - 1 ? ' last' : '');
+        b.textContent = ln.flag ? FLAG_TXT[ln.flag] : '= ' + fmtCents(ln.cents);
         b.dataset.q = q.id; b.dataset.row = ln.r;
-        b.setAttribute('aria-label', ln.flag ? `Line ${ln.r + 1}: ${FLAG_TXT[ln.flag]}` : `Line ${ln.r + 1} total ${fmtMoney(ln.total)} — tap to correct`);
-        rec.ov.append(b);
+        b.setAttribute('aria-label', ln.flag ? `Line ${ln.r + 1}: ${FLAG_TXT[ln.flag]}` : `Line ${ln.r + 1} total ${fmtCents(ln.cents)} — tap to correct`);
+        wrap.append(b); rec.ov.append(wrap);
       });
       if (T.total == null && !T.flagged && !T.pending) return;
       const b = document.createElement('button');
       b.className = 'qt-ui qt-total' + (T.flagged ? ' partial' : '');
       b.style.left = (L.x + L.w - 14) * s + 'px'; b.style.top = (L.add.y + 5) * s + 'px';
-      b.innerHTML = `<small>Total</small> ${T.total == null ? '—' : esc(fmtMoney(T.total))}${T.flagged ? ` <em>· ${T.flagged} line${T.flagged > 1 ? 's' : ''} to check</em>` : T.pending ? ' <em>· reading…</em>' : ''}`;
+      b.innerHTML = `<small>Total</small> ${T.totalCents == null ? '—' : esc(fmtCents(T.totalCents))}${T.flagged ? ` <em>· ${T.flagged} line${T.flagged > 1 ? 's' : ''} to check</em>` : T.pending ? ' <em>· reading…</em>' : ''}`;
       b.dataset.q = q.id; b.setAttribute('aria-label', `Quote ${qi + 1} total — tap to check the numbers`);
       rec.ov.append(b);
     });
   }
 
-  /* ---------- tap a total → check / correct sheet ---------- */
-  function openFix(pi, qid, focusRow) {
+  /* ---------- tap a total / a read value → check / correct sheet ---------- */
+  const canon = (c, f) => !c.p ? '' : f === 'qty' ? String(c.v) : String(c.v) + perTxt(c.p);
+  function openFix(pi, qid, focusRow, focusField) {
     const n = curNote(), pg = n && n.pages[pi]; if (!pg || !pg.qsheet) return;
     const qi = pg.qsheet.quotes.findIndex(q => q.id === qid); if (qi < 0) return; const q = pg.qsheet.quotes[qi], T = quoteTotals(pg, q);
     closeFix();
     const w = document.createElement('div'); w.id = 'qtFix'; w.className = 'qt-fix-wrap';
-    const src = c => c.src === 'manual' ? 'your correction' : c.src === 'typed' ? 'typed' : c.src === 'read' ? `read “${c.text}”` : c.src === 'unreadable' ? `couldn’t read${c.text ? ` (“${c.text}”)` : ''}` : c.src === 'noengine' ? 'no handwriting reader — connect Grok or type it' : c.src === 'pending' ? 'reading…' : c.src === 'error' ? 'read failed' : 'empty';
-    const val = c => c.src === 'manual' || c.v != null ? (c.src === 'manual' ? c.text : String(c.v)) : '';
+    const src = c => c.src === 'manual' ? 'your correction' : c.src === 'typed' ? 'typed' : c.src === 'read' ? `read “${c.text}”` : c.src === 'unreadable' ? (c.why === 'size' ? `looks like a size (“${c.text}”)` : `couldn’t read${c.text ? ` (“${c.text}”)` : ''}`) : c.src === 'noengine' ? 'no handwriting reader — connect Grok or type it' : c.src === 'pending' ? 'reading…' : c.src === 'error' ? 'read failed' : 'empty';
+    const val = (c, f) => c.src === 'manual' ? c.text : canon(c, f);
     w.innerHTML = `<div class="sheet qt-fix" role="dialog" aria-modal="true" aria-label="Check quote ${qi + 1} numbers">
       <h3>Quote ${qi + 1} — check the numbers</h3>
-      <p class="fine">Read from your handwriting. Fix anything that's wrong; your ink is never changed.</p>
-      <div class="qt-rows">${T.lines.map(ln => `<div class="qt-row" data-row="${ln.r}"><b>Line ${ln.r + 1}</b>
-        <label>Qty<input inputmode="decimal" autocomplete="off" data-f="qty" value="${esc(val(ln.qty))}"><small>${esc(src(ln.qty))}</small></label>
+      <p class="fine">Read from your handwriting. Fix anything that's wrong; your ink is never changed. Prices per thousand: write 74.26/M.</p>
+      <div class="qt-rows">${T.lines.map(ln => `<div class="qt-row${ln.flag && ln.flag !== 'reading' ? ' flagged' : ''}" data-row="${ln.r}"><b>Line ${ln.r + 1}</b>
+        <label>Qty<input inputmode="decimal" autocomplete="off" data-f="qty" value="${esc(val(ln.qty, 'qty'))}"><small>${esc(src(ln.qty))}</small></label>
         <span class="qt-x">×</span>
-        <label>Price<input inputmode="decimal" autocomplete="off" data-f="price" value="${esc(val(ln.price))}"><small>${esc(src(ln.price))}</small></label>
+        <label>Price<input inputmode="text" autocomplete="off" data-f="price" value="${esc(val(ln.price, 'price'))}"><small>${esc(src(ln.price))}</small></label>
         <span class="qt-eq" data-eq></span></div>`).join('')}</div>
       <div class="qt-sum"><span>Quote total</span><b data-sum></b></div>
       <div class="sheet-actions"><button class="btn" data-a="reread">↻ Re-read handwriting</button><div class="spacer"></div><button class="btn" data-a="cancel">Cancel</button><button class="btn primary" data-a="save">Save</button></div></div>`;
     document.body.append(w);
-    const calc = () => { let sum = 0, any = false; w.querySelectorAll('.qt-row').forEach(row => { const a = parseQty(row.querySelector('[data-f="qty"]').value), b = parsePrice(row.querySelector('[data-f="price"]').value), e = row.querySelector('[data-eq]');
-      if (a != null && b != null) { e.textContent = '= ' + fmtMoney(a * b); sum += a * b; any = true; } else e.textContent = ''; }); w.querySelector('[data-sum]').textContent = any ? fmtMoney(sum) : '—'; };
+    const calc = () => { let sum = 0, any = false; w.querySelectorAll('.qt-row').forEach(row => { const qv = row.querySelector('[data-f="qty"]').value, pv = row.querySelector('[data-f="price"]').value, a = qtyOf(qv), b = priceOf(pv), e = row.querySelector('[data-eq]');
+      if (a.ok && b.ok) { const c = lineCents(a, b); e.textContent = '= ' + fmtCents(c); sum += c; any = true; } else e.textContent = (qv.trim() || pv.trim()) ? '?' : ''; }); w.querySelector('[data-sum]').textContent = any ? fmtCents(sum) : '—'; };
     w.addEventListener('input', calc); calc();
     w.addEventListener('click', e => {
       const a = e.target.closest('[data-a]'); if (e.target === w) return closeFix(); if (!a) return;
       if (a.dataset.a === 'cancel') return closeFix();
-      if (a.dataset.a === 'reread') { for (const ln of T.lines) for (const c of [ln.qty, ln.price]) if (c.sig && pg.hwc) delete pg.hwc[c.sig];
-        pushHistory(); q.fix = {}; saveNote(n, true); closeFix(); refreshOverlay(pi); readTotals(n, pi).then(() => { persist(n); refreshOverlay(pi); }); toast('Re-reading the handwriting…'); return; }
+      if (a.dataset.a === 'reread') { pushHistory();   // v21es: snapshot BEFORE dropping the cached reads, so Undo brings back reads + corrections
+        for (const ln of T.lines) for (const c of [ln.qty, ln.price]) if (c.sig && pg.hwc) delete pg.hwc[c.sig];
+        q.fix = {}; saveNote(n, true); closeFix(); refreshOverlay(pi); readTotals(n, pi).then(() => { persist(n); refreshOverlay(pi); }); toast('Re-reading the handwriting…'); return; }
       if (a.dataset.a === 'save') {
         pushHistory(); const fix = { ...(q.fix || {}) };
         w.querySelectorAll('.qt-row').forEach(row => { const r = +row.dataset.row, ln = T.lines[r];
           for (const f of ['qty', 'price']) { const c = ln[f], v = row.querySelector(`[data-f="${f}"]`).value.trim(), k = fixKey(f, r, c.sig);
-            const readV = c.src === 'manual' ? null : c.v == null ? '' : String(c.v);
+            const readV = c.src === 'manual' ? null : canon(c, f);
             if (c.src === 'manual' && v === '') delete fix[k]; else if (v !== readV && !(v === '' && readV === '')) fix[k] = v; else if (c.src === 'manual') fix[k] = v; } });
         q.fix = fix; saveNote(n, true); closeFix(); refreshOverlay(pi); toast('✓ Quote numbers updated');
       }
     });
-    setTimeout(() => { const i = w.querySelector(`.qt-row[data-row="${focusRow != null ? focusRow : -1}"] input`); if (i) i.focus(); }, 60);
+    setTimeout(() => { const i = w.querySelector(`.qt-row[data-row="${focusRow != null ? focusRow : -1}"] input${focusField ? `[data-f="${focusField}"]` : ''}`); if (i) { i.focus(); try { i.select(); } catch (_) {} } }, 60);
   }
   function closeFix() { const w = document.getElementById('qtFix'); if (w) w.remove(); }
 
@@ -309,7 +420,7 @@
   v7OverlayHook = function (pi) {
     _ovh.apply(this, arguments);
     const n = curNote(), rec = pageEls[pi], pg = n && n.pages[pi]; if (!rec || !pg) return;
-    rec.ov.querySelectorAll('.qt-ui, .td-ui, .hw-hit').forEach(b => b.remove());
+    rec.ov.querySelectorAll('.qt-ui, .qt-wrapui, .td-ui, .hw-hit').forEach(b => b.remove());
     if (sealed(n)) return;
     try { if (pg.qsheet) drawTotalsUI(pi, pg, rec); else if (pg.todo) drawTodoUI(pi, pg, rec); } catch (e) { console.warn('v21ee overlay', e); }
     if (HL && HL.note === n.id && HL.page === pg.id && Date.now() < HL.until) drawHit(rec, HL.bb);
@@ -317,7 +428,7 @@
   PAGES.addEventListener('click', e => {
     const b = e.target.closest('.qt-ui, .td-ui'); if (!b || b.classList.contains('td-strike')) return; e.stopPropagation(); e.preventDefault();
     const pi = +b.closest('.page[data-pi]').dataset.pi;
-    if (b.classList.contains('qt-ui')) openFix(pi, b.dataset.q, b.dataset.row != null ? +b.dataset.row : null);
+    if (b.classList.contains('qt-ui')) { const row = b.dataset.row != null ? b.dataset.row : b.dataset.vrow; openFix(pi, b.dataset.q, row != null ? +row : null, b.dataset.f || null); }
     else if (b.classList.contains('td-check')) tdToggle(pi, b.dataset.id);
     else if (b.classList.contains('td-addline')) tdAddRow(pi);
     else if (b.classList.contains('td-delrow')) tdRemoveRow(pi, b.dataset.id);
@@ -357,7 +468,10 @@
       L.rows.forEach((R, i) => boxes.push({ x: TD.X, y: R.y, w: TD.W, h: R.h, label: `To-Do · Task ${i + 1}` }));
       boxes.push({ ...L.notes, label: 'To-Do · Notes' }); if (L.tomorrow) boxes.push({ ...L.tomorrow, label: 'To-Do · Tomorrow' }); }
     const out = boxes.map(b => ({ label: b.label, box: b, strokes: [] })), rest = [];
-    for (const s of inkOf(pg)) { const x = ccx(s), y = ccy(s), g = out.find(g => inR(g.box, x, y)); if (g) g.strokes.push(s); else rest.push(s); }
+    // v21es: product-line cells take their ink word by word (rowInk), so the search index and the totals agree on what each cell holds
+    const pre = new Map();
+    if (pg.qsheet) pg.qsheet.quotes.forEach(q => { for (let r = 0; r < q.lines; r++) rowInk(pg, q, r).forEach((list, k) => { const g = out.find(g => g.box.row === r && g.box.key === Q.qLayout(q).rows[r][k].key && g.box.y === Q.qLayout(q).rows[r][k].y); if (g) for (const s of list) pre.set(s, g); }); });
+    for (const s of inkOf(pg)) { if (pre.has(s)) { pre.get(s).strokes.push(s); continue; } const x = ccx(s), y = ccy(s), g = out.find(g => inR(g.box, x, y)); if (g) g.strokes.push(s); else rest.push(s); }
     // line clustering for loose ink: strokes whose (padded) vertical extents overlap and sit close together form one line
     const ext = s => { const b = sbb(s), c = (b[1] + b[3]) / 2; return [b[0], Math.min(b[1], c - 7), b[2], Math.max(b[3], c + 7)]; };
     const sameLine = (A, B) => { const ov = Math.min(A[3], B[3]) - Math.max(A[1], B[1]), gap = Math.max(B[0] - A[2], A[0] - B[2]); return ov > 0.35 * Math.min(A[3] - A[1], B[3] - B[1]) && gap < 170; };
@@ -549,7 +663,7 @@
   whenReady(() => setTimeout(() => { if (engine() && engine().name === 'device') backfill(); const n = curNote(); if (n) enqueue(n); }, 1500));
 
   window.V21ee = { version: 'v21ee', TOTALS_DELAY: 1200, INDEX_DELAY: 2500, stats,
-    setRecognizer(fn) { testRecognizer = fn; }, engine, parseQty, parsePrice, quoteTotals, readTotals, openFix, closeFix,
+    setRecognizer(fn) { testRecognizer = fn; }, engine, parseQty, parsePrice, qtyOf, priceOf, lineCents, fmtCents, fixDigits, rowInk, cellVal, quoteTotals, readTotals, openFix, closeFix,
     insertTodo, tdLayout, tdAddRow, tdRemoveRow, tdToggle, tdToggleTomorrow, TD,
     groupsFor, indexPage, enqueue, backfill, search, openHit, renderResults, pageThumb, IX, idle: () => !IX.running && !IX.queue.length };
 })();

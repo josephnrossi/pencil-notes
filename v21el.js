@@ -267,15 +267,19 @@
     const cands = ink.filter(o => small(o)).map(o => ({ o, cx: (o.b[0] + o.b[2]) / 2, cy: (o.b[1] + o.b[3]) / 2 }))
       .filter(d => d.cy >= top + 0.55 * lineH && d.cy <= bot + 0.35 * lineH)                                // sits low, on the baseline
       .map(d => ({ ...d, left: g.filter(x => (x[0] + x[1]) / 2 < d.cx).length, right: g.filter(x => (x[0] + x[1]) / 2 > d.cx).length }))
-      .filter(d => d.left > 0 && d.right > 0);
+      .filter(d => d.right > 0);                                                                          // v21es: left 0 = a leading point (.85)
     if (!cands.length) return null;
     const d = cands.sort((a, b) => b.cy - a.cy)[0];
     return { left: d.left, right: d.right, glyphs: g.length, x: d.cx, y: d.cy };
   }
   function applyDot(text, info) {
     const t = String(text == null ? '' : text); if (!info || !info.right) return t;
-    return t.replace(/\d[\d,]*(?:\.\d+)?/, num => {
-      const digits = num.replace(/[.,]/g, ''); if (digits.length <= info.right) return num;
+    // v21es: a read that already starts with a point (.85), or has a thousands comma (1,250 — the comma is a small low stroke too), is kept as read
+    if (/(^|[^\d])\.\d/.test(t) || /\d,\d{3}(?!\d)/.test(t)) return t;
+    return t.replace(/\d[\d,]*(?:\.\d+)?/, (num, at0) => {
+      const digits = num.replace(/[.,]/g, '');
+      if (digits.length === info.right && !num.includes('.') && (info.left === 0 || /\$\s*$/.test(t.slice(0, at0)))) return '.' + digits;   // v21es: ".85" read as "85" (or "$85")
+      if (digits.length < info.right) return num;
       if (num.includes('.') && digits.length !== info.left + info.right) return num;          // already has a point; only move it when the glyph count agrees
       const at = digits.length - info.right, fixed = digits.slice(0, at) + '.' + digits.slice(at);
       return fixed.replace(/^0+(?=\d)/, '');
@@ -323,7 +327,7 @@
     if (!V.enabled || !pg || !pg.qsheet || !pg.hwc || !window.V21ed) return 0; let k = 0;
     for (const q of pg.qsheet.quotes || []) { const L = V21ed.qLayout(q);
       for (const row of L.rows) { const c = row[3]; if (!c) continue;
-        const ink = (pg.strokes || []).filter(s => s.tool !== 'highlighter' && s.points && s.points.length).filter(s => { const b = sbb(s), x = (b[0] + b[2]) / 2, y = (b[1] + b[3]) / 2; return x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h; });
+        const ink = window.V21ee && V21ee.rowInk ? V21ee.rowInk(pg, q, row[3].row)[3] : (pg.strokes || []).filter(s => s.tool !== 'highlighter' && s.points && s.points.length).filter(s => { const b = sbb(s), x = (b[0] + b[2]) / 2, y = (b[1] + b[3]) / 2; return x >= c.x && x <= c.x + c.w && y >= c.y && y <= c.y + c.h; });
         if (!ink.length) continue; const sig = ink.map(s => s.id + ':' + s.points.length).sort().join(',');
         const v = pg.hwc[sig]; if (typeof v !== 'string' || v.includes('.')) continue;
         const fixed = H.applyDot(v, H.dotInfo(ink)); if (fixed !== v) { pg.hwc[sig] = fixed; V.dotFixes.push({ read: v, fixed, cached: true }); k++; } } }
