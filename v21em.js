@@ -75,6 +75,7 @@
 
   /** Assign missing meta. Never overwrites an existing date/qnum/status. Returns true if anything was set. */
   function ensureMeta(q, note, opts = {}) {
+    if (window.V21en && typeof V21en.ensureMeta === 'function') return V21en.ensureMeta(q, note, opts);
     if (!q) return false;
     let changed = false;
     if (!STATUSES.some(s => s.id === q.status)) { q.status = 'open'; changed = true; }
@@ -137,7 +138,7 @@
       if (a.dataset.a === 'save') {
         const d = parseDateStr(txt.value) || parseDateStr(iso.value);
         if (!d) { toast('Enter a date like 11/9/26'); return; }
-        pushHistory(); q.date = todayStr(d); saveNote(n, true); closeQm();
+        pushHistory(); q.date = todayStr(d); q.dateEdited = true; saveNote(n, true); closeQm();
         try { renderOverlay(pi); } catch (_) {}
         toast('Date updated');
       }
