@@ -308,7 +308,7 @@ async function askCard(f) {
   (f.c.chat ||= []).push(msg); f.c.chatOpen = true; AS.drafts.delete(id); saveNote(f.n, true);
   const reply = (t, engine) => { const fr = findAsCard(id); if (!fr) return; fr.c.chat.push({ id: uid('m'), role: 'assistant', text: t, engine, at: Date.now() }); AS.chatBusy.delete(id); saveNote(fr.n, true); if (fr.n.id === S.cur) renderAssist(fr.pi); };
   if (!aiReady()) {
-    if (msg.ink) return reply('✍︎ Handwritten questions need AI connected (Settings → Smarter AI summaries). Tap ⌨︎ to type your question instead.', 'note');
+    if (msg.ink) return reply('✍︎ Handwritten questions need AI connected (Settings → Connect Grok). Tap ⌨︎ to type your question instead.', 'note');
     return reply(builtinAnswer(f.c, text) || 'I can answer simple lookups (deadlines, who, what’s asked of you, meeting time). Connect AI in Settings for open questions.', 'Built-in');
   }
   AS.chatBusy.add(id); renderAssist(f.pi);
@@ -390,7 +390,7 @@ async function aiTranscribe(png) {
 }
 const visionMsg = e => isVisionErr(e) ? `${aiModel()} can’t read images — choose a vision-capable model in Settings` : `Couldn’t read the handwriting (${e.name === 'AbortError' ? 'timed out' : e.message})`;
 async function readCardInk(f) {
-  if (!aiReady()) { toast('🔎 Needs AI connected — Settings → Smarter AI summaries', 3000); return; }
+  if (!aiReady()) { toast('🔎 Needs AI connected — Settings → Connect Grok', 3000); return; }
   const id = f.c.id; AS.reading.add(id); renderAssist(f.pi);
   let t; try { t = (await aiTranscribe(inkToPNG(f.c.ink.strokes, f.c.ink.bb))).trim(); } catch (e) { AS.reading.delete(id); const fr = findAsCard(id); if (fr && fr.n.id === S.cur) renderAssist(fr.pi); toast('🔎 ' + visionMsg(e), 4000); return; }
   AS.reading.delete(id); const fr = findAsCard(id); if (!fr) return;
@@ -406,7 +406,7 @@ async function readCardInk(f) {
 function syncReadBtn() { const b = document.getElementById('lassoRead'); if (!b) return; const ok = aiReady(); b.classList.toggle('disabled', !ok); b.setAttribute('aria-disabled', String(!ok)); b.innerHTML = ok ? '🔎 Read handwriting' : '🔎 Read handwriting <small>Needs AI connected</small>'; }
 async function lassoRead() {
   const sel = selection; if (!sel) return;
-  if (!aiReady()) { toast('🔎 Needs AI connected — Settings → Smarter AI summaries', 3000); return; }
+  if (!aiReady()) { toast('🔎 Needs AI connected — Settings → Connect Grok', 3000); return; }
   const n = curNote(), pg = n.pages[sel.pi], strokes = pg.strokes.filter(s => sel.ids.includes(s.id));
   if (!strokes.length) { toast('Lasso some handwriting first'); return; }
   const bb = sel.bb || inkBB(strokes), selIds = sel.ids.slice(), pi = sel.pi;

@@ -227,7 +227,7 @@
   }
   function cardHTML(m) {
     const c = m.card; if (!c) return '';
-    if (c.type === 'nokey') return `<div class="sat-card nokey"><b>Connect Grok to chat</b><p>Add your xAI API key in <b>Settings → Smarter AI</b> and I can summarize pages, answer questions and act on your notes. Find, Insert and Calculate work without it.</p><button data-a="settings">⚙︎ Open AI settings</button></div>`;
+    if (c.type === 'nokey') return `<div class="sat-card nokey"><b>Connect Grok to chat</b><p>Add your xAI API key in <b>Settings → Connect Grok</b> and I can summarize pages, answer questions and act on your notes. Find, Insert and Calculate work without it.</p><button data-a="settings">⚙︎ Open AI settings</button></div>`;
     if (c.type === 'summary') return `<div class="sat-card summary"><div class="sat-ch">📝 ${esc(c.title || 'Summary')}</div>${md(c.text)}</div>`;
     if (c.type === 'hits') return `<div class="sat-card hits"><div class="sat-ch">🔎 ${c.hits.length ? `${c.hits.length} match${c.hits.length === 1 ? '' : 'es'} for “${esc(c.q)}”` : `Nothing found for “${esc(c.q)}”`}</div>${c.hits.map((h, i) => `<button class="sat-hit" data-a="hit" data-i="${i}"><b>${esc(h.title)}</b><small>p.${h.pi + 1} · ${esc(h.kind || '')}</small><span>${h.m ? `${esc(h.m[0])}<mark>${esc(h.m[1])}</mark>${esc(h.m[2])}` : esc(h.s)}</span></button>`).join('')}</div>`;
     if (c.type === 'action') return `<div class="sat-card action ${c.ok ? 'ok' : 'err'}"><div class="sat-ch">${c.ok ? '✓' : '⚠︎'} ${esc(c.text)}</div>${c.ok && ST.undo.has(m.id) ? `<div class="sat-acts">${c.go ? '<button data-a="go">Show me</button>' : ''}<button data-a="undo">↶ Undo</button></div>` : ''}</div>`;

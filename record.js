@@ -711,7 +711,7 @@ function briefHomeHTML(pg, s) {
   const blocks = [];
   if (sumText || points.length || (ov && ov.builtin)) {
     const grokNote = ov && ov.builtin
-      ? `<p class="mb-note">⚙︎ Built-in summary of the transcript. ${aiReady() ? 'Tap ↻ Redo analysis for Grok’s full analysis.' : 'Connect Grok (Settings → ✨ Smarter AI) for each person’s positions, root causes and solutions.'}</p>`
+      ? `<p class="mb-note">⚙︎ Built-in summary of the transcript. ${aiReady() ? 'Tap ↻ Redo analysis for Grok’s full analysis.' : 'Connect Grok (Settings → ✨ Connect Grok) for each person’s positions, root causes and solutions.'}</p>`
       : '';
     blocks.push(`<section class="mb-block as-card brief b-overview" id="mb-sec-overview" data-sec="overview"${ov ? ` data-card="${ov.id}"` : ''}>
       <div class="mb-label">Overview</div>
@@ -848,7 +848,7 @@ function renderBriefHome(pi) {
 function briefCardHTML(c, ctx = {}) {
   const f = findRec(c.rec), rec = f && f.rec; let body = '';
   switch (c.btype) {
-    case 'overview': body = `<p class="as-sum">${esc(c.summary || '')}</p>${sec('Key points', c.points)}${c.builtin ? `<p class="mb-note">⚙︎ Built-in summary of the transcript. ${aiReady() ? 'Tap ↻ Redo analysis for Grok’s full analysis.' : 'Connect Grok (Settings → ✨ Smarter AI) for each person’s positions, root causes and solutions.'}</p>` : ''}`; break;
+    case 'overview': body = `<p class="as-sum">${esc(c.summary || '')}</p>${sec('Key points', c.points)}${c.builtin ? `<p class="mb-note">⚙︎ Built-in summary of the transcript. ${aiReady() ? 'Tap ↻ Redo analysis for Grok’s full analysis.' : 'Connect Grok (Settings → ✨ Connect Grok) for each person’s positions, root causes and solutions.'}</p>` : ''}`; break;
     case 'person': { const p = c.person || {}, sp = (String(p.name).match(/^Speaker (\d+)$/) || [])[1];
       body = `${p.role ? `<p class="mb-role">${esc(p.role)}</p>` : ''}${sec('Key points', p.key_points)}${sec('Positions', p.positions)}${sec('Concerns', p.concerns)}${sec('Commitments', p.commitments, 'mb-commit')}${sp ? `<button class="as-btn sm" data-mb="spk" data-sp="${esc(sp)}">✏️ Name this speaker</button>` : ''}`; break; }
     case 'decisions': body = `<ul class="mb-ul mb-dec">${(c.decisions || []).map(d => `<li>✅ ${esc(d.text)}${d.by ? ` <span class="mb-by">— ${esc(d.by)}</span>` : ''}</li>`).join('')}</ul>`; break;

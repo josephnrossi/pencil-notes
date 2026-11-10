@@ -1,0 +1,105 @@
+/* Pencil Notes v21eq — Idea Board rebuild + app cleanup + polish (mock). Loads after v21ep.css. */
+
+/* ---------- A. Idea Board: the normal toolbar inside the drawer ---------- */
+#qbDrawer > #toolbar.on-board { flex: none; border-bottom: 1px solid var(--line); }
+#qbDrawer[data-board="ideas"] #ibHost { position: relative; }
+.eo-tools { display: none !important; }                      /* the old Pencil/Lasso/Photo… bar is gone */
+.eo-layer { position: absolute; inset: 0; pointer-events: none; }
+.eo-layer > * { pointer-events: auto; }
+.eo-media { z-index: 1; }
+.eo-world > canvas.eo-ink { z-index: 2; }
+.eo-cards { z-index: 3; }
+.eo-world > canvas.eo-live { z-index: 4; }
+
+/* slim cards: thin border, optional small title line, no header / status chip */
+.eo-card.slim { border: 1px solid color-mix(in srgb, var(--line) 85%, var(--text) 15%); border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.06); background: var(--surface2, #fff); }
+:root[data-theme="dark"] .eo-card.slim { background: #23232a; }
+.eo-card.slim .eo-card-title { flex: none; height: 30px; box-sizing: border-box; padding: 6px 10px 0; font: 700 14px/22px -apple-system, system-ui, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.eo-card.slim .eo-card-body { margin: 0; border-radius: 0 0 11px 11px; background: transparent; min-height: 40px; }
+.eo-card.slim .eo-card-title + .eo-card-body { border-radius: 0 0 11px 11px; }
+.eo-card.slim:not(:has(.eo-card-title)) .eo-card-body { border-radius: 11px; }
+.eo-card.slim.done { opacity: .72; }
+.eo-card.c-yellow { background: #fff8d6; } .eo-card.c-green { background: #e9f9ef; } .eo-card.c-blue { background: #eaf2ff; } .eo-card.c-pink { background: #ffeef4; }
+.eo-card.lifted, .eo-img.lifted, .eo-link.lifted { box-shadow: 0 16px 36px rgba(0,0,0,.22); transform: scale(1.015); transition: transform .12s ease, box-shadow .12s ease; }
+.eo-card.selected, .eo-img.selected, .eo-link.selected { outline: 2px solid var(--accent); outline-offset: 2px; }
+.eo-card .eo-card-head, .eo-card .eo-chip, .eo-compact-tag { display: none !important; }
+/* handle + tools only on the selected item, outside the writing area */
+.eo-resize { display: none; }
+.selected > .eo-resize { display: flex; right: -22px; bottom: -22px; border-radius: 50%; width: 44px; height: 44px; border-width: 2px; }
+.selected > .eo-resize::after { width: 14px; height: 14px; }
+.eo-sel-tools { position: absolute; right: -2px; top: -50px; display: flex; gap: 6px; z-index: 5; }
+.eo-sel-tools .eo-icon { width: 44px; height: 44px; min-width: 44px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 4px 12px rgba(0,0,0,.12); color: var(--text); font: 800 18px/1 -apple-system, system-ui, sans-serif; display: flex; align-items: center; justify-content: center; }
+.eo-img .eo-sel-tools, .eo-link .eo-sel-tools { top: -50px; }
+.eo-link { cursor: pointer; }
+.eo-card-body canvas { touch-action: none; }
+
+/* lasso menu above every board layer (drawer is z 60) */
+.eo-lasso-menu { position: fixed !important; z-index: 2000 !important; align-items: center; }
+.eo-lasso-menu .eo-lm-n { font: 650 12px -apple-system, system-ui, sans-serif; color: var(--muted); padding: 0 6px 0 4px; }
+/* ＋ Insert popover on the board */
+.eq-pop { position: fixed; z-index: 2000; min-width: 240px; background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 16px; padding: 6px; box-shadow: 0 16px 40px rgba(0,0,0,.2); display: flex; flex-direction: column; }
+.eq-pop button { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 12px; border: 0; border-radius: 12px; background: transparent; text-align: left; font: 650 15px -apple-system, system-ui, sans-serif; color: inherit; }
+.eq-pop button:active, .eq-pop button:hover { background: var(--surface2); }
+.eq-pop button i { font-style: normal; font-size: 22px; width: 28px; text-align: center; }
+.eq-pop button small { display: block; font: 500 12px -apple-system, system-ui, sans-serif; color: var(--muted); }
+
+/* ---------- B. app cleanup ---------- */
+/* one Add page control: the big button at the end of the note (44px) */
+.page-foot [data-addafter] { display: none !important; }
+#pagesInner > .add-page, .btn.add-page { min-height: 44px; font-size: 16px; padding: 0 22px; }
+/* landscape: panel overlays the page instead of a third column */
+@media (min-width: 1101px) and (orientation: landscape) {
+  #panel { position: fixed; right: 0; top: 0; bottom: 0; width: min(380px, 40vw); z-index: 55; box-shadow: -12px 0 40px rgba(0,0,0,.16); }
+  body.eq-side-open #quotesBtn.eg-ideas .eg-lab { display: none; }
+  body.eq-side-open #quotesBtn.eg-ideas { min-width: 44px; padding: 0 8px; }
+}
+#quotesBtn.eq-icon-only { min-width: 44px; padding: 0 8px; }
+#quotesBtn.eq-icon-only .eq-lbl { display: none; }
+/* compact toolbar levels when space is tight (added by JS only if the row would overflow) */
+#toolbar.tb-tight { gap: 2px; padding-left: 4px; padding-right: 4px; }
+#toolbar.tb-tight .group { padding-left: 3px; padding-right: 3px; gap: 1px; }
+#toolbar.tb-tight .group.tools .tool { width: 46px; }
+#toolbar.tb-tight .swatch { width: 34px; height: 34px; }
+#toolbar.tb-tighter .tool span { display: none; }
+#toolbar.tb-tighter .group.tools .tool { width: 44px; height: 44px; }
+#toolbar.tb-tighter .swatch { width: 30px; height: 30px; }
+#toolbar.tb-tighter #insertBtn span, #toolbar.tb-tighter #fingerBtn span { font-size: 0; }
+#toolbar.tb-tightest .group.colors .swatch:not(.on) { display: none; }
+#toolbar.tb-tightest .group.colors::after { content: '…'; color: var(--muted); padding: 0 4px; }
+/* search: 44px field */
+#search { min-height: 44px; font-size: 16px; }
+.hw-empty-acts { display: flex; gap: 8px; margin: 6px 0 2px; }
+.hw-empty-acts .btn { min-height: 44px; }
+/* lock icon only where a code is set */
+[data-nblock].eq-nolock { display: none !important; }
+/* backup banner */
+#eqBackupNag { position: fixed; left: 50%; bottom: calc(16px + var(--sab, 0px)); transform: translateX(-50%); z-index: 70; display: flex; align-items: center; gap: 10px; max-width: min(640px, calc(100vw - 24px)); background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: 16px; padding: 8px 8px 8px 14px; box-shadow: 0 12px 34px rgba(0,0,0,.18); font: 600 14px/1.35 -apple-system, system-ui, sans-serif; }
+#eqBackupNag[hidden] { display: none; }
+#eqBackupNag button { min-height: 44px; border-radius: 12px; padding: 0 14px; border: 1px solid var(--line); background: var(--surface2); font: 700 14px -apple-system, system-ui, sans-serif; color: inherit; }
+#eqBackupNag button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+#eqBackupNag .x { width: 44px; padding: 0; }
+
+/* ---------- C. polish ---------- */
+/* 44px tap targets in the page margin for − (Quote rows, To-Do rows) and the quote 🗑 */
+.page .overlay .qs-delrow, .page .overlay .td-delrow { width: 44px !important; height: 44px !important; transform: translate(calc(-100% + 8px), -50%) !important; padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; opacity: 1 !important; display: flex; align-items: center; justify-content: center; font-size: 0 !important; }
+.page .overlay .qs-delrow::before, .page .overlay .td-delrow::before { content: '−'; display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font: 700 16px/1 -apple-system, system-ui, sans-serif; }
+.page .overlay .qs-delq { width: 44px !important; height: 44px !important; padding: 0 !important; line-height: 44px !important; transform: translate(0, -12px) !important; border: 0 !important; background: transparent !important; box-shadow: none !important; display: flex; align-items: center; justify-content: center; font-size: 0 !important; }
+.page .overlay .qs-delq::before { content: '🗑'; display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); font-size: 14px; }
+.page .overlay .td-addline { min-height: 32px; }
+
+/* page thumbnails */
+.page-foot .pg-grip { cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; padding: 0 10px; border-radius: 10px; }
+.page-foot .pg-grip:active { background: var(--surface2); }
+#eqThumbs { position: fixed; inset: 0; z-index: 90; background: rgba(20,20,28,.5); display: flex; align-items: center; justify-content: center; padding: 16px; }
+#eqThumbs[hidden] { display: none; }
+#eqThumbs .eq-th-sheet { width: min(900px, 100%); max-height: calc(100dvh - 32px); overflow: auto; background: var(--surface); color: var(--text); border-radius: 20px; padding: 14px 16px 18px; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+#eqThumbs header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+#eqThumbs header h3 { margin: 0; font: 800 20px -apple-system, system-ui, sans-serif; flex: 1; }
+#eqThumbs header small { color: var(--muted); font: 500 13px -apple-system, system-ui, sans-serif; }
+#eqThumbs header button { min-width: 44px; min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface2); font-size: 16px; color: inherit; }
+.eq-th-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.eq-th { border: 2px solid var(--line); border-radius: 12px; background: var(--surface2); padding: 6px 6px 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; touch-action: none; -webkit-user-select: none; user-select: none; font: 650 13px -apple-system, system-ui, sans-serif; color: inherit; }
+.eq-th.cur { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
+.eq-th img { width: 100%; aspect-ratio: 1000 / 1430; object-fit: contain; background: #fffdf8; border-radius: 6px; pointer-events: none; }
+.eq-th.dragging { opacity: .4; }
+.eq-th.drop-before { box-shadow: -6px 0 0 -2px var(--accent); }

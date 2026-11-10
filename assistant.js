@@ -440,7 +440,7 @@ async function smarten(noteId, pageId, cardId, email, ref) {
 }
 function aiSettings() {
   const c = aiCfg(), w = modalWrap('aiWrap');
-  w.innerHTML = `<div class="sheet ai-sheet" role="dialog" aria-modal="true"><h3>✨ Smarter AI summaries</h3>
+  w.innerHTML = `<div class="sheet ai-sheet" role="dialog" aria-modal="true"><h3>✨ Connect Grok</h3>
     <p class="fine">Optional. The built-in assistant works offline with no account. If you add <b>your own</b> API key, new emails are also summarized by that provider. The key is stored only on this device (not in backups) and sent only to the address below, together with the email text you drop.</p>
     <label class="chkrow"><input type="checkbox" id="aiOn" ${c.on ? 'checked' : ''}> Use AI for new assistant cards</label>
     <label>Provider<select id="aiProv">${Object.entries(AI_PRESETS).map(([k, p]) => `<option value="${k}" ${c.provider === k ? 'selected' : ''}>${p.label}</option>`).join('')}</select></label>

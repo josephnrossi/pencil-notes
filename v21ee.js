@@ -459,7 +459,7 @@
   function statusLine() {
     const e = engine();
     if (IX.running || IX.queue.length) return `Reading handwriting with ${engineLabel()}… ${IX.done} of ${IX.total} note${IX.total === 1 ? '' : 's'}`;
-    if (!e) return 'Searching typed text, tasks, labels and handwriting already read. To read new handwriting on iPad, connect your Grok key (⋯ → Settings → Assistant).';
+    if (!e) return 'Searching typed text, tasks, labels and handwriting already read. To read new handwriting on iPad, connect Grok (sidebar → Settings → Connect Grok).';
     return `Handwriting read with ${engineLabel()} · re-read a moment after you write`;
   }
   let lastHits = [];
@@ -499,7 +499,7 @@
   $('#search').setAttribute('placeholder', 'Search notes, typed text & handwriting');
   $('#search').addEventListener('focus', () => backfill());
   $('#search').addEventListener('keydown', e => { if (e.key === 'Enter' && lastHits[0]) { e.preventDefault(); $('#search').blur(); openHit(lastHits[0]); } });
-  try { searchHintText = function () { return engine() ? `Searching titles, typed text, tasks, labels, Quote / To-Do fields and handwriting (read with ${engineLabel()}).` : 'This browser has no on-device handwriting recognition — connect Grok (⋯ → Settings → Assistant) to read new handwriting. Searching titles, typed text, tasks, labels and handwriting already read.'; }; } catch (_) {}
+  try { searchHintText = function () { return engine() ? `Searching titles, typed text, tasks, labels, Quote / To-Do fields and handwriting (read with ${engineLabel()}).` : 'This browser has no on-device handwriting recognition — connect Grok (sidebar → Settings → Connect Grok) to read new handwriting. Searching titles, typed text, tasks, labels and handwriting already read.'; }; } catch (_) {}
 
   /* ==================== Insert menu: Daily To-Do (and keep Quote sheet off To-Do pages) ==================== */
   function addInsertItems() {
