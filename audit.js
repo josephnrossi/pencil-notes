@@ -2,7 +2,7 @@
    One ＋ Insert menu, one grouped Settings screen, a Gestures sheet, a short first-run tour,
    Undo for every delete, a safe importer, storage-full handling and lock hardening.
    Nothing is removed — features are only reached through fewer, more consistent doors. */
-const APP_VERSION = 'v21eq';   // v21eq: Idea Board rebuilt on the normal toolbar; app cleanup; thumbnails, backup, 44px targets
+const APP_VERSION = 'v21er';   // v21er: meeting '+ line' per action item (no auto-grow); board canvas cap, board Cmd+Z, thumbnails scroll, Send to Idea Board, 44px targets, dark contrast
 
 /* ---------- import sanitizer: hostile backups must not inject markup ----------
    Rendering escapes free text, but ids/enums/colors are interpolated into attributes, so they are

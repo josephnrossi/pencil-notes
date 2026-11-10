@@ -1,0 +1,78 @@
+/* Pencil Notes v21er — meeting "+ line" per action item, 44px tap targets, dark-mode contrast. Loads after v21eq.css. */
+
+/* ---------- 1. Meeting action items: "+ line" (right-hand bell column, on each item's last line) and "−" (empty extra line, far right) ---------- */
+.page .overlay .meet-addline, .page .overlay .meet-delline {
+  position: absolute; pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  min-width: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; z-index: 3; isolation: isolate;
+  display: flex; align-items: center; justify-content: center; color: var(--accent);
+  font: 700 11px/1 -apple-system, system-ui, sans-serif; white-space: nowrap; -webkit-user-select: none; user-select: none;
+}
+.page .overlay .meet-addline::before, .page .overlay .meet-delline::before {
+  content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: -1;
+  border: 1px dashed color-mix(in srgb, var(--accent) 70%, transparent); border-radius: 12px; background: var(--surface);
+}
+.page .overlay .meet-addline { font-size: 11px; letter-spacing: -.01em; }
+.page .overlay .meet-addline::before { width: calc(100% - 4px); max-width: 52px; height: 26px; border-radius: 13px; border-style: solid; border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+/* compact bell (1-line items share line 1 with "+ line"): 44px wide, time label truncates */
+.page .overlay .meet-bell.er-compact .mb-time { max-width: 42px; text-overflow: ellipsis; }
+.page .overlay .meet-delline { color: var(--muted); font-size: 16px; }
+.page .overlay .meet-delline::before { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); }
+.page .overlay .meet-addline:active::before, .page .overlay .meet-delline:active::before { background: var(--accent-soft); }
+.page .overlay .meet-addline:focus-visible, .page .overlay .meet-delline:focus-visible { outline: 3px solid #5477c6; outline-offset: -2px; border-radius: 12px; }
+
+/* ---------- F7. 44px hit areas, same look: the visible pill is drawn by ::before ---------- */
+.page .overlay :is(.qs-addline, .qs-addnote, .qs-delnote, .td-addline, .td-tmr, .qs-addq) {
+  height: 44px !important; min-height: 44px !important; line-height: 44px !important; min-width: 44px;
+  background: transparent !important; border-color: transparent !important; box-shadow: none !important; isolation: isolate;
+}
+.page .overlay :is(.qs-addline, .qs-addnote, .qs-delnote, .td-addline, .td-tmr, .qs-addq)::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); z-index: -1; box-sizing: border-box;
+  height: var(--er-pill, 28px); border-radius: calc(var(--er-pill, 28px) / 2); border: 1px dashed var(--accent); background: transparent;
+}
+/* keep each control's visual centre where it was (old heights 28 / 24 / 34) */
+.page .overlay .qs-addline, .page .overlay .td-addline { margin-top: -8px; --er-pill: 28px; }
+.page .overlay .qs-addnote, .page .overlay .qs-delnote { margin-top: -10px; --er-pill: 24px; }
+.page .overlay .qs-delnote::before { border-style: solid; border-color: var(--line); background: var(--surface); }
+.page .overlay .td-tmr { margin-top: -10px; --er-pill: 24px; }
+.page .overlay .td-tmr::before { border-style: solid; border-color: var(--line); background: var(--surface); }
+.page .overlay .qs-addq { margin-top: -5px; --er-pill: 34px; color: #fff !important; }
+.page .overlay .qs-addq::before { border: 0; background: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,.14); }
+
+/* Q-number / date / status chips: 44px tall hit area, 24px pill */
+.page .overlay .qs-meta-row { height: 44px !important; margin-top: -9px; }
+.page .overlay .qs-meta {
+  height: 44px !important; line-height: 44px !important; min-width: 44px; background: transparent !important; border-color: transparent !important;
+  box-shadow: none !important; isolation: isolate; text-align: center;
+}
+.page .overlay .qs-meta::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 10px; height: 24px; box-sizing: border-box; border-radius: 12px; z-index: -1;
+  border: 1px solid var(--er-chip-bd, var(--line)); background: var(--er-chip-bg, var(--surface)); box-shadow: 0 1px 2px rgba(0,0,0,.08);
+}
+.page .overlay .qs-meta.qs-date.blank::before { border-style: dashed; }
+
+/* note lasso menu: 44px buttons */
+#lassoMenu button { min-height: 44px; }
+#lassoMenu #lassoCancel { min-width: 44px; }
+#lassoMenu #lassoCopy svg { width: 18px; height: 18px; display: block; margin: auto; }
+
+/* ---------- F8. dark mode contrast ---------- */
+/* white text on the dark-mode accent (#8b85ff) was 3.0:1 — use a deeper violet behind white text (5.6:1) */
+:root[data-theme="dark"] :is(.btn.primary, button.primary, .float-menu button.primary, .chip-btn.on, .banner .bb button.primary, #undoToast button, #eqBackupNag button.primary) {
+  background-color: #5b50e6 !important; border-color: #5b50e6 !important; color: #fff !important;
+}
+:root[data-theme="dark"] .page .overlay .qs-addq::before { background: #5b50e6; }
+/* quote status chips (inline light colours) — dark-mode text colours ≥ 4.5:1 on the chip */
+:root[data-theme="dark"] .page .overlay .qs-status[data-st="open"] { color: #c7c9ff !important; --er-chip-bg: rgba(129,140,248,.24); --er-chip-bd: rgba(129,140,248,.55); }
+:root[data-theme="dark"] .page .overlay .qs-status[data-st="sent"] { color: #fcd34d !important; --er-chip-bg: rgba(245,158,11,.2); --er-chip-bd: rgba(245,158,11,.55); }
+:root[data-theme="dark"] .page .overlay .qs-status[data-st="won"] { color: #86efac !important; --er-chip-bg: rgba(34,197,94,.2); --er-chip-bd: rgba(34,197,94,.55); }
+:root[data-theme="dark"] .page .overlay .qs-status[data-st="lost"] { color: #fda4af !important; --er-chip-bg: rgba(244,63,94,.2); --er-chip-bd: rgba(244,63,94,.55); }
+:root[data-theme="dark"] .page .overlay .qs-meta.qs-qnum, :root[data-theme="dark"] .page .overlay .qs-meta.qs-date.blank { color: #b4b4be !important; }
+
+/* board prompts (Text card, Add link, titles) are now real modals — a compact card */
+.eo-prompt .eo-sheet-card { width: min(520px, calc(100vw - 24px)); }
+.eo-prompt .eo-url { width: 100%; box-sizing: border-box; min-height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface2); color: var(--text); padding: 0 12px; font: 16px -apple-system, system-ui, sans-serif; }
+
+/* F6 follow-up: a plain toast and the Undo toast used to sit on the same spot and cover each other.
+   When both are showing, lift the plain toast one row above the Undo toast (banner offset still applies). */
+body:has(#undoToast:not([hidden])) #toast:not([hidden]) { bottom: calc(20px + var(--sab, 0px) + 62px); }
+body.eq-nag-on:has(#undoToast:not([hidden])) #toast:not([hidden]) { bottom: calc(16px + var(--sab, 0px) + var(--eq-nag-h, 62px) + 10px + 62px); }

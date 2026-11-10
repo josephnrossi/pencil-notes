@@ -5,6 +5,8 @@
    B. copy rewrites (Settings, Gestures, search, reminders, hints) · one “＋ Add page” · no record chip on Meeting
       pages · landscape toolbar always one row (panel overlays) · 🔐 only where a code is set · “Connect Grok…” ·
       hidden lasso leftovers removed · Ask Grok without Draft reply / Add to Idea Board.
+   v21er (patched in place): thumbnails scroll with a finger and render lazily; backup banner keeps a short label,
+   recounts its days each time it shows, sits clear of toasts, and only counts a download fallback that really started.
    C. 44px − / 🗑 targets · Daily To-Do starts with one task row (＋ Task adds one) · page thumbnails (tap
       “Page 1 of N”) · honest search empty state · Back up now (share sheet → Files / iCloud) + weekly reminder. */
 (function () {
@@ -21,7 +23,7 @@
   try {
     GESTURES.length = 0;
     GESTURES.push(
-      ['Writing', [['✏️', 'Pencil', 'writes · finger scrolls (turn on ☝️ Finger to draw with a finger)'], ['🤏', 'Two fingers', 'scroll · pinch to zoom · tap the % chip to reset'], ['➰', 'Lasso', 'circle ink, photos or stickers → drag to move, corner to resize · ✨ Ask Grok · 📤 Send to the Idea Board']]],
+      ['Writing', [['✏️', 'Pencil', 'writes · finger scrolls (turn on ☝️ Finger to draw with a finger)'], ['🤏', 'Two fingers', 'scroll · pinch to zoom · tap the % chip to reset'], ['➰', 'Lasso', 'circle ink or photos → drag to move, corner to resize · ✨ Ask Grok · 💡 Send to Idea Board (copies it onto a new card)']]],
       ['Pages', [['✋', 'Hold a page with a finger', 'drag it to a new position'], ['🔢', 'Tap “Page 1 of N”', 'see every page as a thumbnail · tap one to jump · hold and drag to reorder'], ['＋', '＋ Add page', 'at the end of the note · or ＋ Insert → Page']]],
       ['Idea Board', [['✏️', 'Pencil', 'writes anywhere — inside a card it writes on the card'], ['☝️', 'One finger', 'pan the board · tap a card, photo or link to select it'], ['✋', 'Press and hold a card', 'then drag to move it'], ['↘︎', 'Drag the round corner', 'resize the selected card or photo'], ['➰', 'Lasso', 'Make card · Delete'], ['🤏', 'Pinch', 'zoom the board']]],
       ['Lists & reminders', [['👉', 'Swipe right on a reminder', 'done'], ['👈', 'Swipe left', 'more actions · swipe all the way to delete (Undo)']]],
@@ -257,13 +259,47 @@
     w.innerHTML = '<div class="eq-th-sheet" role="dialog" aria-modal="true" aria-label="Pages"><header><h3>Pages <small>' + n.pages.length + ' · tap to jump' + (n.pages.length > 1 ? ' · hold and drag to reorder' : '') + '</small></h3><button type="button" data-th="close" aria-label="Close">✕</button></header>' +
       '<div class="eq-th-grid">' + n.pages.map((pg, i) => '<button type="button" class="eq-th' + (i === cur ? ' cur' : '') + '" data-th-pi="' + i + '" aria-label="Page ' + (i + 1) + '"><img alt="" data-th-img="' + i + '"><span>' + (i + 1) + '</span></button>').join('') + '</div></div>';
     w.hidden = false;
-    requestAnimationFrame(() => w.querySelectorAll('img[data-th-img]').forEach(im => { const pg = n.pages[+im.dataset.thImg]; if (pg) im.src = thumbURL(n, pg, 150); }));
+    lazyThumbs(w, n);
     w.onclick = e => {
       if (e.target === w || e.target.closest('[data-th="close"]')) { w.hidden = true; return; }
       const b = e.target.closest('[data-th-pi]'); if (!b || TH.swallow) return;
       w.hidden = true; jumpTo(+b.dataset.thPi);
     };
     w.onpointerdown = thDown;
+  }
+  /* v21er: draw thumbnails lazily — visible ones first, a few per frame (40 pages no longer block ~600ms) */
+  const thCache = new WeakMap();
+  const thSig = pg => [(pg.strokes || []).length, (pg.strokes || []).length ? pg.strokes[pg.strokes.length - 1].id : '', (pg.texts || []).length, (pg.tasks || []).length, (pg.images || []).length, pg.bg && pg.bg.name, document.documentElement.dataset.theme].join('|');
+  function thumbFor(n, pg) {
+    const c = thCache.get(pg), sig = thSig(pg);
+    if (c && c.sig === sig) return c.url;
+    const url = thumbURL(n, pg, 150); thCache.set(pg, { sig, url }); return url;
+  }
+  let thObs = null;
+  function lazyThumbs(w, n) {
+    if (thObs) { thObs.disconnect(); thObs = null; }
+    const imgs = [...w.querySelectorAll('img[data-th-img]')];
+    const queue = [], queued = new Set();
+    const want = im => { if (!queued.has(im) && !im.src) { queued.add(im); queue.push(im); pump(); } };
+    let pumping = false;
+    function pump() {
+      if (pumping) return; pumping = true;
+      requestAnimationFrame(function step() {
+        const t0 = performance.now();
+        while (queue.length && performance.now() - t0 < 10) {
+          const im = queue.shift(); const pg = n.pages[+im.dataset.thImg];
+          if (pg && im.isConnected) { try { im.src = thumbFor(n, pg); } catch (_) {} }
+        }
+        if (queue.length && !w.hidden) requestAnimationFrame(step); else pumping = false;
+      });
+    }
+    const sheet = w.querySelector('.eq-th-sheet');
+    if ('IntersectionObserver' in window) {
+      thObs = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) want(e.target); }), { root: sheet, rootMargin: '400px 0px' });
+      imgs.forEach(im => thObs.observe(im));
+    } else imgs.forEach(want);
+    /* the current page first */
+    const cur = w.querySelector('.eq-th.cur img'); if (cur) want(cur);
   }
   const TH = { g: null, swallow: false };
   function thDown(e) {
@@ -272,6 +308,10 @@
     const g = { from: +b.dataset.thPi, el: b, x: e.clientX, y: e.clientY, pid: e.pointerId, live: false };
     g.timer = setTimeout(() => { g.live = true; b.classList.add('dragging'); try { navigator.vibrate && navigator.vibrate(10); } catch (_) {} }, 350);
     TH.g = g;
+    /* v21er: tiles allow vertical finger scrolling (touch-action: pan-y); once a hold has lifted a tile,
+       stop the sheet from scrolling so the drag reorders instead */
+    const noScroll = ev => { if (g.live && ev.cancelable) ev.preventDefault(); };
+    addEventListener('touchmove', noScroll, { passive: false, capture: true });
     const mv = ev => {
       if (ev.pointerId !== g.pid) return;
       if (!g.live) { if (Math.hypot(ev.clientX - g.x, ev.clientY - g.y) > 10) { clearTimeout(g.timer); end(); } return; }
@@ -282,6 +322,7 @@
     };
     const end = () => {
       removeEventListener('pointermove', mv, true); removeEventListener('pointerup', up, true); removeEventListener('pointercancel', up, true);
+      removeEventListener('touchmove', noScroll, { capture: true });
       clearTimeout(g.timer); TH.g = null;
     };
     const up = ev => {
@@ -338,7 +379,7 @@
     const data = { app: 'inkminder', version: 2, exportedAt: new Date().toISOString(), notebooks: S.notebooks, notes, assets };
     return new Blob([JSON.stringify(data)], { type: 'application/json' });
   }
-  const markBackup = () => { localStorage.setItem('lastBackupAt', String(Date.now())); const nag = $1('#eqBackupNag'); if (nag) nag.hidden = true; };
+  const markBackup = () => { localStorage.setItem('lastBackupAt', String(Date.now())); const nag = $1('#eqBackupNag'); if (nag) nag.hidden = true; nagLayout(); };
   async function backupNow() {
     try {
       const blob = await backupBlob();
@@ -348,9 +389,14 @@
         try { await navigator.share({ files: [file], title: 'Pencil Notes backup' }); markBackup(); t0('Backup saved ✓', 1800); return 'share'; }
         catch (err) { if (err && err.name === 'AbortError') { t0('Backup not saved', 1400); return 'cancel'; } }
       }
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 30000);
-      markBackup(); t0('Backup downloaded — keep it in Files or iCloud Drive', 2600); return 'download';
+      /* v21er: the download fallback can't confirm the file was kept, so only count it when the download really started */
+      const a = document.createElement('a');
+      if (!('download' in a) || typeof URL.createObjectURL !== 'function') { t0('This browser can’t save the backup file — use ⋯ → Share → Export instead', 3200); return 'unsupported'; }
+      let started = false;
+      try { a.href = URL.createObjectURL(blob); a.download = name; a.rel = 'noopener'; document.body.append(a); a.click(); started = true; } catch (err) { console.warn('backup download', err); }
+      a.remove(); setTimeout(() => { try { URL.revokeObjectURL(a.href); } catch (_) {} }, 30000);
+      if (!started) { t0('Could not start the backup download', 2200); return 'error'; }
+      markBackup(); t0('Backup download started — check Files › Downloads and keep it in iCloud Drive', 3200); return 'download';
     } catch (e) { console.warn('backup', e); t0('Could not make the backup'); return 'error'; }
   }
   if (typeof exportBackup === 'function') { const _eb = exportBackup; exportBackup = async function () { const r = await _eb.apply(this, arguments); markBackup(); return r; }; }
@@ -362,20 +408,35 @@
     const due = last ? now - last > WEEK : now - first > WEEK;
     const real = (S.notes || []).some(n => (n.pages || []).some(p => (p.strokes || []).length || (p.texts || []).length));
     let nag = $1('#eqBackupNag');
-    if (!due || now < snooze || !real) { if (nag) nag.hidden = true; return false; }
+    if (!due || now < snooze || !real) { if (nag) nag.hidden = true; nagLayout(); return false; }
     if (!nag) {
       nag = document.createElement('div'); nag.id = 'eqBackupNag'; nag.setAttribute('role', 'status');
-      nag.innerHTML = '<span>☁️ ' + (last ? 'Last backup was ' + Math.floor((now - last) / 864e5) + ' days ago.' : 'Your notes have never been backed up.') + ' Save a copy to Files or iCloud Drive.</span><button type="button" class="primary" data-nag="now">Back up now</button><button type="button" class="x" data-nag="x" aria-label="Remind me next week">✕</button>';
+      nag.innerHTML = '<span class="nag-t"></span><button type="button" class="primary" data-nag="now">Back up</button><button type="button" class="x" data-nag="x" aria-label="Remind me next week">✕</button>';
       document.body.appendChild(nag);
       nag.onclick = e => {
         const b = e.target.closest('[data-nag]'); if (!b) return;
         if (b.dataset.nag === 'now') backupNow();
-        else { localStorage.setItem('backupNagUntil', String(Date.now() + WEEK)); nag.hidden = true; }
+        else { localStorage.setItem('backupNagUntil', String(Date.now() + WEEK)); nag.hidden = true; nagLayout(); }
       };
     }
-    nag.hidden = false; return true;
+    /* v21er: short label, recounted every time it shows */
+    const days = last ? Math.max(1, Math.floor((now - last) / 864e5)) : 0;
+    const txt = last ? '☁️ Last backup ' + days + ' day' + (days === 1 ? '' : 's') + ' ago' : '☁️ Not backed up yet';
+    const span = nag.querySelector('.nag-t'); if (span) span.textContent = txt;
+    nag.title = 'Save a backup copy to Files or iCloud Drive';
+    nag.querySelector('[data-nag="now"]').setAttribute('aria-label', 'Back up now — save a copy to Files or iCloud Drive');
+    nag.hidden = false; nagLayout(); return true;
   }
+  /* v21er: toasts sit just above the banner while it shows (never on top of it) */
+  function nagLayout() {
+    const nag = $1('#eqBackupNag'), on = !!(nag && !nag.hidden);
+    document.body.classList.toggle('eq-nag-on', on);
+    if (on) document.body.style.setProperty('--eq-nag-h', Math.ceil(nag.getBoundingClientRect().height) + 'px');
+  }
+  addEventListener('resize', () => nagLayout());
   ready(() => setTimeout(backupNag, 1200));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) backupNag(); });
+  setInterval(() => { if (!document.hidden) backupNag(); }, 60 * 60 * 1000);
 
   /* ======================= boot ======================= */
   ready(() => {
@@ -384,5 +445,5 @@
     try { if (curNote()) buildPages(); } catch (_) {}
   });
 
-  window.V21eq = { version: VERSION, fitToolbar, openThumbs, visiblePage, jumpTo, backupNow, backupBlob, backupNag, trimTodoRows, searchEmpty, connectGrok };
+  window.V21eq = { version: VERSION, fitToolbar, openThumbs, visiblePage, jumpTo, backupNow, backupBlob, backupNag, nagLayout, trimTodoRows, searchEmpty, connectGrok };
 })();

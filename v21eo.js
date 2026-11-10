@@ -2,7 +2,10 @@
    v21eq rebuild (this file is patched in place): the board uses the normal note toolbar (Pen · Highlight · Erase · Lasso · Text ·
    colours · size · ＋ Insert · Finger), real undo/redo for every board change, a lasso menu above the board (Make card · Delete · Cancel),
    slim cards (finger press-and-hold to move, Pencil always writes, corner handle only when selected) and ink drawn UNDER cards.
-   Does not delete IndexedDB data; v21eo boards migrate (wbSlim) so ink stays where it was. */
+   Does not delete IndexedDB data; v21eo boards migrate (wbSlim) so ink stays where it was.
+   v21er (patched in place): the board ink canvases cover only the visible part of the board (plus a margin),
+   never more than 16,000,000 pixels each (iPad Safari's per-canvas limit), and the live stroke clears only its
+   own dirty box. Ink coordinates are unchanged (world units). Escape in a board prompt closes only the prompt. */
 (function () {
   'use strict';
   const PDF_CAP = 20;
@@ -208,7 +211,7 @@
       afterChange(dstPi);
     }
     if (dstPi === IPI) render();
-    if (!move && typeof actionToast === 'function' && strokes.length) {
+    if (!move && !src.quiet && typeof actionToast === 'function' && strokes.length) {
       const srcNoteId = sn && sn.id, srcPageId = spg && spg.id, keepIds = ids.slice();
       actionToast('Card added — original ink kept', 'Remove original', () => {
         const n2 = S.notes.find(x => x.id === srcNoteId), p2 = n2 && n2.pages.find(q => q.id === srcPageId);
@@ -255,20 +258,67 @@
   function applyView() {
     const w = worldEl(); if (!w) return;
     w.style.transform = 'translate(' + VIEW.x + 'px, ' + VIEW.y + 'px) scale(' + VIEW.s + ')';
+    checkInkRegion();
+  }
+  /* v21er: viewport-sized ink canvases. INK = the board rectangle (world units) the two canvases cover and
+     k = backing pixels per world unit. w*k × h*k never exceeds CANVAS_CAP. */
+  const CANVAS_CAP = 16000000, INK_MARGIN = 0.25;
+  const INK = { x0: 0, y0: 0, w: 0, h: 0, k: 1, s: 1 };
+  let inkRaf = 0, inkZoomT = 0;
+  function wantRegion() {
+    const pg = ideaPg(), v = viewEl(); if (!pg || !v) return null;
+    const ww = pg.board.wb.w, hh = pg.board.wb.h;
+    const vw = Math.max(1, v.clientWidth || 800) / VIEW.s, vh = Math.max(1, v.clientHeight || 900) / VIEW.s;
+    const vx = -VIEW.x / VIEW.s, vy = -VIEW.y / VIEW.s;
+    let x0 = Math.max(0, Math.floor(vx - vw * INK_MARGIN)), y0 = Math.max(0, Math.floor(vy - vh * INK_MARGIN));
+    let x1 = Math.min(ww, Math.ceil(vx + vw * (1 + INK_MARGIN))), y1 = Math.min(hh, Math.ceil(vy + vh * (1 + INK_MARGIN)));
+    if (x1 - x0 < 8) { x0 = Math.max(0, Math.min(x0, ww - 8)); x1 = Math.min(ww, x0 + 8); }
+    if (y1 - y0 < 8) { y0 = Math.max(0, Math.min(y0, hh - 8)); y1 = Math.min(hh, y0 + 8); }
+    const w = Math.max(8, x1 - x0), h = Math.max(8, y1 - y0);
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    let k = dpr * VIEW.s;
+    if (w * k * h * k > CANVAS_CAP) k = Math.sqrt(CANVAS_CAP / (w * h)) * 0.999;
+    return { x0, y0, w, h, k, s: VIEW.s, vx, vy, vw, vh };
+  }
+  function placeInk(force) {
+    const R = wantRegion(); if (!R) return false;
+    const cvs = [host() && host().querySelector('canvas.eo-ink'), host() && host().querySelector('canvas.eo-live')];
+    Object.assign(INK, { x0: R.x0, y0: R.y0, w: R.w, h: R.h, k: R.k, s: R.s });
+    for (const cv of cvs) {
+      if (!cv) continue;
+      cv.style.left = R.x0 + 'px'; cv.style.top = R.y0 + 'px'; cv.style.width = R.w + 'px'; cv.style.height = R.h + 'px';
+      const pw = Math.max(1, Math.floor(R.w * R.k)), ph = Math.max(1, Math.floor(R.h * R.k));
+      if (force || cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
+      inkCtx(cv);
+    }
+    return true;
+  }
+  function inkCtx(cv) {
+    const ctx = cv.getContext('2d');
+    const kx = cv.width / INK.w, ky = cv.height / INK.h;
+    ctx.setTransform(kx, 0, 0, ky, -INK.x0 * kx, -INK.y0 * ky);
+    return ctx;
+  }
+  function clearCanvas(cv) {
+    const ctx = cv.getContext('2d'); ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); ctx.restore(); inkCtx(cv); return ctx;
+  }
+  /* after a pan / zoom: re-place only when the visible board leaves the covered box or the zoom changed a lot */
+  function checkInkRegion() {
+    if (!INK.w || !host() || !host().querySelector('canvas.eo-ink')) return;
+    const R = wantRegion(); if (!R) return;
+    const out = R.vx < INK.x0 - 1 && INK.x0 > 0 || R.vy < INK.y0 - 1 && INK.y0 > 0 ||
+      R.vx + R.vw > INK.x0 + INK.w + 1 && INK.x0 + INK.w < ideaPg().board.wb.w || R.vy + R.vh > INK.y0 + INK.h + 1 && INK.y0 + INK.h < ideaPg().board.wb.h;
+    const zoomed = Math.abs(R.k - INK.k) / INK.k > 0.2;
+    const redo = () => { inkRaf = 0; if (ST.g && (ST.g.typ === 'ink' || ST.g.typ === 'lasso')) return; placeInk(); drawInkLayer(); if (ST.selLasso && ST.selLasso.poly) drawLassoLive(ST.selLasso.poly, true); };
+    if (out) { if (!inkRaf) inkRaf = requestAnimationFrame(redo); }
+    else if (zoomed) { clearTimeout(inkZoomT); inkZoomT = setTimeout(() => { if (!inkRaf) inkRaf = requestAnimationFrame(redo); }, 140); }
   }
   function sizeWorld() {
     const pg = ideaPg(); if (!pg) return;
-    const w = worldEl(), ink = host() && host().querySelector('canvas.eo-ink'), live = host() && host().querySelector('canvas.eo-live');
+    const w = worldEl();
     const ww = pg.board.wb.w, hh = pg.board.wb.h;
     if (w) { w.style.width = ww + 'px'; w.style.height = hh + 'px'; }
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    for (const cv of [ink, live]) {
-      if (!cv) continue;
-      cv.style.width = ww + 'px'; cv.style.height = hh + 'px';
-      const pw = Math.round(ww * dpr), ph = Math.round(hh * dpr);
-      if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
-      cv.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
+    placeInk();
     const grid = host() && host().querySelector('.eo-grid');
     if (grid) { grid.style.width = ww + 'px'; grid.style.height = hh + 'px'; }
   }
@@ -344,7 +394,9 @@
   }
   function hostnameOf(u) { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return ''; } }
   function parseUrlTitle(raw) {
-    const t = String(raw || '').trim();
+    let t = String(raw || '').trim();
+    /* v21er: a typed "airbnb.com/rooms/…" or "www.site.com" gets https:// added (never for other schemes) */
+    if (!/https?:\/\//i.test(t) && !/^[a-z][a-z0-9+.-]*:/i.test(t) && /^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}(:\d+)?([\/?#][^\s<>"]*)?$/i.test(t)) t = 'https://' + t;
     const m = t.match(/https?:\/\/[^\s<>"]+/i);
     if (!m) return null;
     const href = safeLink(m[0]); if (!href) return null;
@@ -403,10 +455,12 @@
   function drawInkLayer() {
     const cv = host() && host().querySelector('canvas.eo-ink');
     const pg = ideaPg(); if (!cv || !pg) return;
-    const ctx = cv.getContext('2d');
-    ctx.clearRect(0, 0, pg.board.wb.w, pg.board.wb.h);
+    if (!INK.w) placeInk();
+    const ctx = clearCanvas(cv);
     if (typeof drawStroke !== 'function') return;
-    const st = pg.strokes || [];
+    /* only strokes that touch the covered box */
+    const X0 = INK.x0 - 40, Y0 = INK.y0 - 40, X1 = INK.x0 + INK.w + 40, Y1 = INK.y0 + INK.h + 40;
+    const st = (pg.strokes || []).filter(s => { const b = s.bb || (s.points && s.points.length && typeof bbox === 'function' ? (s.bb = bbox(s.points)) : null); return !b || !(b[2] < X0 || b[0] > X1 || b[3] < Y0 || b[1] > Y1); });
     st.forEach(s => { if (s.tool === 'highlighter') drawStroke(ctx, s); });
     st.forEach(s => { if (s.tool !== 'highlighter') drawStroke(ctx, s); });
   }
@@ -687,22 +741,28 @@
       drawLassoLive(g.pts);
     }
   }
+  let liveBB = null;
   function clearLive() {
-    const cv = host() && host().querySelector('canvas.eo-live'), pg = ideaPg();
-    if (cv && pg) cv.getContext('2d').clearRect(0, 0, pg.board.wb.w, pg.board.wb.h);
+    const cv = host() && host().querySelector('canvas.eo-live');
+    if (cv) clearCanvas(cv);
+    liveBB = null;
   }
+  /* v21er: clear only the live stroke's own dirty box, then draw the stroke (no full-board clear per move) */
   function drawLive(pts, style) {
     const cv = host() && host().querySelector('canvas.eo-live'); if (!cv) return;
-    const ctx = cv.getContext('2d'), pg = ideaPg();
-    ctx.clearRect(0, 0, pg.board.wb.w, pg.board.wb.h);
+    const ctx = inkCtx(cv);
     const s = Object.assign({}, style || inkStyle(), { points: pts });
-    if (typeof bbox === 'function') s.bb = bbox(pts);
+    const bb = typeof bbox === 'function' ? bbox(pts) : null; if (bb) s.bb = bb;
+    const pad = (s.width || 3) * 2 + 4;
+    const box = bb ? [bb[0] - pad, bb[1] - pad, bb[2] + pad, bb[3] + pad] : null;
+    const u = liveBB && box ? [Math.min(liveBB[0], box[0]), Math.min(liveBB[1], box[1]), Math.max(liveBB[2], box[2]), Math.max(liveBB[3], box[3])] : (box || liveBB);
+    if (u) ctx.clearRect(u[0], u[1], u[2] - u[0], u[3] - u[1]); else clearCanvas(cv);
+    liveBB = box;
     if (typeof drawStroke === 'function') drawStroke(ctx, s);
   }
   function drawLassoLive(pts, closed) {
     const cv = host() && host().querySelector('canvas.eo-live'); if (!cv) return;
-    const ctx = cv.getContext('2d'), pg = ideaPg();
-    ctx.clearRect(0, 0, pg.board.wb.w, pg.board.wb.h);
+    const ctx = clearCanvas(cv); liveBB = null;
     ctx.save(); ctx.strokeStyle = 'rgba(90,130,220,.95)'; ctx.lineWidth = 1.5 / VIEW.s; ctx.setLineDash([6 / VIEW.s, 4 / VIEW.s]);
     ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); if (closed) ctx.closePath(); ctx.stroke();
     if (closed) { ctx.fillStyle = 'rgba(90,130,220,.07)'; ctx.fill(); }
@@ -1000,7 +1060,9 @@
   function openPrompt(title, ph, start, done, type) {
     let wrap = document.getElementById('eoLinkWrap');
     if (wrap) wrap.remove();
-    wrap = document.createElement('div'); wrap.id = 'eoLinkWrap'; wrap.className = 'eo-sheet';
+    /* v21er: was class "eo-sheet" with no position, so the prompt rendered off-screen behind the board; now a real modal */
+    wrap = document.createElement('div'); wrap.id = 'eoLinkWrap'; wrap.className = 'eo-modal eo-prompt';
+    wrap.addEventListener('pointerdown', ev => { if (ev.target === wrap) { ev.preventDefault(); wrap.remove(); } });
     wrap.innerHTML = '<div class="eo-sheet-card"><h3>' + esc(title) + '</h3><input type="' + (type || 'url') + '" class="eo-url" placeholder="' + esc(ph) + '" value="' + esc(start || '') + '"><div class="eo-sheet-actions"><button type="button" data-act="ok">Add</button><button type="button" data-act="cancel">Cancel</button></div></div>';
     document.body.appendChild(wrap);
     const inp = wrap.querySelector('.eo-url'); setTimeout(() => inp.focus(), 50);
@@ -1351,7 +1413,30 @@
     };
   })();
   document.addEventListener('paste', onPaste);
-  addEventListener('keydown', ev => { if (ev.key === 'Escape' && isOpen()) { cancelLasso(); closeInsertMenu(); if (ST.sel) { ST.sel = null; render(); } } });
+  /* v21er: Escape closes the top-most board prompt / sheet only (capture, before quotes.js closes the drawer);
+     Backspace / Delete removes a board lasso selection. */
+  const topSheet = () => document.getElementById('eoLinkWrap') || document.getElementById('eoPickWrap') || document.getElementById('eoPdfWrap') || document.getElementById('eoCardWrap') ||
+    [...document.querySelectorAll('.eo-sheet')].filter(x => x.isConnected && x.offsetParent !== null).pop() || null;
+  addEventListener('keydown', ev => {
+    if (!isOpen()) return;
+    if (ev.key === 'Escape') {
+      const sh = topSheet();
+      if (sh) {
+        ev.preventDefault(); ev.stopImmediatePropagation();
+        const cancel = sh.querySelector('[data-act="cancel"], [data-act="close"]');
+        if (sh.id === 'eoCardWrap') closeCardFull(); else if (cancel) cancel.click(); else sh.remove();
+        return;
+      }
+      if (ST.selLasso || document.getElementById('eqBoardIns') || ST.sel) {
+        ev.preventDefault(); ev.stopImmediatePropagation();
+        cancelLasso(); closeInsertMenu(); if (ST.sel) { ST.sel = null; render(); }
+      }
+      return;
+    }
+    if ((ev.key === 'Backspace' || ev.key === 'Delete') && ST.selLasso && !(ev.target && ev.target.matches && ev.target.matches('input, textarea, [contenteditable], select'))) {
+      ev.preventDefault(); ev.stopImmediatePropagation(); deleteSel();
+    }
+  }, true);
   const drawerEl = document.getElementById('qbDrawer');
   if (drawerEl && window.MutationObserver) new MutationObserver(() => syncMount()).observe(drawerEl, { attributes: true, attributeFilter: ['class', 'data-board', 'hidden'] });
 
@@ -1370,6 +1455,6 @@
     openPdfViewer, openCardFull, closeCardFull, setStatus, statusOf, safeLink, parseUrlTitle,
     cardsOf, ideaPg, screenToWorld, autoGrowCard, PDF_CAP, growWorldToFit, cancelLasso,
     HANDLE: 44, MIN_W, MIN_H, HOLD_MS, TITLE_H, deleteSel, finishLasso, openInsertMenu, closeInsertMenu, mountToolbar, addTextCard, openItemMenu,
-    rebuilt: 'v21eq'
+    rebuilt: 'v21eq', freeSpot, INK, CANVAS_CAP, placeInk, drawInkLayer, isOpen, topSheet, applyView
   };
 })();

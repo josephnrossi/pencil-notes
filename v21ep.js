@@ -6,6 +6,11 @@
      (one checkbox). Later items shift down. Overflow follows v21ek (continuation page).
    - New checkbox items still come only from + Action task (one per tap).
    - Extra empty lines may shrink back on reopen; ink is never discarded.
+   v21er (patched in place): auto-grow is OFF and nothing shrinks on reopen. Each item gets its own
+   "+ line" button (v21er.js) that calls growTask(); shrinkLast() removes one EMPTY extra line only.
+   v21er: "+ line" / "−" live in the right-hand bell column (v21er.js) — items keep their original line heights, so
+   there is no extra row and no layout migration. One shared layout() places, draws and overflows items in the same
+   order as v21ep's rowY (checkbox slots, then continuation fragments); moved items carry their own ink.
    IndexedDB data is never deleted. */
 (function () {
   'use strict';
@@ -16,11 +21,15 @@
   const BELL_X = 848;
   const BELL_W = 112;
   const GROW_PAD = 18;
+  const AUTO_GROW = false;        // v21er: writing on the last line no longer adds lines (use "+ line")
+  const SHRINK_ON_OPEN = false;   // v21er: saved meetLines are kept on reopen (an empty extra line may stay)
 
   const isMeeting = pg => !!(pg && pg.bg && pg.bg.name === 'meeting');
   const actionTop = pg => pg?.bg?.actionContinuation ? 180 : MEET.actionsTop;
   const maxRows = pg => Math.floor((PAGE_H - 21 - actionTop(pg)) / ROW);
   const linesOf = t => Math.max(1, Number.isInteger(t?.meetLines) ? t.meetLines : 1);
+  let blockRowTap = false;                           // v21er: set for one guarded tap (see the pointerup guard)
+  const spanOf = t => linesOf(t);                    // rows an item occupies in the box (no extra strip)
   const sealed = n => typeof isSealed === 'function' && n && isSealed(n);
 
   function isMeetTask(pg, t) {
@@ -35,35 +44,41 @@
   }
   function slotTask(pg, i) { return meetTasks(pg).find(t => t.meetingRow === i); }
 
-  function rowY(i, pg) {
-    const top = actionTop(pg);
+  /* v21er: one layout used by placement, drawing and overflow — continuation fragments first, then the
+     checkbox slots in order, then continuation fragments (the same order v21ep's rowY used, so live notes open
+     with every item exactly where it was); an item = its lines, an empty reserved slot = 1 row. */
+  function layout(pg) {
     const tasks = meetTasks(pg);
-    const byRow = new Map(tasks.filter(t => t.meetingRow != null && !t.continueFrom).map(t => [t.meetingRow, t]));
-    let visual = 0;
-    for (let k = 0; k < i; k++) {
-      const t = byRow.get(k) || (!byRow.size ? tasks[k] : null);
-      visual += t && !t.continueFrom ? linesOf(t) : 1;
+    const real = tasks.filter(t => !t.continueFrom), frags = tasks.filter(t => t.continueFrom);
+    const slots = Math.max(Number.isInteger(pg?.bg?.actionLines) ? pg.bg.actionLines : real.length, real.length);
+    const byRow = new Map(real.filter(t => t.meetingRow != null).map(t => [t.meetingRow, t]));
+    const map = new Map(), slotStart = [];
+    let v = 0;
+    for (let i = 0; i < slots; i++) {
+      slotStart[i] = v;
+      const t = byRow.get(i);
+      if (t) { map.set(t, v); v += spanOf(t); } else v += 1;
     }
-    return top + (visual + 1) * ROW - 44;
+    for (const t of real) if (!map.has(t)) { map.set(t, v); v += spanOf(t); }
+    for (const f of frags) { map.set(f, v); v += spanOf(f); }
+    return { map, slotStart, total: v };
+  }
+  const yOfRow = (pg, v) => actionTop(pg) + (v + 1) * ROW - 44;
+
+  function rowY(i, pg) {
+    const L = layout(pg);
+    const v = L.slotStart[i] != null ? L.slotStart[i] : L.total + Math.max(0, i - L.slotStart.length);
+    return yOfRow(pg, v);
   }
 
   function visualRows(pg) {
     if (!pg) return 0;
-    const tasks = meetTasks(pg).filter(t => !t.continueFrom);
-    const frags = meetTasks(pg).filter(t => t.continueFrom);
-    let v = tasks.reduce((s, t) => s + linesOf(t), 0) + frags.reduce((s, t) => s + linesOf(t), 0);
-    const slots = Number.isInteger(pg.bg?.actionLines) ? pg.bg.actionLines : tasks.length;
-    if (slots > tasks.length) v += slots - tasks.length;
-    return v;
+    return layout(pg).total;
   }
 
   function rowsBefore(pg, t) {
-    let n = 0;
-    for (const x of meetTasks(pg)) {
-      if (x === t) break;
-      n += linesOf(x);
-    }
-    return n;
+    const v = layout(pg).map.get(t);
+    return v == null ? 0 : v;
   }
 
   function itemBand(t) {
@@ -137,8 +152,9 @@
         t.meetingRow = i < 0 ? 0 : i;
       }
     }
+    const L = layout(pg);
     for (const t of tasks) {
-      t.y = rowY(t.meetingRow, pg);
+      t.y = yOfRow(pg, L.map.has(t) ? L.map.get(t) : 0);
       if (t.kind === 'ink') t.x = Math.max(t.x || INK_LEFT, INK_LEFT - 4);
       else t.x = 62;
       t.h = Math.max(36, linesOf(t) * ROW - 20);
@@ -151,12 +167,15 @@
   function migrateMeet(pg) {
     if (!isMeeting(pg)) return;
     const tasks = meetTasks(pg);
+    const legacy = new Set();
     for (const t of tasks) {
-      if (!Number.isInteger(t.meetLines) || t.meetLines < 1) t.meetLines = 1;
+      if (!Number.isInteger(t.meetLines) || t.meetLines < 1) { t.meetLines = 1; legacy.add(t); }
     }
     for (let i = 0; i < tasks.length; i++) {
       const t = tasks[i];
       if (t.continueFrom) continue;
+      /* v21er: items that already carry a saved meetLines keep it (no ink-driven growth = no auto-grow) */
+      if (!AUTO_GROW && !legacy.has(t)) continue;
       const reserved = (pg.bg.actionLines > (t.meetingRow ?? i) + 1) && !tasks[i + 1];
       const nextY = tasks[i + 1]
         ? tasks[i + 1].y - 8
@@ -185,6 +204,28 @@
     return move;
   }
 
+  /* v21er: relayout a page and move every item's own ink (strokes starting in its band) by exactly
+     as much as the item moved. `extra` = Map(task → strokes) for items whose ink was just brought over. */
+  function relayoutKeepInk(pg, extra, mutate) {
+    const tasks = meetTasks(pg), owned = new Map(), oldY = new Map(tasks.map(t => [t, t.y]));
+    const claimed = new Set();
+    if (extra) for (const [t, list] of extra) { owned.set(t, list.slice()); list.forEach(x => claimed.add(x)); }
+    for (const st of pg.strokes || []) {
+      if (claimed.has(st)) continue;
+      const pts = st.points || []; if (!pts.length) continue;
+      if (!pts.some(q => q[0] >= INK_LEFT - 24 && q[0] <= INK_RIGHT + 40)) continue;
+      const minY = Math.min(...pts.map(q => q[1]));
+      const own = tasks.find(t => !(extra && extra.has(t)) && minY >= t.y - 12 && minY < t.y - 8 + linesOf(t) * ROW + 6);
+      if (own) { if (!owned.has(own)) owned.set(own, []); owned.get(own).push(st); }
+    }
+    if (mutate) mutate();
+    relayout(pg);
+    for (const [t, list] of owned) {
+      const dy = t.y - oldY.get(t); if (!dy) continue;
+      for (const st of list) { for (const q of st.points) q[1] = +(q[1] + dy).toFixed(1); if (st.bb) { st.bb[1] += dy; st.bb[3] += dy; } }
+    }
+  }
+
   function ensureContPage(n, pi, date) {
     let next = n.pages[pi + 1];
     if (isMeeting(next) && next.bg.actionContinuation) return { pg: next, pi: pi + 1, inserted: false };
@@ -195,35 +236,27 @@
     return { pg, pi: pi + 1, inserted: true };
   }
 
-  function evictAfter(pi, t) {
-    const n = curNote(), pg = n.pages[pi];
-    const later = meetTasks(pg).filter(x => x !== t && (x.meetingRow ?? 0) > (t.meetingRow ?? 0));
+  function evictAfter(pi, t, nOpt) {
+    const n = nOpt || curNote(), pg = n.pages[pi];
+    const later = meetTasks(pg).filter(x => x !== t && !x.continueFrom && (x.meetingRow ?? 0) > (t.meetingRow ?? 0));
     if (!later.length) return false;
     const next = ensureContPage(n, pi, pg.bg.date);
     const dest = next.pg;
-    const existing = meetTasks(dest);
-    // Evicted items belong immediately after t, so they go to the top of the continuation.
-    const firstY = later[0].y;
-    const destTop = actionTop(dest) + ROW - 44;
-    const dy = destTop - firstY;
-    // Make room at the top of the destination for the evicted block.
-    const blockH = later.reduce((s, x) => s + linesOf(x), 0) * ROW;
-    if (existing.length) shiftBelow(dest, actionTop(dest) - 4, blockH);
+    /* Evicted items belong immediately after t, so they go to the top of the continuation (before its own items).
+       v21er: positions come from the shared layout and each item's ink moves with it (relayoutKeepInk). */
+    const brought = new Map();
+    later.forEach((ev, k) => { ev.meetingRow = -1000 + k; });
+    dest.tasks = dest.tasks || []; dest.strokes = dest.strokes || [];
     for (const ev of later) {
       const strokes = takeItemStrokes(pg, ev);
-      ev.y += dy;
-      dest.tasks = dest.tasks || [];
-      dest.tasks.push(ev);
       pg.tasks = pg.tasks.filter(x => x !== ev);
-      dest.strokes = dest.strokes || [];
-      for (const s of strokes) {
-        for (const p of s.points || []) p[1] = +(p[1] + dy).toFixed(1);
-        if (s.bb) { s.bb[1] += dy; s.bb[3] += dy; }
-        dest.strokes.push(s);
-      }
+      dest.tasks.push(ev);
+      dest.strokes.push(...strokes);
+      brought.set(ev, strokes);
     }
-    reindex(pg); reindex(dest);
-    relayout(pg); relayout(dest);
+    reindex(dest);
+    relayoutKeepInk(dest, brought);
+    reindex(pg); relayout(pg);
     return next.inserted;
   }
 
@@ -233,7 +266,6 @@
     const dest = next.pg;
     let frag = meetTasks(dest).find(x => x.continueFrom === t.id);
     if (!frag) {
-      if (meetTasks(dest).length) shiftBelow(dest, actionTop(dest) - 4, ROW);
       frag = {
         id: uid('t'), kind: 'typed', x: 62, y: actionTop(dest) + ROW - 44, w: INK_RIGHT - 62, h: 36, fs: 26,
         strokeIds: [], text: '', continueFrom: t.id, meetLines: 1, meetingRow: 0,
@@ -241,14 +273,11 @@
       };
       dest.tasks = dest.tasks || [];
       dest.tasks.unshift(frag);
-      reindex(dest); relayout(dest);
+      reindex(dest); relayoutKeepInk(dest, new Map([[frag, []]]));
     } else {
       const cap = maxRows(dest);
-      if (rowsBefore(dest, frag) + linesOf(frag) < cap) {
-        const old = linesOf(frag);
-        frag.meetLines = old + 1;
-        shiftBelow(dest, frag.y + old * ROW, ROW);
-        relayout(dest);
+      if (visualRows(dest) + 1 <= cap) {
+        relayoutKeepInk(dest, null, () => { frag.meetLines = linesOf(frag) + 1; });
       }
     }
     return next.inserted;
@@ -265,11 +294,10 @@
       const old = linesOf(t);
       let inserted = false;
       // Make room by moving later items onto a continuation page when this page would overflow.
-      if (rowsBefore(pg, t) + old + 1 + meetTasks(pg).filter(x => (x.meetingRow ?? 0) > (t.meetingRow ?? 0)).reduce((s, x) => s + linesOf(x), 0) > cap) {
+      if (visualRows(pg) + 1 > cap && meetTasks(pg).some(x => x !== t && (x.meetingRow ?? 0) > (t.meetingRow ?? 0))) {
         inserted = evictAfter(pi, t) || inserted;
       }
-      const room = cap - rowsBefore(pg, t);
-      if (old >= room) {
+      if (rowsBefore(pg, t) + linesOf(t) + 1 > cap) {
         inserted = addContFragment(pi, t) || inserted;
         saveNote(n, true);
         if (inserted) { if (!(typeof drawing === 'object' && drawing)) buildPages(); else { renderPageInk(pi); renderOverlay(pi); } }
@@ -328,6 +356,30 @@
       if (changed) { reindex(pg); relayout(pg); }
     }
     return changed;
+  }
+
+  /* v21er: remove ONE extra line from an item, only when that last line is empty (never loses ink) */
+  function lastLineEmpty(pg, t) {
+    if (!pg || !t || linesOf(t) < 2) return false;
+    const y0 = t.y - 8 + (linesOf(t) - 1) * ROW, y1 = t.y - 8 + linesOf(t) * ROW + 8;
+    /* any tool (highlighter too), anywhere across the band, plus typed text and photos */
+    const inLast = (x, y) => x >= 40 && x <= 960 && y >= y0 && y <= y1;
+    if ((pg.strokes || []).some(s => (s.points || []).some(p => inLast(p[0], p[1])))) return false;
+    if ((pg.texts || []).some(x => inLast(x.x + 1, x.y + 10))) return false;
+    if ((pg.images || []).some(im => im && !im.hidden && im.y + (im.h || 0) >= y0 && im.y <= y1 && im.x + (im.w || 0) >= 40)) return false;
+    return lastUsedLine(pg, t) < linesOf(t) - 1;
+  }
+  function shrinkLast(pi, t) {
+    const n = curNote(), pg = n && n.pages[pi];
+    if (!isMeeting(pg) || !t || sealed(n) || !lastLineEmpty(pg, t)) return false;
+    pushHistory();
+    const old = linesOf(t);
+    t.meetLines = old - 1;
+    shiftBelow(pg, t.y + old * ROW - 8, -ROW);
+    relayout(pg);
+    saveNote(n, true);
+    renderPageInk(pi); renderOverlay(pi);
+    return true;
   }
 
   /* ---------- add / overflow (replaces v21ej addAction; + Action task still adds one item) ---------- */
@@ -427,14 +479,16 @@
       ctx.strokeStyle = c.line; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(60, y); ctx.lineTo(INK_RIGHT, y); ctx.stroke();
       if (check) { ctx.strokeStyle = c.muted; ctx.lineWidth = 1.6; ctx.strokeRect(64, y - 40, 26, 26); }
     };
-    for (const t of frags) {
-      if (visual >= cap) break;
-      for (let k = 0; k < linesOf(t) && visual < cap; k++, visual++) drawLine(top + (visual + 1) * ROW, false);
-    }
+    /* v21er: same order as layout()/rowY — checkbox slots first, then continuation fragments — so drawn rules and
+       checkboxes always line up with the items and their ink */
     for (let i = 0; i < slots && visual < cap; i++) {
       const t = byRow.get(i);
       const nLines = t ? linesOf(t) : 1;
       for (let k = 0; k < nLines && visual < cap; k++, visual++) drawLine(top + (visual + 1) * ROW, k === 0 && !t?.continueFrom);
+    }
+    for (const t of frags) {
+      if (visual >= cap) break;
+      for (let k = 0; k < linesOf(t) && visual < cap; k++, visual++) drawLine(top + (visual + 1) * ROW, false);
     }
     ctx.restore();
   };
@@ -442,6 +496,7 @@
 
   const _ensure = ensureMeetingActionLines;
   ensureMeetingActionLines = function (pg) {
+    if (blockRowTap) return 0;   // v21er: only during a guarded tap (see the pointerup guard below)
     if (!isMeeting(pg)) return _ensure(pg);
     migrateMeet(pg);
     const cap = maxRows(pg);
@@ -509,6 +564,8 @@
     }
   };
 
+  let epTap = null;
+  document.addEventListener('pointerdown', e => { epTap = e.pointerType === 'pen' ? null : { x: e.clientX, y: e.clientY, at: Date.now(), pid: e.pointerId }; }, true);
   /* Don't let a tap on a continuation line create a new checkbox (v21ej capture handler). */
   document.addEventListener('pointerup', e => {
     if (e.pointerType === 'pen' || !e.target?.closest?.('.page')) return;
@@ -519,13 +576,38 @@
     const x = (e.clientX - rect.left) * PAGE_W / rect.width;
     if (x < 40 || x > INK_RIGHT + 8) return;
     const t = meetTasks(pg).find(it => y >= it.y - 12 && y <= it.y - 8 + linesOf(it) * ROW + 4);
-    if (t && y > t.y + 40) e.stopImmediatePropagation();
+    if (!t) return;
+    /* v21er: v21ej maps a tap to a visual row, which is not the item index once an item has several lines —
+       so the first line toggles THIS item here, and continuation lines never create a checkbox. */
+    /* v21er: don't stopImmediatePropagation (that also swallowed the pointerup the v7 press/hold handlers need, so
+       a finger tap could leave a task "lifted"); instead make v21ej's row-tap see zero rows for this one event. */
+    blockRowTap = true; setTimeout(() => { blockRowTap = false; }, 0);
+    const d = epTap; epTap = null;
+    const quick = d && d.pid === e.pointerId && Date.now() - d.at <= 350 && Math.hypot(e.clientX - d.x, e.clientY - d.y) <= 6;
+    if (quick && y <= t.y + 40 && !t.continueFrom && !e.target.closest('button, .task, input, .rec-panel')) addAction(pi, t.meetingRow);
   }, true);
 
   const prevEd = openEditor;
   openEditor = function (item, isNew) {
+    const pg0 = item?.note?.pages[item.page], t0 = item?.obj;
+    /* v21er: a visual row is not the slot index once items have several lines — map the drop point to its slot first */
+    let slot = null, linesBefore = null;
+    if (isNew && item?.type === 'task' && isMeeting(pg0) && t0 && !t0.continueFrom && t0.y >= actionTop(pg0)) {
+      const L = layout(pg0), vr = Math.floor((t0.y - actionTop(pg0)) / ROW);
+      linesBefore = Number.isInteger(pg0.bg.actionLines) ? pg0.bg.actionLines : 0;
+      const slots = L.slotStart.length;
+      for (let i = 0; i < slots; i++) {
+        const st = L.slotStart[i], owner = slotTask(pg0, i), span = owner && owner !== t0 ? spanOf(owner) : 1;
+        if (vr >= st && vr < st + span) { slot = i; break; }   // same slot as before v21er (even if taken)
+      }
+      if (slot == null) slot = vr >= L.total ? slots + Math.max(0, vr - L.total) : slots;
+    }
     const r = prevEd.apply(this, arguments);
     const pg = item?.note?.pages[item.page], t = item?.obj;
+    if (slot != null && pg && t) {
+      t.meetingRow = slot;
+      pg.bg.actionLines = Math.max(linesBefore, slot + 1, meetTasks(pg).filter(x => !x.continueFrom && x !== t).length + 1);
+    }
     if (item?.type === 'task' && isMeeting(pg) && t && t.meetingRow != null && !t.continueFrom) {
       t.y = rowY(t.meetingRow, pg);
     }
@@ -535,7 +617,7 @@
   const prevStroke = window.onStrokeAdded;
   window.onStrokeAdded = function (pi, st) {
     if (typeof prevStroke === 'function') prevStroke(pi, st);
-    maybeGrow(pi, st);
+    if (AUTO_GROW) maybeGrow(pi, st);
     const pg = curNote()?.pages[pi];
     // Re-render after the stroke is in IndexedDB-backed page data so the placeholder can hide.
     if (isMeeting(pg) && st && st.tool !== 'highlighter') renderOverlay(pi);
@@ -548,14 +630,14 @@
     const last = d.stroke.points && d.stroke.points[d.stroke.points.length - 1];
     if (!last) return;
     const pg = curNote()?.pages[d.pi];
-    if (!isMeeting(pg) || growing) return;
+    if (!AUTO_GROW || !isMeeting(pg) || growing) return;
     if (itemAtLastLine(pg, last[0], last[1])) growTask(d.pi, itemAtLastLine(pg, last[0], last[1]));
   }, { passive: true });
 
   const prevOpen = openNote;
   openNote = function (id) {
     const n = S.notes.find(x => x.id === id);
-    if (n) {
+    if (n && SHRINK_ON_OPEN) {
       const changed = shrinkNote(n);
       if (changed) saveNote(n, true);
     }
@@ -571,12 +653,14 @@
 
   window.V21ep = {
     version: 'v21ep', addAction, rowY, maxRows, visualRows, linesOf, hasInk, growTask, maybeGrow,
-    shrinkNote, meetTasks, INK_LEFT, INK_RIGHT, BELL_X, BELL_W, migrateMeet, relayout
+    shrinkNote, meetTasks, INK_LEFT, INK_RIGHT, BELL_X, BELL_W, migrateMeet, relayout,
+    shrinkLast, lastLineEmpty, lastUsedLine, isMeeting, AUTO_GROW, SHRINK_ON_OPEN,
+    layout
   };
 
   const ready = () => {
     const n = typeof curNote === 'function' && curNote();
-    if (n && shrinkNote(n)) {
+    if (n && SHRINK_ON_OPEN && shrinkNote(n)) {
       saveNote(n, true);
       if (typeof buildPages === 'function' && document.getElementById('pagesInner')) buildPages();
     }
