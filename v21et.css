@@ -1,0 +1,6 @@
+/* Pencil Notes v21et — the read-value chips under a quote line no longer take touches at all (Apple Pencil writes straight onto
+   the page under them; a finger tap is hit-tested by v21et.js), and they fade while the Pencil is writing so the ink under them shows. */
+.page .overlay .qt-wrapui .qt-ui { pointer-events: none !important; }
+.page .overlay .qt-wrapui .qt-ui::before { display: none; }
+.page .overlay .qt-wrapui { transition: opacity .15s ease; }
+#pages.qt-pen .page .overlay .qt-wrapui { opacity: .18; }

@@ -265,7 +265,7 @@
       const ov = last ? Math.min(last[1], o.b[2]) - Math.max(last[0], o.b[0]) : -1, minW = last ? Math.max(1, Math.min(last[1] - last[0], o.b[2] - o.b[0])) : 1;
       if (last && ov >= 0.4 * minW - 1) { last[0] = Math.min(last[0], o.b[0]); last[1] = Math.max(last[1], o.b[2]); } else g.push([o.b[0], o.b[2]]); }
     const cands = ink.filter(o => small(o)).map(o => ({ o, cx: (o.b[0] + o.b[2]) / 2, cy: (o.b[1] + o.b[3]) / 2 }))
-      .filter(d => d.cy >= top + 0.55 * lineH && d.cy <= bot + 0.35 * lineH)                                // sits low, on the baseline
+      .filter(d => (d.cy >= top + 0.55 * lineH || (d.o.b[2] - d.o.b[0]) >= 1.8 * Math.max(1, d.o.b[3] - d.o.b[1]) && d.cy >= top + 0.4 * lineH) && d.cy <= bot + 0.35 * lineH)   // sits low, on the baseline (v21et: or a short dash at mid-height — Joseph's 5-46)
       .map(d => ({ ...d, left: g.filter(x => (x[0] + x[1]) / 2 < d.cx).length, right: g.filter(x => (x[0] + x[1]) / 2 > d.cx).length }))
       .filter(d => d.right > 0);                                                                          // v21es: left 0 = a leading point (.85)
     if (!cands.length) return null;
@@ -273,7 +273,9 @@
     return { left: d.left, right: d.right, glyphs: g.length, x: d.cx, y: d.cy };
   }
   function applyDot(text, info) {
-    const t = String(text == null ? '' : text); if (!info || !info.right) return t;
+    let t = String(text == null ? '' : text); if (!info || !info.right) return t;
+    // v21et: a point read as a dash / tick / gap ("5-46", "74 26") — the ink says there is ONE number with a point: join the digit groups first
+    if (!t.includes('.') && !/\d\s*[x×/]\s*\d/i.test(t)) t = t.replace(/(\d)\s*[-\u2010-\u2014\u00b7\u2022\u2219\u2027'` ]\s*(?=\d)/g, '$1');
     // v21es: a read that already starts with a point (.85), or has a thousands comma (1,250 — the comma is a small low stroke too), is kept as read
     if (/(^|[^\d])\.\d/.test(t) || /\d,\d{3}(?!\d)/.test(t)) return t;
     return t.replace(/\d[\d,]*(?:\.\d+)?/, (num, at0) => {

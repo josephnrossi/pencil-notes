@@ -30,7 +30,9 @@
     const fn = (window.V21e4 && V21e4.recognizeStrokes) || (typeof transcribe === 'function' ? transcribe : null);
     if (!fn) return null;
     if (typeof HW !== 'undefined' && HW.state === 'ready') return { name: 'device', fn };
-    try { if (typeof aiReady === 'function' && aiReady()) return { name: 'grok', fn }; } catch (_) {}
+    // v21et: the Grok path calls transcribe() directly. V21e4.recognizeStrokes swallowed every error (timeout, HTTP 429, offline)
+    // and returned '', and that '' was cached as the cell's read, so one failed request left "? can't read" on the cell for good.
+    try { if (typeof aiReady === 'function' && aiReady()) return { name: 'grok', fn: typeof transcribe === 'function' ? (s, c) => transcribe(s, c) : fn }; } catch (_) {}
     return null;
   }
   const engineLabel = () => { const e = engine(); return !e ? '' : e.name === 'device' ? 'on-device handwriting recognition' : e.name === 'grok' ? (typeof aiModel === 'function' ? aiModel() : 'Grok') : 'test recognizer'; };
@@ -74,6 +76,13 @@
       }).join('');
     });
   }
+  /* v21et: a vision model sometimes wraps the read ("The quantity is 3725", "**74.26**", "`5.46`", "Price: $31.26."). Strip
+     the wrapper so the number is parsed instead of the line being flagged as text. Only label words / markdown are removed. */
+  function cleanRead(s) {
+    let t = String(s == null ? '' : s).replace(/[*_`“”"]+/g, ' ').replace(/^\s*\[unreadable\]\s*$/i, '');
+    t = t.replace(/^\s*(?:the\s+)?(?:handwriting|ink|text|number|value|quantity|qty|price|amount|transcription|answer)\b[^\d$.]*?(?:\bis\b|\breads?\b|\bsays\b|:)\s*/i, '');
+    return t.replace(/(\d)\.\s*$/, '$1').trim();
+  }
   const SIZE_RE = /(\d|\.\d)\s*x\s*[\d.]|\d\s*\/\s*\d|\d\s*(?:"|''|in\b|ft\b|mm\b|cm\b)/i;
   /** "3,725" / "1,250.50" / "2,10" / ".85" → {n: Number, s: canonical string} or null. */
   function numTok(tok) {
@@ -88,7 +97,7 @@
   /** Quantity → { ok, v, qm (thousandths), why } */
   function qtyOf(s) {
     if (s == null) return { ok: false, why: 'empty' };
-    let t = fixDigits(s, 'qty').toLowerCase().trim(); if (!t) return { ok: false, why: 'empty' };
+    let t = fixDigits(cleanRead(s), 'qty').toLowerCase().trim(); if (!t) return { ok: false, why: 'empty' };   // v21et: cleanRead
     t = t.replace(/@.*$/, '').replace(/\b(qty|quantity|pcs?|pieces?|ea|each|units?|sheets?|shts?|sht|nos?|no\.)\b\.?/g, ' ').replace(/[#=:]/g, ' ').replace(/^\s*[x*]\s*(?=[\d.])/, '').trim();
     if (!t) return { ok: false, why: 'empty' };
     if (SIZE_RE.test(t)) return { ok: false, why: 'size' };
@@ -104,7 +113,10 @@
   /** Price → { ok, v (the written number), pu (v in 1/10000 $), per (1 | 100 | 1000), why } */
   function priceOf(s) {
     if (s == null) return { ok: false, why: 'empty' };
-    let t = fixDigits(s, 'price').toLowerCase().trim(); if (!t) return { ok: false, why: 'empty' };
+    let t = fixDigits(cleanRead(s), 'price').toLowerCase().trim(); if (!t) return { ok: false, why: 'empty' };   // v21et: cleanRead
+    // v21et: Joseph's decimal point is often a short dash or tick (the "5-46" on his quote sample): in a price, digits–dash–1 or 2
+    // digits is a decimal point. A lone "74 26" (point read as a gap) is too. Sizes (x, /) never get here as a price.
+    if (!t.includes('.') && !SIZE_RE.test(t)) t = t.replace(/^([$\s]*\d+)\s*[-\u2010-\u2014\u00b7\u2022\u2219\u2027'`]\s*(\d{1,2})(?!\d)/, '$1.$2').replace(/^([$\s]*\d{1,4}) (\d{2})$/, '$1.$2');
     let per = 1;
     const PERM = /\s*(?:\/|per\b|@)\s*(?:m|mil|thousand|1,?000)\b\.?|\s+m\b\.?|(?<=\d)m\b\.?/, PERC = /\s*(?:\/|per\b)\s*(?:c|cwt|hundred|100)\b\.?/, PERK = /\s*(?:\/|per\b)\s*k\b\.?/;
     if (PERM.test(t)) { per = 1000; t = t.replace(PERM, ' '); } else if (PERK.test(t)) { per = 1000; t = t.replace(PERK, ' '); } else if (PERC.test(t)) { per = 100; t = t.replace(PERC, ' '); }
@@ -177,7 +189,7 @@
     if (!ink.length) return { ...base, v: null, p: null, text: '', src: 'empty' };
     const hwc = pg.hwc || {};
     if (sig in hwc) return val(hwc[sig], 'read');
-    return { ...base, v: null, p: null, text: '', src: engine() ? (failed.has(sig) ? 'error' : 'pending') : 'noengine' };
+    return { ...base, v: null, p: null, text: '', src: engine() ? (failed.has(sig) && retryAt.get(sig) === Infinity ? 'error' : 'pending') : 'noengine' };   // v21et: 'reading…' while a failed read is being retried
   }
   const failed = new Set();
   /** Totals for one quote: lines [{r, qty, price, cents, total, flag}], totalCents, total, flagged count. Blank or unread
@@ -206,14 +218,21 @@
     for (const q of pg.qsheet.quotes) for (let r = 0; r < q.lines; r++) for (const f of ['qty', 'price']) {
       const ink = rowInk(pg, q, r)[QF[f]]; if (!ink.length) continue;
       const sig = sigOf(ink); if (sig in pg.hwc) continue;
+      if (failed.has(sig) && Date.now() < (retryAt.get(sig) || 0)) { if (retryAt.get(sig) !== Infinity) retrySoon(n, pi, retryAt.get(sig) - Date.now()); continue; }   // v21et: backing off after a failed read
       try { let t = await recognize(ink, { field: f });
+        // v21et: an empty read ("[unreadable]", or a reply with no text) is retried twice before it is kept as "? can't read"
+        if (!String(t).trim() && (tries.get(sig) || 0) < 2) { tries.set(sig, (tries.get(sig) || 0) + 1); failed.add(sig); retryAt.set(sig, Date.now() + RETRY_MS); retrySoon(n, pi); continue; }
         // v21es: the decimal point comes from the ink on every reader (it used to be put back only on the Grok path)
         if (f === 'price' && window.V21el && V21el.enabled && V21el.HWClean) { const H = V21el.HWClean, d = H.dotInfo(ink); if (d) { const o = H.applyDot(t, d); if (o !== t) { V21el.dotFixes.push({ read: t, fixed: o, dot: d }); t = o; } } }
-        pg.hwc[sig] = t; failed.delete(sig); changed = true; } catch (e) { if (!e.none) failed.add(sig); }
+        pg.hwc[sig] = t; failed.delete(sig); tries.delete(sig); retryAt.delete(sig); changed = true; }
+      catch (e) { if (!e.none) { failed.add(sig); const k = (tries.get(sig) || 0) + 1; tries.set(sig, k); if (k <= 3) { retryAt.set(sig, Date.now() + RETRY_MS * k); retrySoon(n, pi, RETRY_MS * k); } else retryAt.set(sig, Infinity); } }   // v21et: retried (backoff), never cached as ''
       if (curNote() === n) refreshOverlay(pi);
     }
     return changed;
   }
+  const tries = new Map(), retryAt = new Map(), retryT = new Map(); let RETRY_MS = 4000;
+  function retrySoon(n, pi, wait) { const k = n.id + ':' + pi; if (retryT.has(k)) return;
+    retryT.set(k, setTimeout(() => { retryT.delete(k); readTotals(n, pi).then(ch => { if (ch) persist(n); if (curNote() === n) refreshOverlay(pi); }).catch(() => {}); }, Math.max(50, wait != null ? wait : RETRY_MS) + 50)); }
   const refreshOverlay = pi => { const n = curNote(); if (n && pageEls[pi]) try { renderOverlay(pi); } catch (_) {} };
 
   const FLAG_TXT = { reading: 'reading…', unreadable: '? can’t read', noengine: 'tap to enter', noqty: '? no qty', noprice: '? no price', size: '? size, not a number' };
@@ -499,7 +518,9 @@
     for (const g of groups) {
       if (g.sig in pg.hwc) continue;
       if (!have) { partial = true; continue; }
-      try { pg.hwc[g.sig] = await recognize(g.strokes, { field: g.box && g.box.key || 'text' }); failed.delete(g.sig); } catch (e) { partial = true; if (!e.none) failed.add(g.sig); }
+      try { const t = await recognize(g.strokes, { field: g.box && g.box.key || 'text' });
+        if (!t && g.box && QF[g.box.key] != null) { partial = true; continue; }   // v21et: an empty qty/price read is not cached (the totals pass retries it)
+        pg.hwc[g.sig] = t; failed.delete(g.sig); } catch (e) { partial = true; if (!e.none) failed.add(g.sig); }
       if (pageSig(pg) !== sig) return indexPage(n, pg);      // edited while reading → start that page over
     }
     const keep = new Set(groups.map(g => g.sig)), hwc = {};
@@ -663,7 +684,7 @@
   whenReady(() => setTimeout(() => { if (engine() && engine().name === 'device') backfill(); const n = curNote(); if (n) enqueue(n); }, 1500));
 
   window.V21ee = { version: 'v21ee', TOTALS_DELAY: 1200, INDEX_DELAY: 2500, stats,
-    setRecognizer(fn) { testRecognizer = fn; }, engine, parseQty, parsePrice, qtyOf, priceOf, lineCents, fmtCents, fixDigits, rowInk, cellVal, quoteTotals, readTotals, openFix, closeFix,
+    setRecognizer(fn) { testRecognizer = fn; }, cleanRead, setRetryMs(ms) { RETRY_MS = ms; }, retryState: () => ({ tries: [...tries], failed: [...failed] }), engine, parseQty, parsePrice, qtyOf, priceOf, lineCents, fmtCents, fixDigits, rowInk, cellVal, quoteTotals, readTotals, openFix, closeFix,
     insertTodo, tdLayout, tdAddRow, tdRemoveRow, tdToggle, tdToggleTomorrow, TD,
     groupsFor, indexPage, enqueue, backfill, search, openHit, renderResults, pageThumb, IX, idle: () => !IX.running && !IX.queue.length };
 })();

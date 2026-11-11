@@ -2,7 +2,7 @@
    One ＋ Insert menu, one grouped Settings screen, a Gestures sheet, a short first-run tour,
    Undo for every delete, a safe importer, storage-full handling and lock hardening.
    Nothing is removed — features are only reached through fewer, more consistent doors. */
-const APP_VERSION = 'v21es';   // v21es: meeting ＋|− pair (remove a line or an item, undoable); Idea Board handwritten card titles, items into/out of cards (hold-drag), cards in cards (groups), vanishing-ink fixes
+const APP_VERSION = 'v21et';   // v21et: Quote Qty/Price audit — failed reads retried (not cached as blank), wrapped reads parsed, dash decimal (5-46), read chips no longer intercept the Pencil
 
 /* ---------- import sanitizer: hostile backups must not inject markup ----------
    Rendering escapes free text, but ids/enums/colors are interpolated into attributes, so they are
