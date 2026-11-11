@@ -13,7 +13,7 @@
   const PAGES = document.getElementById('pages'); if (!PAGES) return;
   const chipAt = (x, y) => {   // finger tap → the chip under it (44px-tall target, ≥44px wide), nearest centre wins
     let best = null, bd = Infinity;
-    for (const b of PAGES.querySelectorAll('.qt-wrapui .qt-ui')) { const r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    for (const b of PAGES.querySelectorAll('.page .overlay .qt-ui.qt-val')) { const r = b.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
       const hw = Math.max(22, r.width / 2), hh = Math.max(22, r.height / 2); if (Math.abs(x - cx) > hw || Math.abs(y - cy) > hh) continue;
       const d = Math.hypot(x - cx, (y - cy) * 2); if (d < bd) { bd = d; best = b; } }
     return best;

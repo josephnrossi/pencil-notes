@@ -441,13 +441,13 @@
     const n = curNote(), rec = pageEls[pi], pg = n && n.pages[pi]; if (!rec || !pg) return;
     rec.ov.querySelectorAll('.qt-ui, .qt-wrapui, .td-ui, .hw-hit').forEach(b => b.remove());
     if (sealed(n)) return;
-    try { if (pg.qsheet) drawTotalsUI(pi, pg, rec); else if (pg.todo) drawTodoUI(pi, pg, rec); } catch (e) { console.warn('v21ee overlay', e); }
+    try { if (pg.qsheet) window.V21ee.drawTotalsUI(pi, pg, rec); else if (pg.todo) drawTodoUI(pi, pg, rec); } catch (e) { console.warn('v21ee overlay', e); }
     if (HL && HL.note === n.id && HL.page === pg.id && Date.now() < HL.until) drawHit(rec, HL.bb);
   };
   PAGES.addEventListener('click', e => {
     const b = e.target.closest('.qt-ui, .td-ui'); if (!b || b.classList.contains('td-strike')) return; e.stopPropagation(); e.preventDefault();
     const pi = +b.closest('.page[data-pi]').dataset.pi;
-    if (b.classList.contains('qt-ui')) { const row = b.dataset.row != null ? b.dataset.row : b.dataset.vrow; openFix(pi, b.dataset.q, row != null ? +row : null, b.dataset.f || null); }
+    if (b.classList.contains('qt-ui')) { const row = b.dataset.row != null ? b.dataset.row : b.dataset.vrow; window.V21ee.openFix(pi, b.dataset.q, row != null ? +row : null, b.dataset.f || null); }
     else if (b.classList.contains('td-check')) tdToggle(pi, b.dataset.id);
     else if (b.classList.contains('td-addline')) tdAddRow(pi);
     else if (b.classList.contains('td-delrow')) tdRemoveRow(pi, b.dataset.id);
@@ -463,7 +463,7 @@
       if (pg.todo && !pg.qsheet) { const L = tdLayout(pg.todo); L.priRows.concat(L.rows).forEach((R, i) => { const it = pg.todo.pri.concat(pg.todo.rows)[i]; if (it.done) { drawTick(ctx, R.check); ctx.save(); ctx.strokeStyle = 'rgba(34,165,90,.55)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(R.write.x, R.y + R.h * 0.62); ctx.lineTo(R.write.x + R.write.w, R.y + R.h * 0.62); ctx.stroke(); ctx.restore(); } }); }
       if (pg.qsheet) {
         ctx.save(); ctx.textAlign = 'right'; ctx.textBaseline = 'alphabetic';
-        for (const q of pg.qsheet.quotes) { const L = Q.qLayout(q), T = quoteTotals(pg, q);
+        for (const q of pg.qsheet.quotes) { const L = Q.qLayout(q), T = window.V21ee.quoteTotals(pg, q);
           ctx.fillStyle = 'rgba(79,70,229,.85)'; ctx.font = `600 13px ${FONT}`;
           for (const ln of T.lines) if (ln.total != null) { const c = L.rows[ln.r][3]; ctx.fillText('= ' + fmtMoney(ln.total), c.x + c.w - 8, c.y + c.h - 5); }
           if (T.total != null) { ctx.font = `700 17px ${FONT}`; ctx.fillStyle = '#1d1d1f'; ctx.fillText('Total ' + fmtMoney(T.total) + (T.flagged ? ` (${T.flagged} line${T.flagged > 1 ? 's' : ''} unread)` : ''), L.x + L.w - 16, L.add.y + 25); } }
@@ -516,6 +516,7 @@
     if (!have && !groups.some(g => g.sig in had)) return false;          // nothing to read with and nothing cached: leave the page untouched
     pg.hwc = had; let partial = false;
     for (const g of groups) {
+      if (g.box && (g.box.key === 'qty' || g.box.key === 'price')) continue;   // v21eu: Qty/Price are typed, never recognized
       if (g.sig in pg.hwc) continue;
       if (!have) { partial = true; continue; }
       try { const t = await recognize(g.strokes, { field: g.box && g.box.key || 'text' });
@@ -523,9 +524,9 @@
         pg.hwc[g.sig] = t; failed.delete(g.sig); } catch (e) { partial = true; if (!e.none) failed.add(g.sig); }
       if (pageSig(pg) !== sig) return indexPage(n, pg);      // edited while reading → start that page over
     }
-    const keep = new Set(groups.map(g => g.sig)), hwc = {};
+    const keep = new Set(groups.filter(g => !(g.box && (g.box.key === 'qty' || g.box.key === 'price'))).map(g => g.sig)), hwc = {};   // v21eu: drop cached Qty/Price reads
     for (const k in pg.hwc) if (keep.has(k)) hwc[k] = pg.hwc[k];
-    // the qty / price cells are groups too, so the totals cache survives this prune
+    // v21eu: Qty/Price reads are dropped here; typed values live on q.typed
     pg.hwc = hwc;
     pg.hwIdx = { v: 1, sig, partial, at: Date.now(), items: groups.filter(g => hwc[g.sig]).map(g => ({ k: g.label === 'Handwriting' ? 'ink' : 'field', label: g.label, t: hwc[g.sig], bb: g.bb.map(v => Math.round(v)) })) };
     return true;
@@ -552,7 +553,7 @@
     if (!note || locked(note)) return;
     clearTimeout(IX.timers.get('t' + note.id)); clearTimeout(IX.timers.get('i' + note.id));
     if (note.pages.some(p => p.qsheet)) IX.timers.set('t' + note.id, setTimeout(async () => {
-      let ch = false; for (let i = 0; i < note.pages.length; i++) if (note.pages[i].qsheet) { if (await readTotals(note, i)) ch = true; if (curNote() === note) refreshOverlay(i); }
+      let ch = false; for (let i = 0; i < note.pages.length; i++) if (note.pages[i].qsheet) { if (await window.V21ee.readTotals(note, i)) ch = true; if (curNote() === note) refreshOverlay(i); }
       if (ch) persist(note);
     }, V21ee.TOTALS_DELAY));
     IX.timers.set('i' + note.id, setTimeout(() => enqueue(note, true), V21ee.INDEX_DELAY));
@@ -684,7 +685,7 @@
   whenReady(() => setTimeout(() => { if (engine() && engine().name === 'device') backfill(); const n = curNote(); if (n) enqueue(n); }, 1500));
 
   window.V21ee = { version: 'v21ee', TOTALS_DELAY: 1200, INDEX_DELAY: 2500, stats,
-    setRecognizer(fn) { testRecognizer = fn; }, cleanRead, setRetryMs(ms) { RETRY_MS = ms; }, retryState: () => ({ tries: [...tries], failed: [...failed] }), engine, parseQty, parsePrice, qtyOf, priceOf, lineCents, fmtCents, fixDigits, rowInk, cellVal, quoteTotals, readTotals, openFix, closeFix,
+    setRecognizer(fn) { testRecognizer = fn; }, cleanRead, setRetryMs(ms) { RETRY_MS = ms; }, retryState: () => ({ tries: [...tries], failed: [...failed] }), engine, parseQty, parsePrice, qtyOf, priceOf, lineCents, fmtCents, fmtNum, fmtPrice, perTxt, fixDigits, fixKey, rowInk, cellVal, quoteTotals, readTotals, drawTotalsUI, openFix, closeFix,
     insertTodo, tdLayout, tdAddRow, tdRemoveRow, tdToggle, tdToggleTomorrow, TD,
     groupsFor, indexPage, enqueue, backfill, search, openHit, renderResults, pageThumb, IX, idle: () => !IX.running && !IX.queue.length };
 })();

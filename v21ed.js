@@ -239,7 +239,8 @@
       return false;
     }
     pushHistory(); takeInk(pg, row);
-    q.lines--; pg.qsheet.quotes.slice(qi + 1).forEach(o => { o.y -= LINE; }); shiftBelow(pg, row.y + LINE, -LINE);
+    q.lines--; if (window.V21eu && V21eu.onRemoveLine) V21eu.onRemoveLine(q, r);   // v21eu: keep typed Qty/Price with their rows
+    pg.qsheet.quotes.slice(qi + 1).forEach(o => { o.y -= LINE; }); shiftBelow(pg, row.y + LINE, -LINE);
     commit(n, [pi], '－ Line removed');
     return true;
   }

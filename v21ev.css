@@ -1,0 +1,23 @@
+/* v21ev — recording badge on the handwritten page, 📁 Recordings sheet, REC label */
+.ev-badge-layer { z-index: 6; pointer-events: none; }
+.ev-recbadge { pointer-events: auto; min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1px solid var(--line, rgba(0,0,0,.15));
+  background: var(--panel, #fff); color: var(--ink, #1d1d1f); font: 600 15px/1 -apple-system, system-ui, sans-serif; display: inline-flex; gap: 6px; align-items: center;
+  box-shadow: 0 1px 4px rgba(0,0,0,.12); cursor: pointer; white-space: nowrap; }
+.ev-recbadge u { color: var(--accent, #0a66d8); text-decoration: none; }
+.ev-sheet { max-width: 640px; width: min(640px, 94vw); max-height: 86vh; display: flex; flex-direction: column; }
+.ev-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ev-head h3 { margin: 0; } .ev-head small { font-weight: 500; opacity: .65; font-size: 14px; margin-left: 6px; }
+.ev-x { min-width: 44px; min-height: 44px; border-radius: 22px; border: 0; background: rgba(127,127,127,.14); color: inherit; font-size: 18px; }
+.ev-list { overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
+.ev-item { border: 1px solid var(--line, rgba(0,0,0,.12)); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.ev-item.focus { outline: 2px solid var(--accent, #0a66d8); }
+.ev-meta { display: flex; flex-direction: column; gap: 2px; } .ev-t { font-size: 17px; } .ev-s { font-size: 13px; opacity: .72; }
+.ev-live { color: #d33; }
+.ev-acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ev-acts button { min-height: 44px; min-width: 44px; padding: 0 14px; border-radius: 22px; border: 1px solid var(--line, rgba(0,0,0,.15)); background: transparent; color: inherit; font-size: 15px; cursor: pointer; }
+.ev-acts button.pri { background: var(--accent, #0a66d8); color: #fff; border-color: transparent; }
+.ev-acts button.danger { color: #d33; margin-left: auto; }
+.ev-pos { font-size: 13px; opacity: .7; font-variant-numeric: tabular-nums; }
+.ev-empty { opacity: .75; padding: 16px 4px; }
+.ev-rec-row { margin-top: 2px; }
+#recMini .ev-rl { font: 800 13px/1 -apple-system, system-ui, sans-serif; letter-spacing: .06em; color: #ff5a5a; }

@@ -1,0 +1,32 @@
+/* Pencil Notes v21eu — typed Qty/Price chips (finger tap only; Pencil writes through) and the number pad. */
+
+/* sit inside the bottom-right of the cell, above the row rule, so writing in the cell stays visible */
+.page .overlay .qt-wrapui.qt-cellui { position: absolute; z-index: 3; transform: translate(-100%, -100%); display: flex; align-items: center; margin: 0; pointer-events: none; }
+.page .overlay .qt-wrapui.qt-cellui.qt-price-pos { transform: translate(0, -100%); }
+.page .overlay .qt-wrapui.qt-cellui .qt-ui { position: relative; left: auto; top: auto; transform: none; margin: 0; pointer-events: none !important; }
+.page .overlay .qt-wrapui.qt-cellui .qt-ui::before { display: none; } /* 44px target is hit-tested in v21et.js, not a CSS box that could steal the Pencil */
+
+.page .overlay .qt-val.empty { min-width: 44px; padding: 0 8px; height: 22px; line-height: 20px; font: 700 11px/20px -apple-system, system-ui, sans-serif;
+  color: var(--accent); background: color-mix(in srgb, var(--surface) 82%, transparent); border: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--line)); letter-spacing: .02em; }
+.page .overlay .qt-val.typed { min-width: 44px; padding: 0 8px; height: 22px; line-height: 20px; font: 700 12px/20px -apple-system, system-ui, sans-serif;
+  color: var(--accent); background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.page .overlay .qt-line { pointer-events: none !important; transform: translate(-100%, -100%); font: 700 12px/16px -apple-system, system-ui, sans-serif; color: var(--accent);
+  background: color-mix(in srgb, var(--surface) 88%, transparent); border-color: transparent; box-shadow: none; }
+.page .overlay .qt-line.last { transform: translate(-100%, -100%); margin-top: 0; }
+.page .overlay .qt-total { pointer-events: none !important; }
+
+/* number pad */
+#qtPad.qt-pad-wrap { z-index: 96; }
+#qtPad .qt-pad { width: min(380px, 100%); }
+#qtPad .qt-pad h3 { margin: 0 0 4px; font: 800 18px/1.25 -apple-system, system-ui, sans-serif; }
+#qtPad .qt-pad .fine { margin: 0 0 12px; }
+#qtPad .qt-disp { width: 100%; box-sizing: border-box; height: 52px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface2, var(--surface));
+  padding: 0 14px; font: 700 26px/52px -apple-system, system-ui, sans-serif; color: var(--text); letter-spacing: .02em; margin: 0 0 12px; }
+#qtPad .qt-keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 0 0 14px; }
+#qtPad .qt-keys button { min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface2, #f3f3f6); color: var(--text);
+  font: 700 20px/1 -apple-system, system-ui, sans-serif; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+#qtPad .qt-keys button[data-k="/M"], #qtPad .qt-keys button[data-k="/C"], #qtPad .qt-keys button[data-k="ea"], #qtPad .qt-keys button[data-k="$"],
+#qtPad .qt-keys button[data-k=","] { font-size: 16px; color: var(--accent); }
+#qtPad .qt-keys button.qt-clear, #qtPad .qt-keys button[data-k="bs"] { font-size: 16px; color: var(--muted); }
+#qtPad .qt-keys button:active { background: var(--accent-soft, color-mix(in srgb, var(--accent) 18%, var(--surface))); }
+#qtPad .sheet-actions { display: flex; gap: 8px; align-items: center; }

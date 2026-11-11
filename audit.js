@@ -2,7 +2,7 @@
    One ＋ Insert menu, one grouped Settings screen, a Gestures sheet, a short first-run tour,
    Undo for every delete, a safe importer, storage-full handling and lock hardening.
    Nothing is removed — features are only reached through fewer, more consistent doors. */
-const APP_VERSION = 'v21et';   // v21et: Quote Qty/Price audit — failed reads retried (not cached as blank), wrapped reads parsed, dash decimal (5-46), read chips no longer intercept the Pencil
+const APP_VERSION = 'v21ev';   // v21ev: recording a meeting files only the recording into 📁 Recordings; the handwritten page stays in its notebook (includes v21eu typed quotes)
 
 /* ---------- import sanitizer: hostile backups must not inject markup ----------
    Rendering escapes free text, but ids/enums/colors are interpolated into attributes, so they are
