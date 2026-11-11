@@ -1,0 +1,57 @@
+/* Pencil Notes v21fa — notebook / page icons, color picker, smoothness tweaks */
+.fa-nbsvg, .fa-pgsvg { --nbc: #5B6B82; --nbring: #8b8f98; --pgfill: color-mix(in srgb, var(--nbc) 12%, #fff); --pgfold: color-mix(in srgb, var(--nbc) 30%, #fff); display: block; flex: none; color: var(--nbc); }
+[data-theme="dark"] .fa-nbsvg, [data-theme="dark"] .fa-pgsvg { --nbring: #c3c6cf; --pgfill: color-mix(in srgb, var(--nbc) 22%, #1b1b20); --pgfold: color-mix(in srgb, var(--nbc) 42%, #1b1b20); }
+.fa-c-blue { --nbc: #3E63DD; } [data-theme="dark"] .fa-c-blue { --nbc: #7B93F5; }
+.fa-c-orange { --nbc: #E8590C; } [data-theme="dark"] .fa-c-orange { --nbc: #FF8F4D; }
+.fa-c-green { --nbc: #2B9A5B; } [data-theme="dark"] .fa-c-green { --nbc: #4CC38A; }
+.fa-c-purple { --nbc: #8E4EC6; } [data-theme="dark"] .fa-c-purple { --nbc: #B98AEE; }
+.fa-c-red { --nbc: #DC3E42; } [data-theme="dark"] .fa-c-red { --nbc: #FF6B6F; }
+.fa-c-teal { --nbc: #0F9488; } [data-theme="dark"] .fa-c-teal { --nbc: #2EC8B4; }
+.fa-c-pink { --nbc: #D23F95; } [data-theme="dark"] .fa-c-pink { --nbc: #F27BC4; }
+.fa-c-amber { --nbc: #C98A00; } [data-theme="dark"] .fa-c-amber { --nbc: #F5C542; }
+.fa-c-indigo { --nbc: #4F46C8; } [data-theme="dark"] .fa-c-indigo { --nbc: #9A94F7; }
+.fa-c-cyan { --nbc: #0784A8; } [data-theme="dark"] .fa-c-cyan { --nbc: #3CC6EA; }
+.fa-c-brown { --nbc: #9A6B47; } [data-theme="dark"] .fa-c-brown { --nbc: #CFA27E; }
+.fa-c-slate { --nbc: #5B6B82; } [data-theme="dark"] .fa-c-slate { --nbc: #A3B1C6; }
+/* sidebar */
+.nb-head .fa-nbi { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; margin-left: -4px; flex: none; }
+.nb.fa-nb > .nb-head .name { color: inherit; }
+.nb.fa-nb > .nb-head.current .name { color: var(--nbc); }
+.nb.fa-nb > .nb-head.current { box-shadow: inset 3px 0 0 var(--nbc); border-radius: 8px; }
+.note-row .fa-pgi { display: inline-flex; align-items: center; justify-content: center; width: 26px; flex: none; margin-left: -2px; }
+.note-row.active .fa-pgsvg { filter: drop-shadow(0 0 0 transparent); }
+.note-row.active { box-shadow: inset 3px 0 0 var(--nbc, var(--accent)); }
+.note-row.empty .s { white-space: normal; }
+.nb-head [data-nblock] { min-width: 44px; min-height: 44px; }
+.fa-search-miss { display: none !important; }
+.nb-head.fa-locked .fa-lockb { color: var(--muted, #777); }
+/* search results */
+.hw-res .fa-pgi-sm { display: inline-flex; vertical-align: -4px; margin-right: 4px; }
+.hw-res .fa-pgi-sm svg { width: 16px; height: 16px; }
+.fa-res-nb { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.fa-res-nb .fa-nbsvg { width: 14px; height: 14px; }
+/* move-to picker */
+#actionBtns .fa-move-nb { display: flex; align-items: center; justify-content: center; gap: 10px; }
+#actionBtns .fa-inline { display: inline-flex; }
+/* recordings */
+.ev-t .fa-pgi-sm { display: inline-flex; vertical-align: -4px; margin-right: 6px; }
+.ev-t .fa-pgi-sm svg { width: 18px; height: 18px; }
+/* color picker */
+.fa-color-wrap { z-index: 1200; }
+.fa-color-sheet { max-width: 440px; width: calc(100% - 32px); padding: 18px; }
+.fa-color-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.fa-color-head h3 { margin: 0; font-size: 18px; }
+.fa-color-head .fine { margin: 2px 0 0; }
+.fa-swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.fa-sw { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 64px; min-width: 44px; border-radius: 14px; border: 2px solid transparent; background: var(--surface2, rgba(127,127,127,.08)); color: var(--text); font-size: 12px; font-weight: 600; }
+.fa-sw.on { border-color: var(--nbc); background: color-mix(in srgb, var(--nbc) 14%, transparent); }
+.fa-sw .fa-nbsvg { width: 30px; height: 30px; }
+.fa-color-foot { display: flex; justify-content: flex-end; margin-top: 14px; }
+.fa-color-foot .btn { min-height: 44px; min-width: 96px; }
+/* collapse: the whole header is the 44px target; the old ▾ button is hidden, a slim chevron shows the state */
+.nb-head [data-toggle].fa-hide { display: none; }
+.nb-head .fa-chev { width: 12px; height: 44px; flex: none; display: inline-flex; align-items: center; justify-content: center; margin-left: 2px; }
+.nb-head .fa-chev::before { content: ''; width: 6px; height: 6px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg) translate(-1px, -1px); transition: transform .15s; }
+.nb-head .fa-chev.col::before { transform: rotate(-45deg); }
+/* empty count pill on the 📁 Recordings row showed as a blank grey dot */
+#evRecRow .cnt:empty { display: none; }

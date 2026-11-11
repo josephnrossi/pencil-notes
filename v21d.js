@@ -61,7 +61,7 @@
       const tasks = n.pages.flatMap(p => p.tasks).concat(n.reminders || []).filter(t => !t.done);
       const od = tasks.filter(t => t.due && new Date(t.due) < now).length;
       const next = tasks.filter(t => t.due && new Date(t.due) >= now).sort((a, b) => new Date(a.due) - new Date(b.due))[0];
-      const sub = [new Date(n.updatedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })];
+      const sub = [(window.__fmtMD || (window.__fmtMD = new Intl.DateTimeFormat([], { month: 'short', day: 'numeric' }))).format(new Date(n.updatedAt))];   // v21fa: cached formatter (toLocaleDateString per row was the main sidebar cost)
       if (noteHasRecording(n)) sub.unshift('🎙');
       if (tasks.length) sub.push(`${tasks.length} open`);
       const hit = q ? searchMatch(n, q) : null;
