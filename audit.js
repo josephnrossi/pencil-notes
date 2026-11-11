@@ -2,7 +2,7 @@
    One ＋ Insert menu, one grouped Settings screen, a Gestures sheet, a short first-run tour,
    Undo for every delete, a safe importer, storage-full handling and lock hardening.
    Nothing is removed — features are only reached through fewer, more consistent doors. */
-const APP_VERSION = 'v21ex';   // v21ex: Quote statuses Just Quote / Live / Dead / Lost Lead-time / Lost Price / Awarded; translucent number-chip colors (Open→Just Quote, Sent→Live, Won→Awarded, Lost→Dead)
+const APP_VERSION = 'v21ey';   // v21ey: meeting recording auto-archives as a transcript in 📁 Recordings (page stays put); lasso Calculate removed; red-team cleanup of leftover UI
 
 /* ---------- import sanitizer: hostile backups must not inject markup ----------
    Rendering escapes free text, but ids/enums/colors are interpolated into attributes, so they are

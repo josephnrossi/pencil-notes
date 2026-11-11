@@ -1,0 +1,17 @@
+/* v21ey — transcript viewer in 📁 Recordings, hide lasso Calculate leftovers */
+#egCalcWrap { display: none !important; }
+.gk-act[data-act="calc"] { display: none !important; }
+
+.ey-tr-sheet { max-width: min(720px, 96vw) !important; width: min(720px, 96vw); height: min(860px, 92vh); max-height: 92vh; padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.ey-tr-sheet .ey-tr-home { position: relative; inset: auto; width: 100% !important; height: 100% !important; left: auto !important; top: auto !important; font-size: 16px; border-radius: 16px; }
+.ey-tr-tools { display: flex; gap: 8px; align-items: center; }
+.ey-44, .ey-tr-sheet .mb-ico, .ey-tr-sheet .mb-mode, .ey-tr-sheet .mb-chip, .ey-tr-sheet .mb-ts, .ey-tr-sheet .mb-sp, .ey-tr-sheet .mb-sp-name { min-height: 44px; min-width: 44px; }
+.ey-tr-sheet .mb-mode { padding: 0 16px; }
+.ey-tr-sheet .ey-pos { font-size: 13px; opacity: .7; font-variant-numeric: tabular-nums; margin-top: 4px; }
+.ey-tr-body { min-height: 0; }
+.ey-pending, .ey-err { color: var(--ink, inherit); opacity: .85; padding: 8px 2px; }
+.ey-err { color: #b45309; }
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .ey-err { color: #92400e; }
+}

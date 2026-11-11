@@ -86,9 +86,12 @@ async function recStart(pi) {
   if (!localStorage.getItem('recConsent')) { if (!(await consentSheet())) return; localStorage.setItem('recConsent', String(Date.now())); }
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
-  catch (e) {
-    infoSheet('🎙 Microphone blocked', e && e.name === 'NotAllowedError' ? '<p>Pencil Notes isn’t allowed to use the microphone.</p><p class="fine">On iPad: tap <b>aA</b> in Safari’s address bar → <b>Website Settings</b> → Microphone → Allow (or Settings → Apps → Safari → Microphone). Then tap Record again.</p>'
-      : `<p>The microphone couldn’t start (${esc(e && (e.name || e.message) || 'unknown error')}). Another app may be using it — close it and try again.</p>`); return; }
+  catch (e1) {
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }  // Safari/iPad: advanced constraints sometimes fail; plain {audio:true} still works
+    catch (e) {
+      infoSheet('🎙 Microphone blocked', e && e.name === 'NotAllowedError' ? '<p>Pencil Notes isn’t allowed to use the microphone.</p><p class="fine">On iPad: tap <b>aA</b> in Safari’s address bar → <b>Website Settings</b> → Microphone → Allow (or Settings → Apps → Safari → Microphone). Then tap Record again.</p>'
+        : `<p>The microphone couldn’t start (${esc(e && (e.name || e.message) || 'unknown error')}). Another app may be using it — close it and try again.</p>`); return; }
+  }
   pg = curNote().pages[pi]; if (!pg.rec) pg.rec = newRec();
   const rec = pg.rec, A = R.active = { noteId: n.id, pageId: pg.id, recId: rec.id, stream, mime: pickMime(), base: rec.dur || 0, segMs: 0, runAt: performance.now(), paused: false, seg: null, srT: new Map(), srGen: 0, interim: '', liveState: 'off' };
   rec.status = 'recording'; rec.startedAt ||= Date.now(); saveNote(n);
@@ -106,7 +109,8 @@ function startSegment(A) {
   mr.ondataavailable = e => { if (e.data && e.data.size) saveChunk(A, seg, e.data); };
   mr.onstop = () => { seg.stopped = true; finishSegment(A, seg); };
   mr.onerror = ev => { console.warn('MediaRecorder error', ev.error || ev); recInterrupted('the recorder hit an error (' + ((ev.error && ev.error.name) || 'unknown') + ')'); };
-  mr.start(REC_SLICE); seg.mime = mr.mimeType || A.mime || 'audio/mp4';
+  try { mr.start(REC_SLICE); } catch (_) { try { mr.start(); } catch (err) { recInterrupted('the recorder could not start (' + ((err && err.name) || 'unknown') + ')'); return; } }
+  seg.mime = mr.mimeType || A.mime || 'audio/mp4';
 }
 async function encChunk(noteId, id, data) {
   if (!lockedOpen(noteId)) return { data };
@@ -144,8 +148,31 @@ function recTick(A) {
   }
   updateRecUI();
 }
-function recPause() { const A = R.active; if (!A) return; if (!A.paused) { A.segMs += performance.now() - A.runAt; A.paused = true; try { A.seg.mr.pause(); } catch (_) {} stopLive(A); }
-  else { A.runAt = performance.now(); A.paused = false; try { A.seg.mr.resume(); } catch (_) {} startLive(A); } rerenderRec(); syncMini(); }
+function recPause() {
+  const A = R.active; if (!A) return;
+  if (!A.paused) {
+    A.segMs += performance.now() - A.runAt; A.paused = true;
+    const mr = A.seg && A.seg.mr;
+    let usedNative = false;
+    if (mr && typeof mr.pause === 'function' && mr.state === 'recording') {
+      try { mr.pause(); usedNative = mr.state === 'paused'; } catch (_) {}
+    }
+    // Safari / iPadOS MediaRecorder often has no pause()/resume() — stop this part and start a new one on Resume, keeping the same stream and recording.
+    if (!usedNative && A.seg) {
+      A.softPause = true;
+      const now = recElapsed(A); A.seg.endAt = now; A.base = now; A.segMs = 0;
+      const old = A.seg; old.after = () => {};
+      try { if (old.mr && old.mr.state !== 'inactive') old.mr.stop(); else finishSegment(A, old); } catch (_) { finishSegment(A, old); }
+    }
+    stopLive(A);
+  } else {
+    A.runAt = performance.now(); A.paused = false;
+    if (A.softPause) { A.softPause = false; startSegment(A); }
+    else { try { A.seg.mr.resume(); } catch (_) { startSegment(A); } }
+    startLive(A);
+  }
+  rerenderRec(); syncMini();
+}
 function recStop(reason) {
   const A = R.active; if (!A || A.stopping) return Promise.resolve(); A.stopping = true;
   const t = recElapsed(A); A.seg.endAt = t; clearInterval(A.tick); stopLive(A);
@@ -221,9 +248,11 @@ async function recRecover() {
   let f = findRec(st.recId); if (!f) { const p = makeTemplatePage('recording', n); p.rec.id = st.recId; n.pages.push(p); f = findRec(st.recId); }
   const r = f.rec; r.segs.push({ asset, mime: blob.type, start: st.start, dur: st.dur || 0, bytes: blob.size }); r.segs.sort((a, b) => a.start - b.start);
   r.dur = Math.max(r.dur || 0, st.start + (st.dur || 0)); r.status = 'done'; (r.interrupted ||= []).push({ t: r.dur, reason: 'Pencil Notes was closed or reloaded while recording', at: Date.now() });
+  if (!r.archivedAt) r.archivedAt = Date.now();
   saveNote(f.n, true); for (const id of st.ids) DB.del('assets', id).catch(() => {});
   if (f.n.id === S.cur) buildPages();
-  toast(`🎙 Recovered ${mmss(st.dur)} from an interrupted recording in “${f.n.title}”`, 5000);
+  toast(`🎙 Recovered ${mmss(st.dur)} from an interrupted recording in “${f.n.title}” — filed in 📁 Recordings`, 5000);
+  if (sttCfg().auto) setTimeout(() => analyzeRec(r.id), 400);
 }
 window.addEventListener('load', () => setTimeout(() => recRecover().catch(e => console.warn('recover', e)), 900));
 
@@ -489,8 +518,10 @@ async function analyzeRec(recId) {
     f = findRec(recId); f.rec.transcript = rec.transcript; f.rec.brief = { engine, at: Date.now(), warn };
     writeBrief(f, brief, engine, warn);
     if (warn) R.lastErr.set(recId, warn);
-    toast(engine === 'Built-in' ? '📋 Meeting Brief ready (built-in — connect Grok in Settings for the full analysis)' : '📋 Meeting Brief ready ✨ ' + engine, 4000);
-  } catch (e) { R.lastErr.set(recId, e.message || String(e)); toast('✗ ' + (e.message || e), 5000); }
+    toast(engine === 'Built-in'
+      ? '📝 Transcript saved to 📁 Recordings (built-in — connect Grok for a full analysis). Your page stays here.'
+      : '📝 Transcript saved to 📁 Recordings ✨ ' + engine + ' — your page stays here', 4000);
+  } catch (e) { R.lastErr.set(recId, e.message || String(e)); toast('✗ ' + (e.message || e) + ' — your recording is saved. Open 📁 Recordings to retry.', 5000); }
   finally { R.busy.delete(recId); rerenderRec(); }
 }
 
@@ -520,19 +551,24 @@ function estH(c) {
   return Math.max(c.btype === 'followup' ? 340 : 170, Math.min(980, 118 + lines * 29));
 }
 function writeBrief(f, b, engine, warn) {
-  /* v21c: ONE Meeting home page (scrollable). Old builds paginated cards across many notebook
-     pages — one half-width card per speaker — so a 4-person meeting spilled onto 3–6 pages and
-     the transcript was truncated to fit PAGE_H. */
+  /* v21ey: the transcript + brief are filed on the recording (rec.briefPack) and opened from
+     📁 Recordings in the existing Brief/Transcript formatting. The handwritten meeting page is
+     left alone — we never insert a Meeting Brief page into the notebook. Existing brief pages
+     (from v21d–v21ev) are updated in place and never deleted. */
   const n = f.n; if (n.id === S.cur) pushHistory();
-  for (const [, i] of briefPagesOf(n, f.rec.id).reverse()) n.pages.splice(i, 1);
-  const recPi = n.pages.findIndex(pg => pg.rec && pg.rec.id === f.rec.id);
   const cards = briefCardsFrom(b, f.rec, engine);
-  for (const c of cards) { c.x = 0; c.y = 0; c.w = PAGE_W - 48; c.h = 1; c._park = true; }  // kept for Inbox sync + search; UI is the home panel
-  const p = makeTemplatePage('assistant', n);
-  p.assist.brief = { rec: f.rec.id, title: b.title || n.title, engine, warn: warn || '', at: Date.now(), unified: true, tab: 'brief', filterSp: '' };
-  p.assist.cards = cards;
-  n.pages.splice(Math.max(0, recPi + 1), 0, p); saveNote(n, true);
-  if (n.id === S.cur) { buildPages(); renderAll(); }
+  for (const c of cards) { c.x = 0; c.y = 0; c.w = PAGE_W - 48; c.h = 1; c._park = true; }
+  f.rec.briefPack = { rec: f.rec.id, title: (b && b.title) || n.title, engine, warn: warn || '', at: Date.now(), unified: true, tab: 'transcript', filterSp: '', cards };
+  f.rec.brief = { engine, at: Date.now(), warn: warn || '' };
+  const existing = briefPagesOf(n, f.rec.id);
+  if (existing.length) {
+    const [pg] = existing[0];
+    const tab = (pg.assist.brief && pg.assist.brief.tab) || 'brief';
+    pg.assist.brief = { rec: f.rec.id, title: f.rec.briefPack.title, engine, warn: warn || '', at: Date.now(), unified: true, tab, filterSp: '' };
+    pg.assist.cards = cards;
+    if (n.id === S.cur) { try { const i = n.pages.indexOf(pg); if (i >= 0 && typeof renderAssist === 'function') renderAssist(i); } catch (_) {} }
+  }
+  saveNote(n, true);
 }
 /** Collapse any legacy multi-page Meeting Brief for a recording into one unified home. */
 function migrateBriefUnified(n, recId) {
