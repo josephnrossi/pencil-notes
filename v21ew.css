@@ -1,0 +1,9 @@
+/* Pencil Notes v21ew — hide any leftover Qty/Price chips, row totals, quote totals, and the number pad /
+   check-numbers sheets. Header chips (.qs-meta) and row buttons (.qs-addline, .qs-delrow, .qs-addq, …) stay. */
+.page .overlay .qt-wrapui,
+.page .overlay .qt-ui,
+.page .overlay .qt-val,
+.page .overlay .qt-line,
+.page .overlay .qt-total,
+.page .overlay .qt-times { display: none !important; pointer-events: none !important; visibility: hidden !important; }
+#qtPad, #qtFix, .qt-fix-wrap, .qt-pad-wrap { display: none !important; }
