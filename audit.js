@@ -2,7 +2,7 @@
    One ＋ Insert menu, one grouped Settings screen, a Gestures sheet, a short first-run tour,
    Undo for every delete, a safe importer, storage-full handling and lock hardening.
    Nothing is removed — features are only reached through fewer, more consistent doors. */
-const APP_VERSION = 'v21ey';   // v21ey: meeting recording auto-archives as a transcript in 📁 Recordings (page stays put); lasso Calculate removed; red-team cleanup of leftover UI
+const APP_VERSION = 'v21ez';   // v21ez: Resin Board pullout (live resin prices + log sheet) beside the Idea Board
 
 /* ---------- import sanitizer: hostile backups must not inject markup ----------
    Rendering escapes free text, but ids/enums/colors are interpolated into attributes, so they are

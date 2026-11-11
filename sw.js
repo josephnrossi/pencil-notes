@@ -1,5 +1,5 @@
-const CACHE = 'pencil-notes-v21ey';
-const ASSETS = ['./', 'index.html', 'styles.css', 'db.js', 'app.js', 'v7.js', 'board.js', 'assist-engine.js', 'assistant.js', 'assistant2.js', 'lock.js', 'record.js', 'audit.js', 'quotes.js', 'graph.js', 'v21.js', 'inbox.js', 'v21d.js', 'v21e.js', 'v21e2.js', 'v21e3.js', 'v21e4.js', 'v21e5.js', 'v21e6.js', 'v21e7.js', 'v21e8.js', 'v21e9.js', 'v21ea.js', 'v21eb.js', 'v21ec.js', 'v21ed.js', 'v21ee.js', 'calcrecog.js', 'calcboard.js', 'calcboard.css', 'v21eg.js', 'v21eg.css', 'v21eh.js', 'v21ei.js', 'v21ej.js', 'v21ek.js', 'v21el.js', 'v21em.js', 'v21en.js', 'v21eo.js', 'v21eo.css', 'v21ep.js', 'v21eq.js', 'v21er.js', 'v21es.js', 'v21ep.css', 'v21eq.css', 'v21er.css', 'v21es.css', 'v21et.js', 'v21et.css', 'v21eu.js', 'v21eu.css', 'v21ev.js', 'v21ev.css', 'v21ew.js', 'v21ew.css', 'v21ex.js', 'v21ex.css', 'v21ey.js', 'v21ey.css', 'authcap.js', 'vendor/msal/msal-browser.min.js', 'vendor/pdfjs/pdf.min.mjs', 'vendor/pdfjs/pdf.worker.min.mjs', 'manifest.json',
+const CACHE = 'pencil-notes-v21ez';
+const ASSETS = ['./', 'index.html', 'styles.css', 'db.js', 'app.js', 'v7.js', 'board.js', 'assist-engine.js', 'assistant.js', 'assistant2.js', 'lock.js', 'record.js', 'audit.js', 'quotes.js', 'graph.js', 'v21.js', 'inbox.js', 'v21d.js', 'v21e.js', 'v21e2.js', 'v21e3.js', 'v21e4.js', 'v21e5.js', 'v21e6.js', 'v21e7.js', 'v21e8.js', 'v21e9.js', 'v21ea.js', 'v21eb.js', 'v21ec.js', 'v21ed.js', 'v21ee.js', 'calcrecog.js', 'calcboard.js', 'calcboard.css', 'v21eg.js', 'v21eg.css', 'v21eh.js', 'v21ei.js', 'v21ej.js', 'v21ek.js', 'v21el.js', 'v21em.js', 'v21en.js', 'v21eo.js', 'v21eo.css', 'v21ep.js', 'v21eq.js', 'v21er.js', 'v21es.js', 'v21ep.css', 'v21eq.css', 'v21er.css', 'v21es.css', 'v21et.js', 'v21et.css', 'v21eu.js', 'v21eu.css', 'v21ev.js', 'v21ev.css', 'v21ew.js', 'v21ew.css', 'v21ex.js', 'v21ex.css', 'v21ey.js', 'v21ey.css', 'v21ez.js', 'v21ez.css', 'resin-data.json', 'authcap.js', 'vendor/msal/msal-browser.min.js', 'vendor/pdfjs/pdf.min.mjs', 'vendor/pdfjs/pdf.worker.min.mjs', 'manifest.json',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'icons/favicon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
@@ -21,6 +21,17 @@ self.addEventListener('fetch', e => {
     if (ics.length > 20000 || !/^BEGIN:VCALENDAR\r?\n/.test(ics) || !/END:VCALENDAR\s*$/.test(ics) || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(ics) || (ics.match(/BEGIN:VCALENDAR/g) || []).length !== 1) { e.respondWith(new Response('Not a valid calendar event', { status: 400, headers: { 'Content-Type': 'text/plain' } })); return; }
     const name = (u.searchParams.get('n') || 'reminder').replace(/[^\w\- ]+/g, '') + '.ics';
     e.respondWith(new Response(ics, { headers: { 'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': 'inline; filename="' + name + '"', 'Cache-Control': 'no-store' } }));
+    return;
+  }
+  // resin-data.json: network-first so an hourly publish is not stuck behind stale-while-revalidate
+  if (u.pathname.endsWith('resin-data.json')) {
+    e.respondWith(fetch(req).then(res => {
+      if (res.ok) caches.open(CACHE).then(c => c.put('resin-data.json', res.clone()));
+      return res;
+    }).catch(async () => {
+      const c = await caches.open(CACHE);
+      return (await c.match('resin-data.json')) || (await c.match(req, { ignoreSearch: true }));
+    }));
     return;
   }
   e.respondWith(caches.open(CACHE).then(async cache => {
