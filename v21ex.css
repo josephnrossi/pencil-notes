@@ -1,0 +1,170 @@
+/* Pencil Notes v21ex — translucent status colors on the quote NUMBER chip
+   (and a matching tint on the status pill). Awarded = diagonal red/white stripes.
+   Text stays high-contrast in light and dark mode so the number is fully readable.
+   Does not change handwriting, ink, or any other Quote sheet chrome. */
+
+/* number + status pills: readable ink on a translucent wash */
+.page .overlay .qs-meta.qs-qnum,
+.page .overlay .qs-meta.qs-status {
+  color: #1d1d1f !important;
+  font-weight: 700;
+}
+.page .overlay .qs-meta.qs-status {
+  max-width: none;
+  font-size: 11px;
+  letter-spacing: -0.01em;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+/* Just Quote = beige */
+.page .overlay .qs-qnum[data-st="justquote"],
+.page .overlay .qs-status[data-st="justquote"] {
+  --er-chip-bg: rgba(210, 180, 140, .42);
+  --er-chip-bd: rgba(166, 124, 82, .55);
+  color: #3b3226 !important;
+}
+/* Live = red */
+.page .overlay .qs-qnum[data-st="live"],
+.page .overlay .qs-status[data-st="live"] {
+  --er-chip-bg: rgba(220, 38, 38, .26);
+  --er-chip-bd: rgba(185, 28, 28, .50);
+  color: #3b1414 !important;
+}
+/* Dead = gray */
+.page .overlay .qs-qnum[data-st="dead"],
+.page .overlay .qs-status[data-st="dead"] {
+  --er-chip-bg: rgba(107, 114, 128, .34);
+  --er-chip-bd: rgba(75, 85, 99, .55);
+  color: #2a2d33 !important;
+}
+/* Lost Lead-time = purple */
+.page .overlay .qs-qnum[data-st="lostlead"],
+.page .overlay .qs-status[data-st="lostlead"] {
+  --er-chip-bg: rgba(126, 34, 206, .26);
+  --er-chip-bd: rgba(107, 33, 168, .50);
+  color: #2e1065 !important;
+}
+/* Lost Price = green */
+.page .overlay .qs-qnum[data-st="lostprice"],
+.page .overlay .qs-status[data-st="lostprice"] {
+  --er-chip-bg: rgba(22, 163, 74, .28);
+  --er-chip-bd: rgba(21, 128, 61, .50);
+  color: #14532d !important;
+}
+/* Awarded = translucent diagonal red + white stripes.
+   background-color is a representative blend so contrast tests (and fallbacks) still read a solid. */
+.page .overlay .qs-qnum[data-st="awarded"],
+.page .overlay .qs-status[data-st="awarded"],
+.page .overlay .qs-st-awarded {
+  --er-chip-bg: rgba(220, 38, 38, .22);
+  --er-chip-bd: rgba(185, 28, 28, .50);
+  color: #3b1414 !important;
+}
+.page .overlay .qs-qnum[data-st="awarded"]::before,
+.page .overlay .qs-status[data-st="awarded"]::before,
+.page .overlay .qs-st-awarded::before {
+  background-color: rgba(220, 38, 38, .22);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(220, 38, 38, .38) 0 6px,
+    rgba(255, 255, 255, .55) 6px 12px
+  ) !important;
+}
+
+/* Dark mode: slightly stronger washes, near-white number/status text (≥ 4.5:1) */
+:root[data-theme="dark"] .page .overlay .qs-meta.qs-qnum,
+:root[data-theme="dark"] .page .overlay .qs-meta.qs-status {
+  color: #f4f4f7 !important;
+}
+:root[data-theme="dark"] .page .overlay .qs-qnum[data-st="justquote"],
+:root[data-theme="dark"] .page .overlay .qs-status[data-st="justquote"] {
+  --er-chip-bg: rgba(210, 180, 140, .40);
+  --er-chip-bd: rgba(222, 184, 135, .60);
+  color: #f8efe4 !important;
+}
+:root[data-theme="dark"] .page .overlay .qs-qnum[data-st="live"],
+:root[data-theme="dark"] .page .overlay .qs-status[data-st="live"] {
+  --er-chip-bg: rgba(239, 68, 68, .36);
+  --er-chip-bd: rgba(252, 165, 165, .55);
+  color: #fee2e2 !important;
+}
+:root[data-theme="dark"] .page .overlay .qs-qnum[data-st="dead"],
+:root[data-theme="dark"] .page .overlay .qs-status[data-st="dead"] {
+  --er-chip-bg: rgba(156, 163, 175, .36);
+  --er-chip-bd: rgba(209, 213, 219, .50);
+  color: #f3f4f6 !important;
+}
+:root[data-theme="dark"] .page .overlay .qs-qnum[data-st="lostlead"],
+:root[data-theme="dark"] .page .overlay .qs-status[data-st="lostlead"] {
+  --er-chip-bg: rgba(168, 85, 247, .36);
+  --er-chip-bd: rgba(216, 180, 254, .55);
+  color: #f3e8ff !important;
+}
+:root[data-theme="dark"] .page .overlay .qs-qnum[data-st="lostprice"],
+:root[data-theme="dark"] .page .overlay .qs-status[data-st="lostprice"] {
+  --er-chip-bg: rgba(34, 197, 94, .34);
+  --er-chip-bd: rgba(134, 239, 172, .50);
+  color: #dcfce7 !important;
+}
+:root[data-theme="dark"] .page .overlay .qs-qnum[data-st="awarded"],
+:root[data-theme="dark"] .page .overlay .qs-status[data-st="awarded"],
+:root[data-theme="dark"] .page .overlay .qs-st-awarded {
+  --er-chip-bg: rgba(239, 68, 68, .32);
+  --er-chip-bd: rgba(252, 165, 165, .55);
+  color: #fee2e2 !important;
+}
+:root[data-theme="dark"] .page .overlay .qs-qnum[data-st="awarded"]::before,
+:root[data-theme="dark"] .page .overlay .qs-status[data-st="awarded"]::before,
+:root[data-theme="dark"] .page .overlay .qs-st-awarded::before {
+  background-color: rgba(239, 68, 68, .32);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(239, 68, 68, .48) 0 6px,
+    rgba(255, 255, 255, .22) 6px 12px
+  ) !important;
+}
+
+/* Status picker: 44px targets, matching washes, Awarded stripes */
+.qm-status-sheet .qm-status-list { gap: 8px; }
+.qm-status-sheet .qm-status-list button {
+  min-height: 44px; height: 44px; position: relative; isolation: isolate; overflow: hidden;
+}
+.qm-status-sheet .qm-status-list button[data-st="awarded"],
+.qm-status-sheet .qm-status-list button.qs-st-awarded {
+  background-color: rgba(220, 38, 38, .16) !important;
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(220, 38, 38, .32) 0 6px,
+    rgba(255, 255, 255, .50) 6px 12px
+  ) !important;
+}
+.qm-dot-awarded {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(220, 38, 38, .85) 0 3px,
+    rgba(255, 255, 255, .95) 3px 6px
+  ) !important;
+  border: 1px solid rgba(185, 28, 28, .5);
+}
+:root[data-theme="dark"] .qm-status-sheet .qm-status-list button[data-st="awarded"],
+:root[data-theme="dark"] .qm-status-sheet .qm-status-list button.qs-st-awarded {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(239, 68, 68, .48) 0 6px,
+    rgba(255, 255, 255, .18) 6px 12px
+  ) !important;
+  color: #fee2e2 !important;
+}
+:root[data-theme="dark"] .qm-status-sheet .qm-status-list button { color: var(--text); }
+
+/* search-result status chip: awarded stripes */
+.hw-res .hw-status-chip.qs-st-awarded {
+  background-color: rgba(220, 38, 38, .18);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(220, 38, 38, .38) 0 4px,
+    rgba(255, 255, 255, .55) 4px 8px
+  );
+  color: #3b1414;
+}
