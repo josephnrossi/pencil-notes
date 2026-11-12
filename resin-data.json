@@ -1,5 +1,5 @@
 {
-  "generated_et": "2026-11-12T14:16:39-05:00",
+  "generated_et": "2026-11-12T15:10:06-05:00",
   "timezone": "America/New_York",
   "stale_after_minutes": 120,
   "rows": [
@@ -6274,67 +6274,9 @@
       "offer_high": "",
       "source_period": "",
       "notes": "scripted fetch failed: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=8); same series is taken from the BLS API instead"
-    }
-  ],
-  "latest": [
-    {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
-      "source": "FRED",
-      "source_url": "https://fred.stlouisfed.org/series/PCU325211325211",
-      "resin": "Plastics material and resin manufacturing (PPI PCU325211325211)",
-      "price": "",
-      "unit": "index Dec 1980=100",
-      "change_vs_previous": "",
-      "status": "fetch_failed",
-      "offer_low": "",
-      "offer_high": "",
-      "source_period": "",
-      "notes": "scripted fetch failed: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=8); same series is taken from the BLS API instead"
     },
     {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
-      "source": "The Plastics Exchange",
-      "source_url": "https://www.theplasticsexchange.com/",
-      "resin": "HDPE - Blow Mold",
-      "price": "0.6425",
-      "unit": "USD/lb (spot mid)",
-      "change_vs_previous": "unchanged",
-      "status": "ok",
-      "offer_low": "0.605",
-      "offer_high": "0.68",
-      "source_period": "current offers",
-      "notes": "8 Offers; 1,614,576 lb listed; spot mid of offer range $0.605–$0.68 / lb"
-    },
-    {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
-      "source": "The Plastics Exchange",
-      "source_url": "https://www.theplasticsexchange.com/",
-      "resin": "HDPE - Inj",
-      "price": "0.5775",
-      "unit": "USD/lb (spot mid)",
-      "change_vs_previous": "unchanged",
-      "status": "ok",
-      "offer_low": "0.48",
-      "offer_high": "0.675",
-      "source_period": "current offers",
-      "notes": "9 Offers; 1,821,404 lb listed; spot mid of offer range $0.48–$0.675 / lb"
-    },
-    {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
-      "source": "The Plastics Exchange",
-      "source_url": "https://www.theplasticsexchange.com/",
-      "resin": "HMWPE - Film",
-      "price": "0.68",
-      "unit": "USD/lb (spot mid)",
-      "change_vs_previous": "unchanged",
-      "status": "ok",
-      "offer_low": "0.68",
-      "offer_high": "0.68",
-      "source_period": "current offers",
-      "notes": "2 Offers; 440,920 lb listed; spot mid of offer range $0.68–$0.68 / lb"
-    },
-    {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
       "source": "The Plastics Exchange",
       "source_url": "https://www.theplasticsexchange.com/",
       "resin": "LDPE - Film",
@@ -6348,63 +6290,7 @@
       "notes": "23 Offers; 3,868,416 lb listed; spot mid of offer range $0.6–$0.74 / lb"
     },
     {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
-      "source": "The Plastics Exchange",
-      "source_url": "https://www.theplasticsexchange.com/",
-      "resin": "LDPE - Inj",
-      "price": "0.6875",
-      "unit": "USD/lb (spot mid)",
-      "change_vs_previous": "unchanged",
-      "status": "ok",
-      "offer_low": "0.635",
-      "offer_high": "0.74",
-      "source_period": "current offers",
-      "notes": "2 Offers; 278,184 lb listed; spot mid of offer range $0.635–$0.74 / lb"
-    },
-    {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
-      "source": "The Plastics Exchange",
-      "source_url": "https://www.theplasticsexchange.com/",
-      "resin": "LLDPE - Film",
-      "price": "0.6",
-      "unit": "USD/lb (spot mid)",
-      "change_vs_previous": "unchanged",
-      "status": "ok",
-      "offer_low": "0.54",
-      "offer_high": "0.66",
-      "source_period": "current offers",
-      "notes": "19 Offers; 3,178,668 lb listed; spot mid of offer range $0.54–$0.66 / lb"
-    },
-    {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
-      "source": "The Plastics Exchange",
-      "source_url": "https://www.theplasticsexchange.com/",
-      "resin": "LLDPE - Inj",
-      "price": "0.6825",
-      "unit": "USD/lb (spot mid)",
-      "change_vs_previous": "unchanged",
-      "status": "ok",
-      "offer_low": "0.645",
-      "offer_high": "0.72",
-      "source_period": "current offers",
-      "notes": "5 Offers; 705,472 lb listed; spot mid of offer range $0.645–$0.72 / lb"
-    },
-    {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
-      "source": "The Plastics Exchange",
-      "source_url": "https://www.theplasticsexchange.com/",
-      "resin": "PP Copolymer - Inj",
-      "price": "0.66",
-      "unit": "USD/lb (spot mid)",
-      "change_vs_previous": "unchanged",
-      "status": "ok",
-      "offer_low": "0.575",
-      "offer_high": "0.745",
-      "source_period": "current offers",
-      "notes": "15 Offers; 2,183,564 lb listed; spot mid of offer range $0.575–$0.745 / lb"
-    },
-    {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
       "source": "The Plastics Exchange",
       "source_url": "https://www.theplasticsexchange.com/",
       "resin": "PP Homopolymer - Inj",
@@ -6418,147 +6304,147 @@
       "notes": "16 Offers; 3,468,392 lb listed; spot mid of offer range $0.565–$0.68 / lb"
     },
     {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "The Plastics Exchange",
+      "source_url": "https://www.theplasticsexchange.com/",
+      "resin": "LLDPE - Film",
+      "price": "0.6",
+      "unit": "USD/lb (spot mid)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "0.54",
+      "offer_high": "0.66",
+      "source_period": "current offers",
+      "notes": "19 Offers; 3,178,668 lb listed; spot mid of offer range $0.54–$0.66 / lb"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "The Plastics Exchange",
+      "source_url": "https://www.theplasticsexchange.com/",
+      "resin": "PP Copolymer - Inj",
+      "price": "0.66",
+      "unit": "USD/lb (spot mid)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "0.575",
+      "offer_high": "0.745",
+      "source_period": "current offers",
+      "notes": "15 Offers; 2,183,564 lb listed; spot mid of offer range $0.575–$0.745 / lb"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "The Plastics Exchange",
+      "source_url": "https://www.theplasticsexchange.com/",
+      "resin": "HDPE - Inj",
+      "price": "0.5775",
+      "unit": "USD/lb (spot mid)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "0.48",
+      "offer_high": "0.675",
+      "source_period": "current offers",
+      "notes": "9 Offers; 1,821,404 lb listed; spot mid of offer range $0.48–$0.675 / lb"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "The Plastics Exchange",
+      "source_url": "https://www.theplasticsexchange.com/",
+      "resin": "HDPE - Blow Mold",
+      "price": "0.6425",
+      "unit": "USD/lb (spot mid)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "0.605",
+      "offer_high": "0.68",
+      "source_period": "current offers",
+      "notes": "8 Offers; 1,614,576 lb listed; spot mid of offer range $0.605–$0.68 / lb"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "The Plastics Exchange",
+      "source_url": "https://www.theplasticsexchange.com/",
+      "resin": "LLDPE - Inj",
+      "price": "0.6825",
+      "unit": "USD/lb (spot mid)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "0.645",
+      "offer_high": "0.72",
+      "source_period": "current offers",
+      "notes": "5 Offers; 705,472 lb listed; spot mid of offer range $0.645–$0.72 / lb"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "The Plastics Exchange",
+      "source_url": "https://www.theplasticsexchange.com/",
+      "resin": "HMWPE - Film",
+      "price": "0.68",
+      "unit": "USD/lb (spot mid)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "0.68",
+      "offer_high": "0.68",
+      "source_period": "current offers",
+      "notes": "2 Offers; 440,920 lb listed; spot mid of offer range $0.68–$0.68 / lb"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "The Plastics Exchange",
+      "source_url": "https://www.theplasticsexchange.com/",
+      "resin": "LDPE - Inj",
+      "price": "0.6875",
+      "unit": "USD/lb (spot mid)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "0.635",
+      "offer_high": "0.74",
+      "source_period": "current offers",
+      "notes": "2 Offers; 278,184 lb listed; spot mid of offer range $0.635–$0.74 / lb"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
       "source": "U.S. BLS PPI",
       "source_url": "https://data.bls.gov/timeseries/WPU066",
       "resin": "Plastic resins and materials (PPI WPU066)",
-      "price": "",
-      "unit": "index 1982=100",
-      "change_vs_previous": "",
-      "status": "fetch_failed",
+      "price": "276.296",
+      "unit": "index 1982=100 (preliminary)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
       "offer_low": "",
       "offer_high": "",
-      "source_period": "",
-      "notes": "BLS API fetch failed: 503 Server Error: Service Unavailable for url: https://api.bls.gov/publicAPI/v2/timeseries/data/"
+      "source_period": "September 2026",
+      "notes": "BLS series WPU066; September 2026; marked preliminary (subject to revision for up to four months)"
     },
     {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
-      "source": "U.S. BLS PPI",
-      "source_url": "https://data.bls.gov/timeseries/PCU325211325211",
-      "resin": "Plastics material and resin manufacturing (PPI PCU325211325211)",
-      "price": "",
-      "unit": "index Dec 1980=100",
-      "change_vs_previous": "",
-      "status": "fetch_failed",
-      "offer_low": "",
-      "offer_high": "",
-      "source_period": "",
-      "notes": "BLS API fetch failed: 503 Server Error: Service Unavailable for url: https://api.bls.gov/publicAPI/v2/timeseries/data/"
-    },
-    {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
       "source": "U.S. BLS PPI",
       "source_url": "https://data.bls.gov/timeseries/WPU0662",
       "resin": "Thermoplastic resins and plastics materials (PPI WPU0662)",
-      "price": "",
-      "unit": "index 1982=100",
-      "change_vs_previous": "",
-      "status": "fetch_failed",
-      "offer_low": "",
-      "offer_high": "",
-      "source_period": "",
-      "notes": "BLS API fetch failed: 503 Server Error: Service Unavailable for url: https://api.bls.gov/publicAPI/v2/timeseries/data/"
-    },
-    {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
-      "source": "pla365 / 100ppi",
-      "source_url": "https://www.100ppi.com/rawmex/detail-713.html",
-      "resin": "ABS (China)",
-      "price": "12083",
-      "unit": "CNY/metric ton",
+      "price": "278.148",
+      "unit": "index 1982=100 (preliminary)",
       "change_vs_previous": "unchanged",
       "status": "ok",
       "offer_low": "",
       "offer_high": "",
-      "source_period": "2026-11-10",
-      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change 0.00%"
+      "source_period": "September 2026",
+      "notes": "BLS series WPU0662; September 2026; marked preliminary (subject to revision for up to four months)"
     },
     {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
-      "source": "pla365 / 100ppi",
-      "source_url": "https://www.100ppi.com/rawmex/detail-465.html",
-      "resin": "GPPS (general purpose PS)",
-      "price": "12333",
-      "unit": "CNY/metric ton",
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "U.S. BLS PPI",
+      "source_url": "https://data.bls.gov/timeseries/PCU325211325211",
+      "resin": "Plastics material and resin manufacturing (PPI PCU325211325211)",
+      "price": "327.535",
+      "unit": "index Dec 1980=100 (preliminary)",
       "change_vs_previous": "unchanged",
       "status": "ok",
       "offer_low": "",
       "offer_high": "",
-      "source_period": "2026-11-10",
-      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change -1.86%; 生意社 PS benchmark assessed on the GPPS 525 specification (pla365.com/grade/525/); confirmed on pla365 GPPS 525 grade page"
+      "source_period": "September 2026",
+      "notes": "BLS series PCU325211325211; September 2026; marked preliminary (subject to revision for up to four months)"
     },
     {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
-      "source": "pla365 / 100ppi",
-      "source_url": "https://www.100ppi.com/rawmex/detail-295.html",
-      "resin": "HDPE (China)",
-      "price": "10900",
-      "unit": "CNY/metric ton",
-      "change_vs_previous": "unchanged",
-      "status": "ok",
-      "offer_low": "",
-      "offer_high": "",
-      "source_period": "2026-11-10",
-      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change -2.02%"
-    },
-    {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
-      "source": "pla365 / 100ppi",
-      "source_url": "https://pla365.com/grade/hips/",
-      "resin": "HIPS (high impact PS)",
-      "price": "",
-      "unit": "CNY/metric ton",
-      "change_vs_previous": "",
-      "status": "fetch_failed",
-      "offer_low": "",
-      "offer_high": "",
-      "source_period": "",
-      "notes": "pla365 states HIPS has no public daily grade quote; it only refers readers to the 生意社 PS benchmark (GPPS 525 specification). That benchmark is not recorded as a HIPS price."
-    },
-    {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
-      "source": "pla365 / 100ppi",
-      "source_url": "https://www.100ppi.com/rawmex/detail-334.html",
-      "resin": "LDPE (China)",
-      "price": "12067",
-      "unit": "CNY/metric ton",
-      "change_vs_previous": "unchanged",
-      "status": "ok",
-      "offer_low": "",
-      "offer_high": "",
-      "source_period": "2026-11-10",
-      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change -1.23%"
-    },
-    {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
-      "source": "pla365 / 100ppi",
-      "source_url": "https://www.100ppi.com/rawmex/detail-435.html",
-      "resin": "LLDPE (China)",
-      "price": "9975",
-      "unit": "CNY/metric ton",
-      "change_vs_previous": "unchanged",
-      "status": "ok",
-      "offer_low": "",
-      "offer_high": "",
-      "source_period": "2026-11-10",
-      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change 0.00%"
-    },
-    {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
-      "source": "pla365 / 100ppi",
-      "source_url": "https://www.100ppi.com/rawmex/detail-173.html",
-      "resin": "PET (China)",
-      "price": "8379",
-      "unit": "CNY/metric ton",
-      "change_vs_previous": "unchanged",
-      "status": "ok",
-      "offer_low": "",
-      "offer_high": "",
-      "source_period": "2026-11-10",
-      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change 0.00%"
-    },
-    {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
       "source": "pla365 / 100ppi",
       "source_url": "https://www.100ppi.com/rawmex/detail-718.html",
       "resin": "PP raffia (China)",
@@ -6572,7 +6458,429 @@
       "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change 0.00%"
     },
     {
-      "timestamp_et": "2026-11-12T14:16:39-05:00",
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "pla365 / 100ppi",
+      "source_url": "https://www.100ppi.com/rawmex/detail-435.html",
+      "resin": "LLDPE (China)",
+      "price": "9975",
+      "unit": "CNY/metric ton",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "2026-11-10",
+      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change 0.00%"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "pla365 / 100ppi",
+      "source_url": "https://www.100ppi.com/rawmex/detail-295.html",
+      "resin": "HDPE (China)",
+      "price": "10900",
+      "unit": "CNY/metric ton",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "2026-11-10",
+      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change -2.02%"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "pla365 / 100ppi",
+      "source_url": "https://www.100ppi.com/rawmex/detail-334.html",
+      "resin": "LDPE (China)",
+      "price": "12067",
+      "unit": "CNY/metric ton",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "2026-11-10",
+      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change -1.23%"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "pla365 / 100ppi",
+      "source_url": "https://www.100ppi.com/rawmex/detail-107.html",
+      "resin": "PVC SG-5 (China)",
+      "price": "4875",
+      "unit": "CNY/metric ton",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "2026-11-10",
+      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change -1.12%"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "pla365 / 100ppi",
+      "source_url": "https://www.100ppi.com/rawmex/detail-713.html",
+      "resin": "ABS (China)",
+      "price": "12083",
+      "unit": "CNY/metric ton",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "2026-11-10",
+      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change 0.00%"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "pla365 / 100ppi",
+      "source_url": "https://www.100ppi.com/rawmex/detail-465.html",
+      "resin": "GPPS (general purpose PS)",
+      "price": "12333",
+      "unit": "CNY/metric ton",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "2026-11-10",
+      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change -1.86%; 生意社 PS benchmark assessed on the GPPS 525 specification (pla365.com/grade/525/); confirmed on pla365 GPPS 525 grade page"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "pla365 / 100ppi",
+      "source_url": "https://www.100ppi.com/rawmex/detail-173.html",
+      "resin": "PET (China)",
+      "price": "8379",
+      "unit": "CNY/metric ton",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "2026-11-10",
+      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change 0.00%"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "pla365 / 100ppi",
+      "source_url": "https://pla365.com/grade/hips/",
+      "resin": "HIPS (high impact PS)",
+      "price": "",
+      "unit": "CNY/metric ton",
+      "change_vs_previous": "",
+      "status": "fetch_failed",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "",
+      "notes": "pla365 states HIPS has no public daily grade quote; it only refers readers to the 生意社 PS benchmark (GPPS 525 specification). That benchmark is not recorded as a HIPS price."
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "FRED",
+      "source_url": "https://fred.stlouisfed.org/series/PCU325211325211",
+      "resin": "Plastics material and resin manufacturing (PPI PCU325211325211)",
+      "price": "",
+      "unit": "index Dec 1980=100",
+      "change_vs_previous": "",
+      "status": "fetch_failed",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "",
+      "notes": "scripted fetch failed: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=8); same series is taken from the BLS API instead"
+    }
+  ],
+  "latest": [
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "FRED",
+      "source_url": "https://fred.stlouisfed.org/series/PCU325211325211",
+      "resin": "Plastics material and resin manufacturing (PPI PCU325211325211)",
+      "price": "",
+      "unit": "index Dec 1980=100",
+      "change_vs_previous": "",
+      "status": "fetch_failed",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "",
+      "notes": "scripted fetch failed: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=8); same series is taken from the BLS API instead"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "The Plastics Exchange",
+      "source_url": "https://www.theplasticsexchange.com/",
+      "resin": "HDPE - Blow Mold",
+      "price": "0.6425",
+      "unit": "USD/lb (spot mid)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "0.605",
+      "offer_high": "0.68",
+      "source_period": "current offers",
+      "notes": "8 Offers; 1,614,576 lb listed; spot mid of offer range $0.605–$0.68 / lb"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "The Plastics Exchange",
+      "source_url": "https://www.theplasticsexchange.com/",
+      "resin": "HDPE - Inj",
+      "price": "0.5775",
+      "unit": "USD/lb (spot mid)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "0.48",
+      "offer_high": "0.675",
+      "source_period": "current offers",
+      "notes": "9 Offers; 1,821,404 lb listed; spot mid of offer range $0.48–$0.675 / lb"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "The Plastics Exchange",
+      "source_url": "https://www.theplasticsexchange.com/",
+      "resin": "HMWPE - Film",
+      "price": "0.68",
+      "unit": "USD/lb (spot mid)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "0.68",
+      "offer_high": "0.68",
+      "source_period": "current offers",
+      "notes": "2 Offers; 440,920 lb listed; spot mid of offer range $0.68–$0.68 / lb"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "The Plastics Exchange",
+      "source_url": "https://www.theplasticsexchange.com/",
+      "resin": "LDPE - Film",
+      "price": "0.67",
+      "unit": "USD/lb (spot mid)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "0.6",
+      "offer_high": "0.74",
+      "source_period": "current offers",
+      "notes": "23 Offers; 3,868,416 lb listed; spot mid of offer range $0.6–$0.74 / lb"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "The Plastics Exchange",
+      "source_url": "https://www.theplasticsexchange.com/",
+      "resin": "LDPE - Inj",
+      "price": "0.6875",
+      "unit": "USD/lb (spot mid)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "0.635",
+      "offer_high": "0.74",
+      "source_period": "current offers",
+      "notes": "2 Offers; 278,184 lb listed; spot mid of offer range $0.635–$0.74 / lb"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "The Plastics Exchange",
+      "source_url": "https://www.theplasticsexchange.com/",
+      "resin": "LLDPE - Film",
+      "price": "0.6",
+      "unit": "USD/lb (spot mid)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "0.54",
+      "offer_high": "0.66",
+      "source_period": "current offers",
+      "notes": "19 Offers; 3,178,668 lb listed; spot mid of offer range $0.54–$0.66 / lb"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "The Plastics Exchange",
+      "source_url": "https://www.theplasticsexchange.com/",
+      "resin": "LLDPE - Inj",
+      "price": "0.6825",
+      "unit": "USD/lb (spot mid)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "0.645",
+      "offer_high": "0.72",
+      "source_period": "current offers",
+      "notes": "5 Offers; 705,472 lb listed; spot mid of offer range $0.645–$0.72 / lb"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "The Plastics Exchange",
+      "source_url": "https://www.theplasticsexchange.com/",
+      "resin": "PP Copolymer - Inj",
+      "price": "0.66",
+      "unit": "USD/lb (spot mid)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "0.575",
+      "offer_high": "0.745",
+      "source_period": "current offers",
+      "notes": "15 Offers; 2,183,564 lb listed; spot mid of offer range $0.575–$0.745 / lb"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "The Plastics Exchange",
+      "source_url": "https://www.theplasticsexchange.com/",
+      "resin": "PP Homopolymer - Inj",
+      "price": "0.6225",
+      "unit": "USD/lb (spot mid)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "0.565",
+      "offer_high": "0.68",
+      "source_period": "current offers",
+      "notes": "16 Offers; 3,468,392 lb listed; spot mid of offer range $0.565–$0.68 / lb"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "U.S. BLS PPI",
+      "source_url": "https://data.bls.gov/timeseries/WPU066",
+      "resin": "Plastic resins and materials (PPI WPU066)",
+      "price": "276.296",
+      "unit": "index 1982=100 (preliminary)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "September 2026",
+      "notes": "BLS series WPU066; September 2026; marked preliminary (subject to revision for up to four months)"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "U.S. BLS PPI",
+      "source_url": "https://data.bls.gov/timeseries/PCU325211325211",
+      "resin": "Plastics material and resin manufacturing (PPI PCU325211325211)",
+      "price": "327.535",
+      "unit": "index Dec 1980=100 (preliminary)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "September 2026",
+      "notes": "BLS series PCU325211325211; September 2026; marked preliminary (subject to revision for up to four months)"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "U.S. BLS PPI",
+      "source_url": "https://data.bls.gov/timeseries/WPU0662",
+      "resin": "Thermoplastic resins and plastics materials (PPI WPU0662)",
+      "price": "278.148",
+      "unit": "index 1982=100 (preliminary)",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "September 2026",
+      "notes": "BLS series WPU0662; September 2026; marked preliminary (subject to revision for up to four months)"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "pla365 / 100ppi",
+      "source_url": "https://www.100ppi.com/rawmex/detail-713.html",
+      "resin": "ABS (China)",
+      "price": "12083",
+      "unit": "CNY/metric ton",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "2026-11-10",
+      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change 0.00%"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "pla365 / 100ppi",
+      "source_url": "https://www.100ppi.com/rawmex/detail-465.html",
+      "resin": "GPPS (general purpose PS)",
+      "price": "12333",
+      "unit": "CNY/metric ton",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "2026-11-10",
+      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change -1.86%; 生意社 PS benchmark assessed on the GPPS 525 specification (pla365.com/grade/525/); confirmed on pla365 GPPS 525 grade page"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "pla365 / 100ppi",
+      "source_url": "https://www.100ppi.com/rawmex/detail-295.html",
+      "resin": "HDPE (China)",
+      "price": "10900",
+      "unit": "CNY/metric ton",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "2026-11-10",
+      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change -2.02%"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "pla365 / 100ppi",
+      "source_url": "https://pla365.com/grade/hips/",
+      "resin": "HIPS (high impact PS)",
+      "price": "",
+      "unit": "CNY/metric ton",
+      "change_vs_previous": "",
+      "status": "fetch_failed",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "",
+      "notes": "pla365 states HIPS has no public daily grade quote; it only refers readers to the 生意社 PS benchmark (GPPS 525 specification). That benchmark is not recorded as a HIPS price."
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "pla365 / 100ppi",
+      "source_url": "https://www.100ppi.com/rawmex/detail-334.html",
+      "resin": "LDPE (China)",
+      "price": "12067",
+      "unit": "CNY/metric ton",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "2026-11-10",
+      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change -1.23%"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "pla365 / 100ppi",
+      "source_url": "https://www.100ppi.com/rawmex/detail-435.html",
+      "resin": "LLDPE (China)",
+      "price": "9975",
+      "unit": "CNY/metric ton",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "2026-11-10",
+      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change 0.00%"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "pla365 / 100ppi",
+      "source_url": "https://www.100ppi.com/rawmex/detail-173.html",
+      "resin": "PET (China)",
+      "price": "8379",
+      "unit": "CNY/metric ton",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "2026-11-10",
+      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change 0.00%"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
+      "source": "pla365 / 100ppi",
+      "source_url": "https://www.100ppi.com/rawmex/detail-718.html",
+      "resin": "PP raffia (China)",
+      "price": "11100",
+      "unit": "CNY/metric ton",
+      "change_vs_previous": "unchanged",
+      "status": "ok",
+      "offer_low": "",
+      "offer_high": "",
+      "source_period": "2026-11-10",
+      "notes": "Publisher date 2026-11-10; compiled by pla365 from 生意社/100ppi; source-listed change 0.00%"
+    },
+    {
+      "timestamp_et": "2026-11-12T15:10:06-05:00",
       "source": "pla365 / 100ppi",
       "source_url": "https://www.100ppi.com/rawmex/detail-107.html",
       "resin": "PVC SG-5 (China)",
@@ -22648,7 +22956,2219 @@
     "bls_monthly": {
       "unit": "index",
       "caption": "Official monthly U.S. Producer Price Indexes from the BLS Public API. These are indexes, not dollars per pound.",
-      "series": {}
+      "series": {
+        "Plastic resins and materials (PPI WPU066)": [
+          {
+            "period": "2018-01",
+            "year": "2018",
+            "periodName": "January",
+            "value": 235.1,
+            "preliminary": false
+          },
+          {
+            "period": "2018-02",
+            "year": "2018",
+            "periodName": "February",
+            "value": 236.4,
+            "preliminary": false
+          },
+          {
+            "period": "2018-03",
+            "year": "2018",
+            "periodName": "March",
+            "value": 240.3,
+            "preliminary": false
+          },
+          {
+            "period": "2018-04",
+            "year": "2018",
+            "periodName": "April",
+            "value": 238.3,
+            "preliminary": false
+          },
+          {
+            "period": "2018-05",
+            "year": "2018",
+            "periodName": "May",
+            "value": 241.9,
+            "preliminary": false
+          },
+          {
+            "period": "2018-06",
+            "year": "2018",
+            "periodName": "June",
+            "value": 243.8,
+            "preliminary": false
+          },
+          {
+            "period": "2018-07",
+            "year": "2018",
+            "periodName": "July",
+            "value": 248.5,
+            "preliminary": false
+          },
+          {
+            "period": "2018-08",
+            "year": "2018",
+            "periodName": "August",
+            "value": 252.3,
+            "preliminary": false
+          },
+          {
+            "period": "2018-09",
+            "year": "2018",
+            "periodName": "September",
+            "value": 250.2,
+            "preliminary": false
+          },
+          {
+            "period": "2018-10",
+            "year": "2018",
+            "periodName": "October",
+            "value": 251.2,
+            "preliminary": false
+          },
+          {
+            "period": "2018-11",
+            "year": "2018",
+            "periodName": "November",
+            "value": 246.7,
+            "preliminary": false
+          },
+          {
+            "period": "2018-12",
+            "year": "2018",
+            "periodName": "December",
+            "value": 242.4,
+            "preliminary": false
+          },
+          {
+            "period": "2019-01",
+            "year": "2019",
+            "periodName": "January",
+            "value": 235.9,
+            "preliminary": false
+          },
+          {
+            "period": "2019-02",
+            "year": "2019",
+            "periodName": "February",
+            "value": 230.8,
+            "preliminary": false
+          },
+          {
+            "period": "2019-03",
+            "year": "2019",
+            "periodName": "March",
+            "value": 226.6,
+            "preliminary": false
+          },
+          {
+            "period": "2019-04",
+            "year": "2019",
+            "periodName": "April",
+            "value": 225.0,
+            "preliminary": false
+          },
+          {
+            "period": "2019-05",
+            "year": "2019",
+            "periodName": "May",
+            "value": 227.4,
+            "preliminary": false
+          },
+          {
+            "period": "2019-06",
+            "year": "2019",
+            "periodName": "June",
+            "value": 223.9,
+            "preliminary": false
+          },
+          {
+            "period": "2019-07",
+            "year": "2019",
+            "periodName": "July",
+            "value": 223.9,
+            "preliminary": false
+          },
+          {
+            "period": "2019-08",
+            "year": "2019",
+            "periodName": "August",
+            "value": 224.7,
+            "preliminary": false
+          },
+          {
+            "period": "2019-09",
+            "year": "2019",
+            "periodName": "September",
+            "value": 224.2,
+            "preliminary": false
+          },
+          {
+            "period": "2019-10",
+            "year": "2019",
+            "periodName": "October",
+            "value": 224.6,
+            "preliminary": false
+          },
+          {
+            "period": "2019-11",
+            "year": "2019",
+            "periodName": "November",
+            "value": 222.0,
+            "preliminary": false
+          },
+          {
+            "period": "2019-12",
+            "year": "2019",
+            "periodName": "December",
+            "value": 217.3,
+            "preliminary": false
+          },
+          {
+            "period": "2020-01",
+            "year": "2020",
+            "periodName": "January",
+            "value": 216.8,
+            "preliminary": false
+          },
+          {
+            "period": "2020-02",
+            "year": "2020",
+            "periodName": "February",
+            "value": 220.9,
+            "preliminary": false
+          },
+          {
+            "period": "2020-03",
+            "year": "2020",
+            "periodName": "March",
+            "value": 220.1,
+            "preliminary": false
+          },
+          {
+            "period": "2020-04",
+            "year": "2020",
+            "periodName": "April",
+            "value": 207.9,
+            "preliminary": false
+          },
+          {
+            "period": "2020-05",
+            "year": "2020",
+            "periodName": "May",
+            "value": 201.5,
+            "preliminary": false
+          },
+          {
+            "period": "2020-06",
+            "year": "2020",
+            "periodName": "June",
+            "value": 202.4,
+            "preliminary": false
+          },
+          {
+            "period": "2020-07",
+            "year": "2020",
+            "periodName": "July",
+            "value": 206.3,
+            "preliminary": false
+          },
+          {
+            "period": "2020-08",
+            "year": "2020",
+            "periodName": "August",
+            "value": 212.1,
+            "preliminary": false
+          },
+          {
+            "period": "2020-09",
+            "year": "2020",
+            "periodName": "September",
+            "value": 214.1,
+            "preliminary": false
+          },
+          {
+            "period": "2020-10",
+            "year": "2020",
+            "periodName": "October",
+            "value": 223.7,
+            "preliminary": false
+          },
+          {
+            "period": "2020-11",
+            "year": "2020",
+            "periodName": "November",
+            "value": 224.7,
+            "preliminary": false
+          },
+          {
+            "period": "2020-12",
+            "year": "2020",
+            "periodName": "December",
+            "value": 229.7,
+            "preliminary": false
+          },
+          {
+            "period": "2021-01",
+            "year": "2021",
+            "periodName": "January",
+            "value": 237.7,
+            "preliminary": false
+          },
+          {
+            "period": "2021-02",
+            "year": "2021",
+            "periodName": "February",
+            "value": 249.9,
+            "preliminary": false
+          },
+          {
+            "period": "2021-03",
+            "year": "2021",
+            "periodName": "March",
+            "value": 274.0,
+            "preliminary": false
+          },
+          {
+            "period": "2021-04",
+            "year": "2021",
+            "periodName": "April",
+            "value": 289.7,
+            "preliminary": false
+          },
+          {
+            "period": "2021-05",
+            "year": "2021",
+            "periodName": "May",
+            "value": 298.5,
+            "preliminary": false
+          },
+          {
+            "period": "2021-06",
+            "year": "2021",
+            "periodName": "June",
+            "value": 311.4,
+            "preliminary": false
+          },
+          {
+            "period": "2021-07",
+            "year": "2021",
+            "periodName": "July",
+            "value": 320.153,
+            "preliminary": false
+          },
+          {
+            "period": "2021-08",
+            "year": "2021",
+            "periodName": "August",
+            "value": 326.872,
+            "preliminary": false
+          },
+          {
+            "period": "2021-09",
+            "year": "2021",
+            "periodName": "September",
+            "value": 325.79,
+            "preliminary": false
+          },
+          {
+            "period": "2021-10",
+            "year": "2021",
+            "periodName": "October",
+            "value": 326.733,
+            "preliminary": false
+          },
+          {
+            "period": "2021-11",
+            "year": "2021",
+            "periodName": "November",
+            "value": 323.232,
+            "preliminary": false
+          },
+          {
+            "period": "2021-12",
+            "year": "2021",
+            "periodName": "December",
+            "value": 313.849,
+            "preliminary": false
+          },
+          {
+            "period": "2022-01",
+            "year": "2022",
+            "periodName": "January",
+            "value": 304.44,
+            "preliminary": false
+          },
+          {
+            "period": "2022-02",
+            "year": "2022",
+            "periodName": "February",
+            "value": 304.632,
+            "preliminary": false
+          },
+          {
+            "period": "2022-03",
+            "year": "2022",
+            "periodName": "March",
+            "value": 304.748,
+            "preliminary": false
+          },
+          {
+            "period": "2022-04",
+            "year": "2022",
+            "periodName": "April",
+            "value": 316.927,
+            "preliminary": false
+          },
+          {
+            "period": "2022-05",
+            "year": "2022",
+            "periodName": "May",
+            "value": 322.403,
+            "preliminary": false
+          },
+          {
+            "period": "2022-06",
+            "year": "2022",
+            "periodName": "June",
+            "value": 326.29,
+            "preliminary": false
+          },
+          {
+            "period": "2022-07",
+            "year": "2022",
+            "periodName": "July",
+            "value": 319.83,
+            "preliminary": false
+          },
+          {
+            "period": "2022-08",
+            "year": "2022",
+            "periodName": "August",
+            "value": 309.932,
+            "preliminary": false
+          },
+          {
+            "period": "2022-09",
+            "year": "2022",
+            "periodName": "September",
+            "value": 306.825,
+            "preliminary": false
+          },
+          {
+            "period": "2022-10",
+            "year": "2022",
+            "periodName": "October",
+            "value": 299.731,
+            "preliminary": false
+          },
+          {
+            "period": "2022-11",
+            "year": "2022",
+            "periodName": "November",
+            "value": 283.819,
+            "preliminary": false
+          },
+          {
+            "period": "2022-12",
+            "year": "2022",
+            "periodName": "December",
+            "value": 280.446,
+            "preliminary": false
+          },
+          {
+            "period": "2023-01",
+            "year": "2023",
+            "periodName": "January",
+            "value": 275.754,
+            "preliminary": false
+          },
+          {
+            "period": "2023-02",
+            "year": "2023",
+            "periodName": "February",
+            "value": 281.969,
+            "preliminary": false
+          },
+          {
+            "period": "2023-03",
+            "year": "2023",
+            "periodName": "March",
+            "value": 284.482,
+            "preliminary": false
+          },
+          {
+            "period": "2023-04",
+            "year": "2023",
+            "periodName": "April",
+            "value": 289.072,
+            "preliminary": false
+          },
+          {
+            "period": "2023-05",
+            "year": "2023",
+            "periodName": "May",
+            "value": 285.861,
+            "preliminary": false
+          },
+          {
+            "period": "2023-06",
+            "year": "2023",
+            "periodName": "June",
+            "value": 280.39,
+            "preliminary": false
+          },
+          {
+            "period": "2023-07",
+            "year": "2023",
+            "periodName": "July",
+            "value": 270.722,
+            "preliminary": false
+          },
+          {
+            "period": "2023-08",
+            "year": "2023",
+            "periodName": "August",
+            "value": 267.608,
+            "preliminary": false
+          },
+          {
+            "period": "2023-09",
+            "year": "2023",
+            "periodName": "September",
+            "value": 267.261,
+            "preliminary": false
+          },
+          {
+            "period": "2023-10",
+            "year": "2023",
+            "periodName": "October",
+            "value": 266.048,
+            "preliminary": false
+          },
+          {
+            "period": "2023-11",
+            "year": "2023",
+            "periodName": "November",
+            "value": 266.482,
+            "preliminary": false
+          },
+          {
+            "period": "2023-12",
+            "year": "2023",
+            "periodName": "December",
+            "value": 265.438,
+            "preliminary": false
+          },
+          {
+            "period": "2024-01",
+            "year": "2024",
+            "periodName": "January",
+            "value": 262.312,
+            "preliminary": false
+          },
+          {
+            "period": "2024-02",
+            "year": "2024",
+            "periodName": "February",
+            "value": 267.951,
+            "preliminary": false
+          },
+          {
+            "period": "2024-03",
+            "year": "2024",
+            "periodName": "March",
+            "value": 265.417,
+            "preliminary": false
+          },
+          {
+            "period": "2024-04",
+            "year": "2024",
+            "periodName": "April",
+            "value": 268.226,
+            "preliminary": false
+          },
+          {
+            "period": "2024-05",
+            "year": "2024",
+            "periodName": "May",
+            "value": 267.898,
+            "preliminary": false
+          },
+          {
+            "period": "2024-06",
+            "year": "2024",
+            "periodName": "June",
+            "value": 267.287,
+            "preliminary": false
+          },
+          {
+            "period": "2024-07",
+            "year": "2024",
+            "periodName": "July",
+            "value": 271.484,
+            "preliminary": false
+          },
+          {
+            "period": "2024-08",
+            "year": "2024",
+            "periodName": "August",
+            "value": 270.614,
+            "preliminary": false
+          },
+          {
+            "period": "2024-09",
+            "year": "2024",
+            "periodName": "September",
+            "value": 263.854,
+            "preliminary": false
+          },
+          {
+            "period": "2024-10",
+            "year": "2024",
+            "periodName": "October",
+            "value": 267.158,
+            "preliminary": false
+          },
+          {
+            "period": "2024-11",
+            "year": "2024",
+            "periodName": "November",
+            "value": 265.272,
+            "preliminary": false
+          },
+          {
+            "period": "2024-12",
+            "year": "2024",
+            "periodName": "December",
+            "value": 263.662,
+            "preliminary": false
+          },
+          {
+            "period": "2025-01",
+            "year": "2025",
+            "periodName": "January",
+            "value": 262.691,
+            "preliminary": false
+          },
+          {
+            "period": "2025-02",
+            "year": "2025",
+            "periodName": "February",
+            "value": 269.737,
+            "preliminary": false
+          },
+          {
+            "period": "2025-03",
+            "year": "2025",
+            "periodName": "March",
+            "value": 272.362,
+            "preliminary": false
+          },
+          {
+            "period": "2025-04",
+            "year": "2025",
+            "periodName": "April",
+            "value": 270.527,
+            "preliminary": false
+          },
+          {
+            "period": "2025-05",
+            "year": "2025",
+            "periodName": "May",
+            "value": 267.258,
+            "preliminary": false
+          },
+          {
+            "period": "2025-06",
+            "year": "2025",
+            "periodName": "June",
+            "value": 265.103,
+            "preliminary": false
+          },
+          {
+            "period": "2025-07",
+            "year": "2025",
+            "periodName": "July",
+            "value": 264.631,
+            "preliminary": false
+          },
+          {
+            "period": "2025-08",
+            "year": "2025",
+            "periodName": "August",
+            "value": 263.078,
+            "preliminary": false
+          },
+          {
+            "period": "2025-09",
+            "year": "2025",
+            "periodName": "September",
+            "value": 259.393,
+            "preliminary": false
+          },
+          {
+            "period": "2025-10",
+            "year": "2025",
+            "periodName": "October",
+            "value": 259.307,
+            "preliminary": false
+          },
+          {
+            "period": "2025-11",
+            "year": "2025",
+            "periodName": "November",
+            "value": 257.278,
+            "preliminary": false
+          },
+          {
+            "period": "2025-12",
+            "year": "2025",
+            "periodName": "December",
+            "value": 253.552,
+            "preliminary": false
+          },
+          {
+            "period": "2026-01",
+            "year": "2026",
+            "periodName": "January",
+            "value": 252.962,
+            "preliminary": false
+          },
+          {
+            "period": "2026-02",
+            "year": "2026",
+            "periodName": "February",
+            "value": 258.5,
+            "preliminary": false
+          },
+          {
+            "period": "2026-03",
+            "year": "2026",
+            "periodName": "March",
+            "value": 263.464,
+            "preliminary": false
+          },
+          {
+            "period": "2026-04",
+            "year": "2026",
+            "periodName": "April",
+            "value": 277.033,
+            "preliminary": false
+          },
+          {
+            "period": "2026-05",
+            "year": "2026",
+            "periodName": "May",
+            "value": 309.985,
+            "preliminary": false
+          },
+          {
+            "period": "2026-06",
+            "year": "2026",
+            "periodName": "June",
+            "value": 299.249,
+            "preliminary": true
+          },
+          {
+            "period": "2026-07",
+            "year": "2026",
+            "periodName": "July",
+            "value": 283.282,
+            "preliminary": true
+          },
+          {
+            "period": "2026-08",
+            "year": "2026",
+            "periodName": "August",
+            "value": 280.51,
+            "preliminary": true
+          },
+          {
+            "period": "2026-09",
+            "year": "2026",
+            "periodName": "September",
+            "value": 276.296,
+            "preliminary": true
+          }
+        ],
+        "Thermoplastic resins and plastics materials (PPI WPU0662)": [
+          {
+            "period": "2018-01",
+            "year": "2018",
+            "periodName": "January",
+            "value": 238.5,
+            "preliminary": false
+          },
+          {
+            "period": "2018-02",
+            "year": "2018",
+            "periodName": "February",
+            "value": 238.5,
+            "preliminary": false
+          },
+          {
+            "period": "2018-03",
+            "year": "2018",
+            "periodName": "March",
+            "value": 243.2,
+            "preliminary": false
+          },
+          {
+            "period": "2018-04",
+            "year": "2018",
+            "periodName": "April",
+            "value": 240.4,
+            "preliminary": false
+          },
+          {
+            "period": "2018-05",
+            "year": "2018",
+            "periodName": "May",
+            "value": 244.7,
+            "preliminary": false
+          },
+          {
+            "period": "2018-06",
+            "year": "2018",
+            "periodName": "June",
+            "value": 246.9,
+            "preliminary": false
+          },
+          {
+            "period": "2018-07",
+            "year": "2018",
+            "periodName": "July",
+            "value": 252.3,
+            "preliminary": false
+          },
+          {
+            "period": "2018-08",
+            "year": "2018",
+            "periodName": "August",
+            "value": 257.5,
+            "preliminary": false
+          },
+          {
+            "period": "2018-09",
+            "year": "2018",
+            "periodName": "September",
+            "value": 254.9,
+            "preliminary": false
+          },
+          {
+            "period": "2018-10",
+            "year": "2018",
+            "periodName": "October",
+            "value": 255.5,
+            "preliminary": false
+          },
+          {
+            "period": "2018-11",
+            "year": "2018",
+            "periodName": "November",
+            "value": 250.1,
+            "preliminary": false
+          },
+          {
+            "period": "2018-12",
+            "year": "2018",
+            "periodName": "December",
+            "value": 244.8,
+            "preliminary": false
+          },
+          {
+            "period": "2019-01",
+            "year": "2019",
+            "periodName": "January",
+            "value": 237.9,
+            "preliminary": false
+          },
+          {
+            "period": "2019-02",
+            "year": "2019",
+            "periodName": "February",
+            "value": 231.4,
+            "preliminary": false
+          },
+          {
+            "period": "2019-03",
+            "year": "2019",
+            "periodName": "March",
+            "value": 227.0,
+            "preliminary": false
+          },
+          {
+            "period": "2019-04",
+            "year": "2019",
+            "periodName": "April",
+            "value": 224.8,
+            "preliminary": false
+          },
+          {
+            "period": "2019-05",
+            "year": "2019",
+            "periodName": "May",
+            "value": 227.8,
+            "preliminary": false
+          },
+          {
+            "period": "2019-06",
+            "year": "2019",
+            "periodName": "June",
+            "value": 224.1,
+            "preliminary": false
+          },
+          {
+            "period": "2019-07",
+            "year": "2019",
+            "periodName": "July",
+            "value": 223.7,
+            "preliminary": false
+          },
+          {
+            "period": "2019-08",
+            "year": "2019",
+            "periodName": "August",
+            "value": 224.1,
+            "preliminary": false
+          },
+          {
+            "period": "2019-09",
+            "year": "2019",
+            "periodName": "September",
+            "value": 223.9,
+            "preliminary": false
+          },
+          {
+            "period": "2019-10",
+            "year": "2019",
+            "periodName": "October",
+            "value": 224.7,
+            "preliminary": false
+          },
+          {
+            "period": "2019-11",
+            "year": "2019",
+            "periodName": "November",
+            "value": 221.6,
+            "preliminary": false
+          },
+          {
+            "period": "2019-12",
+            "year": "2019",
+            "periodName": "December",
+            "value": 216.5,
+            "preliminary": false
+          },
+          {
+            "period": "2020-01",
+            "year": "2020",
+            "periodName": "January",
+            "value": 215.8,
+            "preliminary": false
+          },
+          {
+            "period": "2020-02",
+            "year": "2020",
+            "periodName": "February",
+            "value": 219.8,
+            "preliminary": false
+          },
+          {
+            "period": "2020-03",
+            "year": "2020",
+            "periodName": "March",
+            "value": 219.2,
+            "preliminary": false
+          },
+          {
+            "period": "2020-04",
+            "year": "2020",
+            "periodName": "April",
+            "value": 205.2,
+            "preliminary": false
+          },
+          {
+            "period": "2020-05",
+            "year": "2020",
+            "periodName": "May",
+            "value": 199.6,
+            "preliminary": false
+          },
+          {
+            "period": "2020-06",
+            "year": "2020",
+            "periodName": "June",
+            "value": 199.8,
+            "preliminary": false
+          },
+          {
+            "period": "2020-07",
+            "year": "2020",
+            "periodName": "July",
+            "value": 205.1,
+            "preliminary": false
+          },
+          {
+            "period": "2020-08",
+            "year": "2020",
+            "periodName": "August",
+            "value": 211.6,
+            "preliminary": false
+          },
+          {
+            "period": "2020-09",
+            "year": "2020",
+            "periodName": "September",
+            "value": 213.5,
+            "preliminary": false
+          },
+          {
+            "period": "2020-10",
+            "year": "2020",
+            "periodName": "October",
+            "value": 225.2,
+            "preliminary": false
+          },
+          {
+            "period": "2020-11",
+            "year": "2020",
+            "periodName": "November",
+            "value": 226.6,
+            "preliminary": false
+          },
+          {
+            "period": "2020-12",
+            "year": "2020",
+            "periodName": "December",
+            "value": 231.9,
+            "preliminary": false
+          },
+          {
+            "period": "2021-01",
+            "year": "2021",
+            "periodName": "January",
+            "value": 241.4,
+            "preliminary": false
+          },
+          {
+            "period": "2021-02",
+            "year": "2021",
+            "periodName": "February",
+            "value": 255.2,
+            "preliminary": false
+          },
+          {
+            "period": "2021-03",
+            "year": "2021",
+            "periodName": "March",
+            "value": 282.2,
+            "preliminary": false
+          },
+          {
+            "period": "2021-04",
+            "year": "2021",
+            "periodName": "April",
+            "value": 300.8,
+            "preliminary": false
+          },
+          {
+            "period": "2021-05",
+            "year": "2021",
+            "periodName": "May",
+            "value": 310.4,
+            "preliminary": false
+          },
+          {
+            "period": "2021-06",
+            "year": "2021",
+            "periodName": "June",
+            "value": 323.5,
+            "preliminary": false
+          },
+          {
+            "period": "2021-07",
+            "year": "2021",
+            "periodName": "July",
+            "value": 334.088,
+            "preliminary": false
+          },
+          {
+            "period": "2021-08",
+            "year": "2021",
+            "periodName": "August",
+            "value": 340.606,
+            "preliminary": false
+          },
+          {
+            "period": "2021-09",
+            "year": "2021",
+            "periodName": "September",
+            "value": 339.206,
+            "preliminary": false
+          },
+          {
+            "period": "2021-10",
+            "year": "2021",
+            "periodName": "October",
+            "value": 339.441,
+            "preliminary": false
+          },
+          {
+            "period": "2021-11",
+            "year": "2021",
+            "periodName": "November",
+            "value": 335.109,
+            "preliminary": false
+          },
+          {
+            "period": "2021-12",
+            "year": "2021",
+            "periodName": "December",
+            "value": 323.642,
+            "preliminary": false
+          },
+          {
+            "period": "2022-01",
+            "year": "2022",
+            "periodName": "January",
+            "value": 311.899,
+            "preliminary": false
+          },
+          {
+            "period": "2022-02",
+            "year": "2022",
+            "periodName": "February",
+            "value": 312.202,
+            "preliminary": false
+          },
+          {
+            "period": "2022-03",
+            "year": "2022",
+            "periodName": "March",
+            "value": 311.697,
+            "preliminary": false
+          },
+          {
+            "period": "2022-04",
+            "year": "2022",
+            "periodName": "April",
+            "value": 325.584,
+            "preliminary": false
+          },
+          {
+            "period": "2022-05",
+            "year": "2022",
+            "periodName": "May",
+            "value": 330.423,
+            "preliminary": false
+          },
+          {
+            "period": "2022-06",
+            "year": "2022",
+            "periodName": "June",
+            "value": 334.29,
+            "preliminary": false
+          },
+          {
+            "period": "2022-07",
+            "year": "2022",
+            "periodName": "July",
+            "value": 326.056,
+            "preliminary": false
+          },
+          {
+            "period": "2022-08",
+            "year": "2022",
+            "periodName": "August",
+            "value": 314.594,
+            "preliminary": false
+          },
+          {
+            "period": "2022-09",
+            "year": "2022",
+            "periodName": "September",
+            "value": 310.588,
+            "preliminary": false
+          },
+          {
+            "period": "2022-10",
+            "year": "2022",
+            "periodName": "October",
+            "value": 302.487,
+            "preliminary": false
+          },
+          {
+            "period": "2022-11",
+            "year": "2022",
+            "periodName": "November",
+            "value": 283.16,
+            "preliminary": false
+          },
+          {
+            "period": "2022-12",
+            "year": "2022",
+            "periodName": "December",
+            "value": 279.195,
+            "preliminary": false
+          },
+          {
+            "period": "2023-01",
+            "year": "2023",
+            "periodName": "January",
+            "value": 273.812,
+            "preliminary": false
+          },
+          {
+            "period": "2023-02",
+            "year": "2023",
+            "periodName": "February",
+            "value": 281.478,
+            "preliminary": false
+          },
+          {
+            "period": "2023-03",
+            "year": "2023",
+            "periodName": "March",
+            "value": 284.307,
+            "preliminary": false
+          },
+          {
+            "period": "2023-04",
+            "year": "2023",
+            "periodName": "April",
+            "value": 289.322,
+            "preliminary": false
+          },
+          {
+            "period": "2023-05",
+            "year": "2023",
+            "periodName": "May",
+            "value": 287.985,
+            "preliminary": false
+          },
+          {
+            "period": "2023-06",
+            "year": "2023",
+            "periodName": "June",
+            "value": 282.107,
+            "preliminary": false
+          },
+          {
+            "period": "2023-07",
+            "year": "2023",
+            "periodName": "July",
+            "value": 272.999,
+            "preliminary": false
+          },
+          {
+            "period": "2023-08",
+            "year": "2023",
+            "periodName": "August",
+            "value": 268.977,
+            "preliminary": false
+          },
+          {
+            "period": "2023-09",
+            "year": "2023",
+            "periodName": "September",
+            "value": 268.394,
+            "preliminary": false
+          },
+          {
+            "period": "2023-10",
+            "year": "2023",
+            "periodName": "October",
+            "value": 268.101,
+            "preliminary": false
+          },
+          {
+            "period": "2023-11",
+            "year": "2023",
+            "periodName": "November",
+            "value": 268.972,
+            "preliminary": false
+          },
+          {
+            "period": "2023-12",
+            "year": "2023",
+            "periodName": "December",
+            "value": 267.825,
+            "preliminary": false
+          },
+          {
+            "period": "2024-01",
+            "year": "2024",
+            "periodName": "January",
+            "value": 264.566,
+            "preliminary": false
+          },
+          {
+            "period": "2024-02",
+            "year": "2024",
+            "periodName": "February",
+            "value": 270.597,
+            "preliminary": false
+          },
+          {
+            "period": "2024-03",
+            "year": "2024",
+            "periodName": "March",
+            "value": 268.538,
+            "preliminary": false
+          },
+          {
+            "period": "2024-04",
+            "year": "2024",
+            "periodName": "April",
+            "value": 269.99,
+            "preliminary": false
+          },
+          {
+            "period": "2024-05",
+            "year": "2024",
+            "periodName": "May",
+            "value": 269.8,
+            "preliminary": false
+          },
+          {
+            "period": "2024-06",
+            "year": "2024",
+            "periodName": "June",
+            "value": 268.83,
+            "preliminary": false
+          },
+          {
+            "period": "2024-07",
+            "year": "2024",
+            "periodName": "July",
+            "value": 273.5,
+            "preliminary": false
+          },
+          {
+            "period": "2024-08",
+            "year": "2024",
+            "periodName": "August",
+            "value": 273.517,
+            "preliminary": false
+          },
+          {
+            "period": "2024-09",
+            "year": "2024",
+            "periodName": "September",
+            "value": 266.442,
+            "preliminary": false
+          },
+          {
+            "period": "2024-10",
+            "year": "2024",
+            "periodName": "October",
+            "value": 269.186,
+            "preliminary": false
+          },
+          {
+            "period": "2024-11",
+            "year": "2024",
+            "periodName": "November",
+            "value": 267.225,
+            "preliminary": false
+          },
+          {
+            "period": "2024-12",
+            "year": "2024",
+            "periodName": "December",
+            "value": 265.648,
+            "preliminary": false
+          },
+          {
+            "period": "2025-01",
+            "year": "2025",
+            "periodName": "January",
+            "value": 263.763,
+            "preliminary": false
+          },
+          {
+            "period": "2025-02",
+            "year": "2025",
+            "periodName": "February",
+            "value": 272.924,
+            "preliminary": false
+          },
+          {
+            "period": "2025-03",
+            "year": "2025",
+            "periodName": "March",
+            "value": 275.426,
+            "preliminary": false
+          },
+          {
+            "period": "2025-04",
+            "year": "2025",
+            "periodName": "April",
+            "value": 273.469,
+            "preliminary": false
+          },
+          {
+            "period": "2025-05",
+            "year": "2025",
+            "periodName": "May",
+            "value": 270.092,
+            "preliminary": false
+          },
+          {
+            "period": "2025-06",
+            "year": "2025",
+            "periodName": "June",
+            "value": 266.301,
+            "preliminary": false
+          },
+          {
+            "period": "2025-07",
+            "year": "2025",
+            "periodName": "July",
+            "value": 266.379,
+            "preliminary": false
+          },
+          {
+            "period": "2025-08",
+            "year": "2025",
+            "periodName": "August",
+            "value": 263.885,
+            "preliminary": false
+          },
+          {
+            "period": "2025-09",
+            "year": "2025",
+            "periodName": "September",
+            "value": 260.671,
+            "preliminary": false
+          },
+          {
+            "period": "2025-10",
+            "year": "2025",
+            "periodName": "October",
+            "value": 260.388,
+            "preliminary": false
+          },
+          {
+            "period": "2025-11",
+            "year": "2025",
+            "periodName": "November",
+            "value": 258.016,
+            "preliminary": false
+          },
+          {
+            "period": "2025-12",
+            "year": "2025",
+            "periodName": "December",
+            "value": 253.737,
+            "preliminary": false
+          },
+          {
+            "period": "2026-01",
+            "year": "2026",
+            "periodName": "January",
+            "value": 254.169,
+            "preliminary": false
+          },
+          {
+            "period": "2026-02",
+            "year": "2026",
+            "periodName": "February",
+            "value": 260.673,
+            "preliminary": false
+          },
+          {
+            "period": "2026-03",
+            "year": "2026",
+            "periodName": "March",
+            "value": 266.682,
+            "preliminary": false
+          },
+          {
+            "period": "2026-04",
+            "year": "2026",
+            "periodName": "April",
+            "value": 281.892,
+            "preliminary": false
+          },
+          {
+            "period": "2026-05",
+            "year": "2026",
+            "periodName": "May",
+            "value": 317.308,
+            "preliminary": false
+          },
+          {
+            "period": "2026-06",
+            "year": "2026",
+            "periodName": "June",
+            "value": 304.199,
+            "preliminary": true
+          },
+          {
+            "period": "2026-07",
+            "year": "2026",
+            "periodName": "July",
+            "value": 285.532,
+            "preliminary": true
+          },
+          {
+            "period": "2026-08",
+            "year": "2026",
+            "periodName": "August",
+            "value": 283.037,
+            "preliminary": true
+          },
+          {
+            "period": "2026-09",
+            "year": "2026",
+            "periodName": "September",
+            "value": 278.148,
+            "preliminary": true
+          }
+        ],
+        "Plastics material and resin manufacturing (PPI PCU325211325211)": [
+          {
+            "period": "2018-01",
+            "year": "2018",
+            "periodName": "January",
+            "value": 275.1,
+            "preliminary": false
+          },
+          {
+            "period": "2018-02",
+            "year": "2018",
+            "periodName": "February",
+            "value": 278.0,
+            "preliminary": false
+          },
+          {
+            "period": "2018-03",
+            "year": "2018",
+            "periodName": "March",
+            "value": 282.7,
+            "preliminary": false
+          },
+          {
+            "period": "2018-04",
+            "year": "2018",
+            "periodName": "April",
+            "value": 280.7,
+            "preliminary": false
+          },
+          {
+            "period": "2018-05",
+            "year": "2018",
+            "periodName": "May",
+            "value": 285.1,
+            "preliminary": false
+          },
+          {
+            "period": "2018-06",
+            "year": "2018",
+            "periodName": "June",
+            "value": 288.0,
+            "preliminary": false
+          },
+          {
+            "period": "2018-07",
+            "year": "2018",
+            "periodName": "July",
+            "value": 289.0,
+            "preliminary": false
+          },
+          {
+            "period": "2018-08",
+            "year": "2018",
+            "periodName": "August",
+            "value": 292.6,
+            "preliminary": false
+          },
+          {
+            "period": "2018-09",
+            "year": "2018",
+            "periodName": "September",
+            "value": 290.4,
+            "preliminary": false
+          },
+          {
+            "period": "2018-10",
+            "year": "2018",
+            "periodName": "October",
+            "value": 291.4,
+            "preliminary": false
+          },
+          {
+            "period": "2018-11",
+            "year": "2018",
+            "periodName": "November",
+            "value": 286.8,
+            "preliminary": false
+          },
+          {
+            "period": "2018-12",
+            "year": "2018",
+            "periodName": "December",
+            "value": 282.2,
+            "preliminary": false
+          },
+          {
+            "period": "2019-01",
+            "year": "2019",
+            "periodName": "January",
+            "value": 276.5,
+            "preliminary": false
+          },
+          {
+            "period": "2019-02",
+            "year": "2019",
+            "periodName": "February",
+            "value": 275.8,
+            "preliminary": false
+          },
+          {
+            "period": "2019-03",
+            "year": "2019",
+            "periodName": "March",
+            "value": 273.9,
+            "preliminary": false
+          },
+          {
+            "period": "2019-04",
+            "year": "2019",
+            "periodName": "April",
+            "value": 273.9,
+            "preliminary": false
+          },
+          {
+            "period": "2019-05",
+            "year": "2019",
+            "periodName": "May",
+            "value": 275.7,
+            "preliminary": false
+          },
+          {
+            "period": "2019-06",
+            "year": "2019",
+            "periodName": "June",
+            "value": 273.2,
+            "preliminary": false
+          },
+          {
+            "period": "2019-07",
+            "year": "2019",
+            "periodName": "July",
+            "value": 272.7,
+            "preliminary": false
+          },
+          {
+            "period": "2019-08",
+            "year": "2019",
+            "periodName": "August",
+            "value": 273.1,
+            "preliminary": false
+          },
+          {
+            "period": "2019-09",
+            "year": "2019",
+            "periodName": "September",
+            "value": 273.3,
+            "preliminary": false
+          },
+          {
+            "period": "2019-10",
+            "year": "2019",
+            "periodName": "October",
+            "value": 273.8,
+            "preliminary": false
+          },
+          {
+            "period": "2019-11",
+            "year": "2019",
+            "periodName": "November",
+            "value": 271.2,
+            "preliminary": false
+          },
+          {
+            "period": "2019-12",
+            "year": "2019",
+            "periodName": "December",
+            "value": 266.1,
+            "preliminary": false
+          },
+          {
+            "period": "2020-01",
+            "year": "2020",
+            "periodName": "January",
+            "value": 265.7,
+            "preliminary": false
+          },
+          {
+            "period": "2020-02",
+            "year": "2020",
+            "periodName": "February",
+            "value": 269.6,
+            "preliminary": false
+          },
+          {
+            "period": "2020-03",
+            "year": "2020",
+            "periodName": "March",
+            "value": 268.6,
+            "preliminary": false
+          },
+          {
+            "period": "2020-04",
+            "year": "2020",
+            "periodName": "April",
+            "value": 255.8,
+            "preliminary": false
+          },
+          {
+            "period": "2020-05",
+            "year": "2020",
+            "periodName": "May",
+            "value": 249.0,
+            "preliminary": false
+          },
+          {
+            "period": "2020-06",
+            "year": "2020",
+            "periodName": "June",
+            "value": 251.1,
+            "preliminary": false
+          },
+          {
+            "period": "2020-07",
+            "year": "2020",
+            "periodName": "July",
+            "value": 254.5,
+            "preliminary": false
+          },
+          {
+            "period": "2020-08",
+            "year": "2020",
+            "periodName": "August",
+            "value": 261.2,
+            "preliminary": false
+          },
+          {
+            "period": "2020-09",
+            "year": "2020",
+            "periodName": "September",
+            "value": 262.3,
+            "preliminary": false
+          },
+          {
+            "period": "2020-10",
+            "year": "2020",
+            "periodName": "October",
+            "value": 272.2,
+            "preliminary": false
+          },
+          {
+            "period": "2020-11",
+            "year": "2020",
+            "periodName": "November",
+            "value": 273.6,
+            "preliminary": false
+          },
+          {
+            "period": "2020-12",
+            "year": "2020",
+            "periodName": "December",
+            "value": 279.1,
+            "preliminary": false
+          },
+          {
+            "period": "2021-01",
+            "year": "2021",
+            "periodName": "January",
+            "value": 287.5,
+            "preliminary": false
+          },
+          {
+            "period": "2021-02",
+            "year": "2021",
+            "periodName": "February",
+            "value": 300.4,
+            "preliminary": false
+          },
+          {
+            "period": "2021-03",
+            "year": "2021",
+            "periodName": "March",
+            "value": 326.7,
+            "preliminary": false
+          },
+          {
+            "period": "2021-04",
+            "year": "2021",
+            "periodName": "April",
+            "value": 342.8,
+            "preliminary": false
+          },
+          {
+            "period": "2021-05",
+            "year": "2021",
+            "periodName": "May",
+            "value": 350.3,
+            "preliminary": false
+          },
+          {
+            "period": "2021-06",
+            "year": "2021",
+            "periodName": "June",
+            "value": 362.9,
+            "preliminary": false
+          },
+          {
+            "period": "2021-07",
+            "year": "2021",
+            "periodName": "July",
+            "value": 371.402,
+            "preliminary": false
+          },
+          {
+            "period": "2021-08",
+            "year": "2021",
+            "periodName": "August",
+            "value": 376.96,
+            "preliminary": false
+          },
+          {
+            "period": "2021-09",
+            "year": "2021",
+            "periodName": "September",
+            "value": 377.061,
+            "preliminary": false
+          },
+          {
+            "period": "2021-10",
+            "year": "2021",
+            "periodName": "October",
+            "value": 379.449,
+            "preliminary": false
+          },
+          {
+            "period": "2021-11",
+            "year": "2021",
+            "periodName": "November",
+            "value": 375.398,
+            "preliminary": false
+          },
+          {
+            "period": "2021-12",
+            "year": "2021",
+            "periodName": "December",
+            "value": 367.883,
+            "preliminary": false
+          },
+          {
+            "period": "2022-01",
+            "year": "2022",
+            "periodName": "January",
+            "value": 357.296,
+            "preliminary": false
+          },
+          {
+            "period": "2022-02",
+            "year": "2022",
+            "periodName": "February",
+            "value": 357.647,
+            "preliminary": false
+          },
+          {
+            "period": "2022-03",
+            "year": "2022",
+            "periodName": "March",
+            "value": 357.628,
+            "preliminary": false
+          },
+          {
+            "period": "2022-04",
+            "year": "2022",
+            "periodName": "April",
+            "value": 370.66,
+            "preliminary": false
+          },
+          {
+            "period": "2022-05",
+            "year": "2022",
+            "periodName": "May",
+            "value": 377.211,
+            "preliminary": false
+          },
+          {
+            "period": "2022-06",
+            "year": "2022",
+            "periodName": "June",
+            "value": 380.764,
+            "preliminary": false
+          },
+          {
+            "period": "2022-07",
+            "year": "2022",
+            "periodName": "July",
+            "value": 373.717,
+            "preliminary": false
+          },
+          {
+            "period": "2022-08",
+            "year": "2022",
+            "periodName": "August",
+            "value": 362.99,
+            "preliminary": false
+          },
+          {
+            "period": "2022-09",
+            "year": "2022",
+            "periodName": "September",
+            "value": 361.292,
+            "preliminary": false
+          },
+          {
+            "period": "2022-10",
+            "year": "2022",
+            "periodName": "October",
+            "value": 353.335,
+            "preliminary": false
+          },
+          {
+            "period": "2022-11",
+            "year": "2022",
+            "periodName": "November",
+            "value": 337.078,
+            "preliminary": false
+          },
+          {
+            "period": "2022-12",
+            "year": "2022",
+            "periodName": "December",
+            "value": 333.108,
+            "preliminary": false
+          },
+          {
+            "period": "2023-01",
+            "year": "2023",
+            "periodName": "January",
+            "value": 327.564,
+            "preliminary": false
+          },
+          {
+            "period": "2023-02",
+            "year": "2023",
+            "periodName": "February",
+            "value": 334.96,
+            "preliminary": false
+          },
+          {
+            "period": "2023-03",
+            "year": "2023",
+            "periodName": "March",
+            "value": 338.133,
+            "preliminary": false
+          },
+          {
+            "period": "2023-04",
+            "year": "2023",
+            "periodName": "April",
+            "value": 344.749,
+            "preliminary": false
+          },
+          {
+            "period": "2023-05",
+            "year": "2023",
+            "periodName": "May",
+            "value": 340.782,
+            "preliminary": false
+          },
+          {
+            "period": "2023-06",
+            "year": "2023",
+            "periodName": "June",
+            "value": 334.366,
+            "preliminary": false
+          },
+          {
+            "period": "2023-07",
+            "year": "2023",
+            "periodName": "July",
+            "value": 322.48,
+            "preliminary": false
+          },
+          {
+            "period": "2023-08",
+            "year": "2023",
+            "periodName": "August",
+            "value": 318.412,
+            "preliminary": false
+          },
+          {
+            "period": "2023-09",
+            "year": "2023",
+            "periodName": "September",
+            "value": 317.718,
+            "preliminary": false
+          },
+          {
+            "period": "2023-10",
+            "year": "2023",
+            "periodName": "October",
+            "value": 318.102,
+            "preliminary": false
+          },
+          {
+            "period": "2023-11",
+            "year": "2023",
+            "periodName": "November",
+            "value": 318.798,
+            "preliminary": false
+          },
+          {
+            "period": "2023-12",
+            "year": "2023",
+            "periodName": "December",
+            "value": 317.748,
+            "preliminary": false
+          },
+          {
+            "period": "2024-01",
+            "year": "2024",
+            "periodName": "January",
+            "value": 314.049,
+            "preliminary": false
+          },
+          {
+            "period": "2024-02",
+            "year": "2024",
+            "periodName": "February",
+            "value": 320.519,
+            "preliminary": false
+          },
+          {
+            "period": "2024-03",
+            "year": "2024",
+            "periodName": "March",
+            "value": 317.074,
+            "preliminary": false
+          },
+          {
+            "period": "2024-04",
+            "year": "2024",
+            "periodName": "April",
+            "value": 320.7,
+            "preliminary": false
+          },
+          {
+            "period": "2024-05",
+            "year": "2024",
+            "periodName": "May",
+            "value": 321.393,
+            "preliminary": false
+          },
+          {
+            "period": "2024-06",
+            "year": "2024",
+            "periodName": "June",
+            "value": 321.248,
+            "preliminary": false
+          },
+          {
+            "period": "2024-07",
+            "year": "2024",
+            "periodName": "July",
+            "value": 324.553,
+            "preliminary": false
+          },
+          {
+            "period": "2024-08",
+            "year": "2024",
+            "periodName": "August",
+            "value": 325.268,
+            "preliminary": false
+          },
+          {
+            "period": "2024-09",
+            "year": "2024",
+            "periodName": "September",
+            "value": 315.105,
+            "preliminary": false
+          },
+          {
+            "period": "2024-10",
+            "year": "2024",
+            "periodName": "October",
+            "value": 320.429,
+            "preliminary": false
+          },
+          {
+            "period": "2024-11",
+            "year": "2024",
+            "periodName": "November",
+            "value": 317.001,
+            "preliminary": false
+          },
+          {
+            "period": "2024-12",
+            "year": "2024",
+            "periodName": "December",
+            "value": 315.192,
+            "preliminary": false
+          },
+          {
+            "period": "2025-01",
+            "year": "2025",
+            "periodName": "January",
+            "value": 315.011,
+            "preliminary": false
+          },
+          {
+            "period": "2025-02",
+            "year": "2025",
+            "periodName": "February",
+            "value": 321.45,
+            "preliminary": false
+          },
+          {
+            "period": "2025-03",
+            "year": "2025",
+            "periodName": "March",
+            "value": 325.548,
+            "preliminary": false
+          },
+          {
+            "period": "2025-04",
+            "year": "2025",
+            "periodName": "April",
+            "value": 322.852,
+            "preliminary": false
+          },
+          {
+            "period": "2025-05",
+            "year": "2025",
+            "periodName": "May",
+            "value": 319.543,
+            "preliminary": false
+          },
+          {
+            "period": "2025-06",
+            "year": "2025",
+            "periodName": "June",
+            "value": 317.427,
+            "preliminary": false
+          },
+          {
+            "period": "2025-07",
+            "year": "2025",
+            "periodName": "July",
+            "value": 315.615,
+            "preliminary": false
+          },
+          {
+            "period": "2025-08",
+            "year": "2025",
+            "periodName": "August",
+            "value": 313.877,
+            "preliminary": false
+          },
+          {
+            "period": "2025-09",
+            "year": "2025",
+            "periodName": "September",
+            "value": 309.16,
+            "preliminary": false
+          },
+          {
+            "period": "2025-10",
+            "year": "2025",
+            "periodName": "October",
+            "value": 309.279,
+            "preliminary": false
+          },
+          {
+            "period": "2025-11",
+            "year": "2025",
+            "periodName": "November",
+            "value": 307.1,
+            "preliminary": false
+          },
+          {
+            "period": "2025-12",
+            "year": "2025",
+            "periodName": "December",
+            "value": 302.525,
+            "preliminary": false
+          },
+          {
+            "period": "2026-01",
+            "year": "2026",
+            "periodName": "January",
+            "value": 303.509,
+            "preliminary": false
+          },
+          {
+            "period": "2026-02",
+            "year": "2026",
+            "periodName": "February",
+            "value": 308.307,
+            "preliminary": false
+          },
+          {
+            "period": "2026-03",
+            "year": "2026",
+            "periodName": "March",
+            "value": 312.707,
+            "preliminary": false
+          },
+          {
+            "period": "2026-04",
+            "year": "2026",
+            "periodName": "April",
+            "value": 328.413,
+            "preliminary": false
+          },
+          {
+            "period": "2026-05",
+            "year": "2026",
+            "periodName": "May",
+            "value": 364.982,
+            "preliminary": false
+          },
+          {
+            "period": "2026-06",
+            "year": "2026",
+            "periodName": "June",
+            "value": 354.422,
+            "preliminary": true
+          },
+          {
+            "period": "2026-07",
+            "year": "2026",
+            "periodName": "July",
+            "value": 336.195,
+            "preliminary": true
+          },
+          {
+            "period": "2026-08",
+            "year": "2026",
+            "periodName": "August",
+            "value": 332.707,
+            "preliminary": true
+          },
+          {
+            "period": "2026-09",
+            "year": "2026",
+            "periodName": "September",
+            "value": 327.535,
+            "preliminary": true
+          }
+        ]
+      }
     }
   },
   "sources": [
