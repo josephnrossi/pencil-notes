@@ -1,0 +1,79 @@
+/* Pencil Notes v21fd — drop the handwritten title strip; restore the v21fb topbar;
+   keep default “<Template> – <date>” titles. Resin Board shows GPPS / HIPS. */
+
+/* Undo v21fc’s two-row header. Match styles.css + v21fb.css exactly. */
+#topbar {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: calc(6px + var(--sat)) 8px 6px;
+  box-sizing: border-box;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+#topbarRow { display: contents; }
+
+#titleStrip,
+#titleInkClear,
+#titleInkCv,
+#titleStrip .fc-ink-area,
+#titleStrip .fc-rule,
+canvas.fc-ink-preview {
+  display: none !important;
+}
+
+#topbar #noteTitle,
+#noteTitle {
+  position: static;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  min-width: 0;
+  flex: 0 1 420px;
+  height: 40px;
+  max-height: none;
+  width: auto;
+  max-width: none;
+  margin: 0;
+  border: 0;
+  background: none;
+  font-size: 20px;
+  font-weight: 700;
+  padding: 0 6px;
+  border-radius: 8px;
+  line-height: normal;
+  color: var(--text);
+  overflow: hidden;
+  z-index: auto;
+  box-sizing: border-box;
+}
+#topbar #noteTitle { min-width: 80px; }
+#noteTitle:focus { outline: none; background: var(--surface2); }
+@media (max-width: 700px) {
+  #noteTitle, #topbar #noteTitle { font-size: 17px; }
+}
+
+/* Text title is the visible title again, even if a note still has stored titleInk. */
+.note-row.fc-has-ink { align-items: stretch; }
+.note-row.fc-has-ink .meta .t,
+.note-row .meta .t {
+  font-size: inherit;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Resin Board: HIPS coverage note */
+#rbHipsNote {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface2, #f4f4f5);
+  color: var(--muted, #667);
+  font-size: 13px;
+  line-height: 1.4;
+}
+#rbChips button.rb-hips-gap { opacity: 0.85; font-style: normal; }
