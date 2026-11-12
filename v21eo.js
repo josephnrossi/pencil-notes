@@ -42,7 +42,7 @@
   const cardsOf = () => { const pg = ideaPg(); return pg ? (pg.tasks || []).filter(t => t && t.kind === 'card') : []; };
   const byId = (arr, id) => (arr || []).find(x => x && x.id === id);
   const pushWB = () => { if (typeof bH === 'function') bH(IPI); };
-  const saveWB = () => { const n = ideaN(); if (n && typeof saveNote === 'function') saveNote(n, true); };
+  let saveWB = () => { const n = ideaN(); if (n && typeof saveNote === 'function') saveNote(n, true); };
   const toastMsg = (m, ms) => { if (typeof toast === 'function') toast(m, ms); };
   const extraAssetIds = pg => {
     const s = new Set();
@@ -819,7 +819,7 @@
     const inSel = !inSheet && ST.selLasso && lassoHas(ev.clientX, ev.clientY);
     if (tgt || inSel) {
       const g = { typ: 'hold', tgt: inSel ? { sel: true } : tgt, sx: ev.clientX, sy: ev.clientY, vx: VIEW.x, vy: VIEW.y, pid: ev.pointerId, inSheet, t0: Date.now(), ev0: { clientX: ev.clientX, clientY: ev.clientY, pressure: ev.pressure, buttons: ev.buttons, pointerType: ev.pointerType, target: ev.target, pointerId: ev.pointerId } };
-      g.timer = setTimeout(() => { if (ST.g !== g) return; liftDrag(g); }, HOLD_MS);
+      g.timer = setTimeout(() => { if (ST.g !== g) return; liftDrag(g); }, (ST.holdMs != null ? ST.holdMs : HOLD_MS));
       ST.g = g; return;
     }
     if (fingerDraws() && ['pen', 'highlighter', 'eraser', 'lasso', 'text'].includes(curTool())) { startGesture(ev, null, inSheet); return; }
@@ -1958,6 +1958,29 @@
   const _readyWatch = setInterval(() => { if (window.__ready) { clearInterval(_readyWatch); boot(); } }, 200);
   setTimeout(() => clearInterval(_readyWatch), 15000);
 
+  function fgHook(name, core) {
+    const wrapped = function () {
+      const h = window.V21fg && V21fg.hooks && V21fg.hooks[name];
+      return h ? h(core, this, arguments) : core.apply(this, arguments);
+    };
+    wrapped._core = core;
+    return wrapped;
+  }
+  render = fgHook('render', render);
+  saveWB = fgHook('saveWB', saveWB);
+  liftDrag = fgHook('liftDrag', liftDrag);
+  dragMove = fgHook('dragMove', dragMove);
+  dragEnd = fgHook('dragEnd', dragEnd);
+  dropCancel = fgHook('dropCancel', dropCancel);
+  drawInkLayer = fgHook('drawInkLayer', drawInkLayer);
+  drawCardEl = fgHook('drawCardEl', drawCardEl);
+  paintInk = fgHook('paintInk', paintInk);
+  cardHtml = fgHook('cardHtml', cardHtml);
+  makeCardFromSel = fgHook('makeCardFromSel', makeCardFromSel);
+  addBlankCard = fgHook('addBlankCard', addBlankCard);
+  sizeWorld = fgHook('sizeWorld', sizeWorld);
+  applyView = fgHook('applyView', applyView);
+
   window.V21eo = {
     version: 'v21eo', ensureWB, migrate: ensureWB, render, VIEW, ST,
     cardFromInk, makeCardFromSel, addBlankCard, addLink, addPhotoFile, importPdfToBoard,
@@ -1967,6 +1990,6 @@
     rebuilt: 'v21eq', freeSpot, INK, CANVAS_CAP, placeInk, drawInkLayer, isOpen, topSheet, applyView,
     /* v21es */
     wbVersion: WB_VERSION, TITLE_H2, MAX_DEPTH, HOLD_MS_ES: HOLD_MS, migrateV2, kidsOf, loose, folderH, bodyH, fitFolder, depthOf, worldToScreen, clampView,
-    moveOut, ungroup, deleteCard, renderSheet, moveSelOut, cardOrigin, canDropCardIn, recognizeTitle, lassoHas, placePieces, pieceSet
+    moveOut, ungroup, deleteCard, renderSheet, moveSelOut, cardOrigin, canDropCardIn, recognizeTitle, lassoHas, placePieces, pieceSet, cardHtml, drawCardEl, paintInk, saveWB, liftDrag, dragMove, dragEnd, dropCancel, sizeWorld, syncMount, bindBoard, bindItemClicks, emptyHint, fillAssetImgs, flushRender, growWorldAt, checkInkRegion, ghostLayer, dropTargetAt, bodyScreen, srcScreen, worldEl, viewEl, host, CARD_W, TITLE_H2
   };
 })();

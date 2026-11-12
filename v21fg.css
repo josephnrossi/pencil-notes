@@ -1,0 +1,130 @@
+/* Pencil Notes v21fg — Idea Board titles, smoother drag, search, fast add.
+   Does not override #topbar or #salesBtn (v21fe safe-area and hidden Sales Leads stay). */
+
+.eo-card.es-card > .es-title { min-height: 44px; }
+.eo-card.es-card > .es-title > .fg-title-label {
+  position: absolute; left: 8px; right: 8px; top: 4px; bottom: 4px;
+  z-index: 3; box-sizing: border-box; margin: 0; padding: 2px 8px;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden; text-overflow: ellipsis;
+  overflow-wrap: break-word; word-break: break-word;
+  font: 700 13px/17px -apple-system, system-ui, sans-serif;
+  color: var(--text, #1a1a1a);
+  pointer-events: none;
+}
+.eo-card.es-card > .es-title > .fg-title-label.is-empty {
+  color: var(--muted, #8a8478); font-weight: 600; opacity: .72;
+  -webkit-line-clamp: 1;
+}
+.eo-card.es-card.fg-naming > .es-title > .fg-title-label { visibility: hidden; }
+.eo-card.es-card > .es-title > .fg-title-input,
+.eo-card.es-card > .es-title > input.fg-title-input,
+.eo-card.es-card > .es-title > textarea.fg-title-input {
+  position: absolute; left: 8px; right: 8px; top: 4px; bottom: 4px;
+  z-index: 4; box-sizing: border-box; height: auto; min-height: 36px;
+  padding: 2px 8px; margin: 0; border: 0; border-radius: 8px;
+  background: transparent; resize: none; overflow: hidden;
+  font: 700 13px/17px -apple-system, system-ui, sans-serif;
+  color: var(--text, #1a1a1a);
+  outline: none; pointer-events: none;
+  opacity: 0; white-space: pre-wrap; word-break: break-word;
+}
+.eo-card.es-card > .es-title > .fg-title-input::placeholder {
+  color: var(--muted, #8a8478); font-weight: 600; opacity: .72;
+}
+.eo-card.es-card > .es-title > .fg-title-input:focus,
+.eo-card.es-card.fg-naming > .es-title > .fg-title-input {
+  opacity: 1;
+  background: var(--surface, #fffdf8);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.eo-card.es-card.fg-naming { z-index: 8; }
+/* Keep the legacy title label / "Title" placeholder in the DOM for existing cards and tests, but the typed field is what you see. */
+.eo-card.es-card > .es-title > .es-title-ph,
+.eo-card.es-card > .es-title > .fg-title-ph { display: none; }
+.eo-card.es-card > .es-title > .eo-card-title { display: none; }
+.eo-card.es-card > .es-title > canvas.es-title-ink { z-index: 2; pointer-events: none; }
+
+#esGhost.fg-lift,
+#esGhost.fg-lift.on {
+  display: block; z-index: 4000; pointer-events: none;
+  transform-origin: 0 0; will-change: transform;
+  filter: drop-shadow(0 18px 28px rgba(0, 0, 0, .28));
+}
+#esGhost.fg-lift .es-ghost-card,
+#esGhost.fg-lift .eo-card {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .22), 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+#fgBoardBar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px 8px; flex: none;
+  background: var(--surface, #fffdf8);
+  border-bottom: 1px solid color-mix(in srgb, var(--line, #ddd) 80%, transparent);
+}
+#fgBoardBar[hidden] { display: none !important; }
+#fgBoardBar .fg-search { flex: 1; min-width: 0; position: relative; display: flex; align-items: center; }
+#fgBoardBar .fg-search input {
+  width: 100%; height: 44px; min-height: 44px; box-sizing: border-box;
+  padding: 0 108px 0 12px; border: 1px solid var(--line, #d5d0c6); border-radius: 12px;
+  background: var(--surface2, #fff); font: 600 15px/44px -apple-system, system-ui, sans-serif;
+  color: var(--text); outline: none;
+  -webkit-appearance: none; appearance: none;
+}
+#fgBoardBar .fg-search input::-webkit-search-cancel-button,
+#fgBoardBar .fg-search input::-webkit-search-decoration {
+  -webkit-appearance: none; appearance: none; display: none;
+}
+#fgBoardBar .fg-search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+#fgBoardBar .fg-search-n {
+  position: absolute; right: 40px; max-width: 72px;
+  font: 600 11px/1 -apple-system, system-ui, sans-serif;
+  color: var(--muted); pointer-events: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#fgBoardBar .fg-search-clear {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0;
+  border: 0; border-radius: 14px; background: transparent;
+  color: var(--muted, #8a8478); font: 700 16px/28px -apple-system, system-ui, sans-serif;
+  cursor: pointer; touch-action: manipulation;
+}
+#fgBoardBar .fg-search-clear:hover { background: color-mix(in srgb, var(--line, #ddd) 55%, transparent); color: var(--text); }
+#fgBoardBar .fg-search-clear[hidden] { display: none !important; }
+#fgBoardBar .fg-new,
+#fgFab {
+  flex: none; height: 44px; min-height: 44px; min-width: 44px;
+  padding: 0 14px; border: 0; border-radius: 12px;
+  background: var(--accent, #4a6fd4); color: #fff;
+  font: 700 14px/44px -apple-system, system-ui, sans-serif;
+  box-shadow: 0 1px 3px rgba(0,0,0,.14); touch-action: manipulation;
+}
+#fgFab {
+  position: absolute; right: 16px; bottom: 16px; z-index: 20;
+  width: 52px; height: 52px; min-width: 52px; min-height: 52px;
+  padding: 0; border-radius: 26px; font-size: 26px; line-height: 52px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.22);
+}
+#fgFab[hidden], #fgBoardBar[hidden] { display: none !important; }
+.fg-search .visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0);
+}
+.eo-card.fg-miss { opacity: .28; }
+.eo-card.fg-hit { outline: 2px solid var(--accent); outline-offset: 2px; }
+.eo-lasso-menu button { min-height: 44px; padding: 0 14px; }
+
+/* Origin of a drag: a faint slot, not a faded duplicate of the card. */
+#ibHost .eo-card.es-src-drag,
+#qbDrawer .eo-card.es-src-drag,
+.eo-card.es-src-drag.fg-src-slot {
+  opacity: 1 !important;
+  background: color-mix(in srgb, var(--surface, #fffdf8) 35%, transparent) !important;
+  box-shadow: none !important;
+  outline: none !important;
+  border: 2px dashed color-mix(in srgb, var(--accent, #4a6fd4) 40%, #c5c0b6) !important;
+}
+#ibHost .eo-card.es-src-drag > *,
+#qbDrawer .eo-card.es-src-drag > *,
+.eo-card.es-src-drag.fg-src-slot > * {
+  visibility: hidden !important;
+}
