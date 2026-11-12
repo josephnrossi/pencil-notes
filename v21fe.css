@@ -1,0 +1,31 @@
+/* Pencil Notes v21fe
+   1. Restore v21fb safe-area padding on the topbar (v21fc set padding: 0 8px and pushed
+      the menu into the iOS status bar in the installed PWA). Title field and toolbar sit
+      below the inset with the topbar.
+   2. Hide the Sales Leads topbar button — the board lives in the standalone Sales Leads app.
+   The v21fb/v21fc/v21fd overlays stay loaded; this file only tightens the chrome. */
+
+/* Use both env() and the --sat token so a test can emulate an inset by setting --sat. */
+#topbar {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 6px 8px;
+  padding-top: calc(6px + env(safe-area-inset-top, 0px));
+  padding-top: calc(6px + var(--sat, 0px));
+  padding-right: 8px;
+  padding-bottom: 6px;
+  padding-left: 8px;
+  box-sizing: border-box;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+/* Sales Leads is its own app. Keep the board code; do not show the button here. */
+#salesBtn,
+#salesBtn.fb-sales {
+  display: none !important;
+}
