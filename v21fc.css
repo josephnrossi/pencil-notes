@@ -1,0 +1,176 @@
+/* Pencil Notes v21fc — default template+date titles, handwritten title strip */
+
+/* Title ink lives in a second row of #topbar (full width, on a writing line) so we don't add a
+   whole extra chrome row above the toolbar. Budget: original topbar is 57px; stay ≤ 91px total. */
+#topbar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0;
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+#topbarRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  height: 44px;
+  flex: none;
+  padding: 0;
+}
+
+#titleStrip {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 47px;
+  height: 47px;
+  max-height: 47px;
+  padding: 0 0 2px 4px;
+  background: transparent;
+  border-bottom: 0;
+  flex: none;
+  touch-action: none;
+  box-sizing: border-box;
+  overflow: hidden;
+  z-index: 2;
+}
+#titleStrip .fc-ink-area {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 44px;
+  height: 45px;
+  overflow: hidden;
+}
+#titleStrip.has-ink .fc-ink-area { height: 64px; min-height: 64px; }
+#titleInkCv {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none; /* finger goes through to the text field; Pencil is handled on the strip */
+  z-index: 2;
+}
+#titleStrip .fc-rule {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 70%;
+  height: 0;
+  border-bottom: 1.5px solid color-mix(in srgb, var(--accent, #4f46e5) 28%, var(--line));
+  pointer-events: none;
+  z-index: 1;
+}
+#titleStrip.has-ink .fc-rule { opacity: .35; }
+
+/* typed title lives in the strip; sits on the writing line when there's no ink */
+#titleStrip #noteTitle {
+  position: absolute;
+  left: 0;
+  right: 52px;
+  top: 0;
+  bottom: 0;
+  height: 100%;
+  width: auto;
+  max-width: none;
+  max-height: 100%;
+  box-sizing: border-box;
+  flex: none;
+  z-index: 3;
+  font-size: 20px;
+  font-weight: 700;
+  /* sit the text on the writing line (rule at 70% of the ink area) — use px, never % (width-relative padding overflowed onto the toolbar) */
+  padding: 14px 8px 4px;
+  line-height: 24px;
+  background: transparent;
+  border-radius: 8px;
+  color: var(--text);
+  overflow: hidden;
+}
+#titleStrip #noteTitle:focus { outline: none; background: color-mix(in srgb, var(--surface2, var(--line)) 70%, transparent); }
+#titleStrip.has-ink {
+  height: 47px;
+  max-height: 47px;
+}
+#titleStrip.has-ink #noteTitle {
+  position: absolute;
+  left: 0;
+  right: 52px;
+  top: 0;
+  bottom: auto;
+  height: 16px;
+  min-height: 16px;
+  max-height: 16px;
+  padding: 0 8px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 16px;
+  background: transparent;
+  flex: none;
+  z-index: 3;
+}
+#titleInkClear {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 4;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface2, var(--line)) 80%, transparent);
+  color: var(--text);
+  font: 650 12px/1 -apple-system, system-ui, sans-serif;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+#titleStrip.has-ink #titleInkClear { display: inline-flex; }
+#titleInkClear:active { background: var(--accent-soft, var(--line)); }
+body.note-locked #titleStrip { opacity: .7; }
+#app.focus #titleStrip { display: none !important; }
+
+/* sidebar / search: ink preview with the text title as a subtitle */
+.note-row.fc-has-ink { align-items: center; }
+.note-row .fc-ink-preview {
+  display: block;
+  width: 108px;
+  height: 28px;
+  flex: none;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--surface2, var(--line)) 55%, transparent);
+}
+.note-row.fc-has-ink .meta .t {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.hw-res .fc-ink-preview {
+  display: block;
+  width: 72px;
+  height: 22px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--surface2, var(--line)) 55%, transparent);
+  flex: none;
+  margin-right: 6px;
+}
+.ev-row.fc-has-ink .fc-ink-preview,
+.ev-meta .fc-ink-preview {
+  display: inline-block;
+  width: 96px;
+  height: 24px;
+  vertical-align: middle;
+  margin-right: 6px;
+  border-radius: 4px;
+}
+
+@media (max-width: 700px) {
+  #titleStrip #noteTitle { font-size: 17px; right: 48px; }
+}

@@ -2,7 +2,7 @@
    One ＋ Insert menu, one grouped Settings screen, a Gestures sheet, a short first-run tour,
    Undo for every delete, a safe importer, storage-full handling and lock hardening.
    Nothing is removed — features are only reached through fewer, more consistent doors. */
-const APP_VERSION = 'v21fb';   // v21fb: Sales Leads Board pullout (printers by state, leads table, chain & printer news)
+const APP_VERSION = 'v21fc';   // v21fc: default titles are template + date; handwritten title strip (no OCR)
 
 /* ---------- import sanitizer: hostile backups must not inject markup ----------
    Rendering escapes free text, but ids/enums/colors are interpolated into attributes, so they are
