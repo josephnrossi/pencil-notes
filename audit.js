@@ -2,7 +2,7 @@
    One ＋ Insert menu, one grouped Settings screen, a Gestures sheet, a short first-run tour,
    Undo for every delete, a safe importer, storage-full handling and lock hardening.
    Nothing is removed — features are only reached through fewer, more consistent doors. */
-const APP_VERSION = 'v21fk';   // v21fk: never run overflow/reflow or rebuild canvases during a Pencil stroke
+const APP_VERSION = 'v21fl';   // v21fl: revert to v21fi behavior; keep v21fj/v21fk continuation pages visible
 
 /* ---------- import sanitizer: hostile backups must not inject markup ----------
    Rendering escapes free text, but ids/enums/colors are interpolated into attributes, so they are

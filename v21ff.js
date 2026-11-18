@@ -66,9 +66,8 @@
   function TD() { return (window.V21ee && V21ee.TD) || { X, W, TOP: 104, GAP: 16, HEAD, ROW, ADD: 36, NOTES: 150, NOTE_LH: LH, TMR: 132, BOX, DEF: 1 }; }
   function notesCount(t) { return t && t.notesLines != null ? Math.max(1, t.notesLines | 0) : NOTES_DEF; }
   function tmrCount(t) { return t && t.tmrLines != null ? Math.max(1, t.tmrLines | 0) : TMR_DEF; }
-  const NOTES_BASE = 150, TMR_BASE = 132;
-  function notesH(t) { const D = TD(); return NOTES_BASE + (notesCount(t) - NOTES_DEF) * (D.NOTE_LH || LH); }
-  function tmrH(t) { const D = TD(); return TMR_BASE + (tmrCount(t) - TMR_DEF) * (D.NOTE_LH || LH); }
+  function notesH(t) { const D = TD(); return D.NOTES + (notesCount(t) - NOTES_DEF) * D.NOTE_LH; }
+  function tmrH(t) { const D = TD(); return D.TMR + (tmrCount(t) - TMR_DEF) * D.NOTE_LH; }
   function applyTodoMetrics(t) {
     const D = TD(); if (!D || !t) return null;
     const saved = { NOTES: D.NOTES, TMR: D.TMR };
