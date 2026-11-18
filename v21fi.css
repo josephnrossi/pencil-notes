@@ -1,0 +1,18 @@
+/* Pencil Notes v21fi — hide the Resin Board chrome.
+   The v21ez/v21fd board code and resin-data.json stay in the tree;
+   this file only removes the button, pullout, and stale badge from the UI.
+   Sales Leads stays hidden (v21fe). */
+
+#resinBtn,
+#resinBtn.ez-resin {
+  display: none !important;
+}
+
+#rbDrawer,
+#rbDrawer.open,
+#rbDrawer.stale,
+#rbStale,
+#rbDrawer.stale #rbStale,
+#rbOffline {
+  display: none !important;
+}
