@@ -1351,6 +1351,42 @@
     }
   }
 
+  function fhHook(name, core) {
+    const wrapped = function () {
+      const h = window.V21fh && V21fh.hooks && V21fh.hooks[name];
+      return h ? h(core, this, arguments) : core.apply(this, arguments);
+    };
+    wrapped._core = core;
+    return wrapped;
+  }
+  todoAdd = fhHook('todoAdd', todoAdd);
+  todoRemoveLast = fhHook('todoRemoveLast', todoRemoveLast);
+  todoRemovePriAt = fhHook('todoRemovePriAt', todoRemovePriAt);
+  todoRemoveTaskAt = fhHook('todoRemoveTaskAt', todoRemoveTaskAt);
+  todoToggleTomorrow = fhHook('todoToggleTomorrow', todoToggleTomorrow);
+  custAdd = fhHook('custAdd', custAdd);
+  custRemoveLast = fhHook('custRemoveLast', custRemoveLast);
+  custRemoveRow = fhHook('custRemoveRow', custRemoveRow);
+  moduleHeight = fhHook('moduleHeight', moduleHeight);
+  freshState = fhHook('freshState', freshState);
+  growable = fhHook('growable', growable);
+  custLayout = fhHook('custLayout', custLayout);
+  drawCustom = fhHook('drawCustom', drawCustom);
+  drawCustomUI = fhHook('drawCustomUI', drawCustomUI);
+  applyCustomToPage = fhHook('applyCustomToPage', applyCustomToPage);
+  renderBuilder = fhHook('renderBuilder', renderBuilder);
+  paintBuilderPage = fhHook('paintBuilderPage', paintBuilderPage);
+  editPanel = fhHook('editPanel', editPanel);
+  addModule = fhHook('addModule', addModule);
+  reorderModule = fhHook('reorderModule', reorderModule);
+  removeModule = fhHook('removeModule', removeModule);
+  openBuilder = fhHook('openBuilder', openBuilder);
+  closeBuilder = fhHook('closeBuilder', closeBuilder);
+  hookBuilderEvents = fhHook('hookBuilderEvents', hookBuilderEvents);
+  showTplMenu = fhHook('showTplMenu', showTplMenu);
+  saveBuilder = fhHook('saveBuilder', saveBuilder);
+  pickerHTML = fhHook('pickerHTML', pickerHTML);
+
   window.V21ff = {
     version: VERSION,
     ready: () => readyP,
