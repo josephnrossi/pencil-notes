@@ -2,7 +2,7 @@
    One ＋ Insert menu, one grouped Settings screen, a Gestures sheet, a short first-run tour,
    Undo for every delete, a safe importer, storage-full handling and lock hardening.
    Nothing is removed — features are only reached through fewer, more consistent doors. */
-const APP_VERSION = 'v21fi';   // v21fi: remove the Resin Board from the Pencil Notes UI
+const APP_VERSION = 'v21fj';   // v21fj: auto-continue overflowing templates instead of a “page is full” toast
 
 /* ---------- import sanitizer: hostile backups must not inject markup ----------
    Rendering escapes free text, but ids/enums/colors are interpolated into attributes, so they are
