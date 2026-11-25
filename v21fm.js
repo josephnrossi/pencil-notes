@@ -208,6 +208,9 @@
           const n = noteById(cmd.noteId);
           if (n) n.strokes = (n.strokes || []).filter(s => s.id !== cmd.stroke.id);
           invalidateNote(cmd.noteId);
+        } else if (cmd.frameId) {
+          const fr = fm.frames.find(x => x.id === cmd.frameId);
+          if (fr) fr.titleInk = (fr.titleInk || []).filter(s => s.id !== cmd.stroke.id);
         } else {
           const s = fm.strokes.find(s => s.id === cmd.stroke.id);
           fm.strokes = fm.strokes.filter(s => s.id !== cmd.stroke.id);
@@ -218,6 +221,9 @@
           const n = noteById(cmd.noteId);
           if (n) n.strokes = (n.strokes || []).concat([copy(cmd.stroke)]);
           invalidateNote(cmd.noteId);
+        } else if (cmd.frameId) {
+          const fr = fm.frames.find(x => x.id === cmd.frameId);
+          if (fr) fr.titleInk = (fr.titleInk || []).concat([copy(cmd.stroke)]);
         } else {
           fm.strokes.push(copy(cmd.stroke));
           invalidateStroke(cmd.stroke);
@@ -246,6 +252,15 @@
           n.strokes = (n.strokes || []).concat(ch.gone.map(copy));
         }
         invalidateNote(ch.id);
+      });
+      (cmd.frames || []).forEach(ch => {
+        const fr = fm.frames.find(x => x.id === ch.id); if (!fr) return;
+        if (applyGone) {
+          const ids = new Set(ch.gone.map(s => s.id));
+          fr.titleInk = (fr.titleInk || []).filter(s => !ids.has(s.id));
+        } else {
+          fr.titleInk = (fr.titleInk || []).concat(ch.gone.map(copy));
+        }
       });
       paintAll(); scheduleSave();
       return;
@@ -823,6 +838,9 @@
         invalidateNote(n.id); paintScene(); paintMap(); return true;
       }
     }
+    if (typeof EXT.eraseAt === 'function') {
+      try { if (EXT.eraseAt(x, y, r, bag, { hitStroke })) return true; } catch (err) { console.warn('eraseAt', err); }
+    }
     const kept = [], gone = [];
     for (const s of fm.strokes) { if (hitStroke(s, x, y, r)) gone.push(s); else kept.push(s); }
     if (gone.length) {
@@ -889,12 +907,13 @@
     ST.stroke = true;
     if (ST.sel) { ST.sel = null; const hs = host(); if (hs) hs.querySelectorAll('.fm-sel-bar, .fm-resize').forEach(x => { x.hidden = true; }); }
     const n = noteAt(wx, wy);
+    const extra = !n && typeof EXT.inkTarget === 'function' ? EXT.inkTarget(wx, wy) : null;
     const y0 = n && (n.title || (n.titleInk && n.titleInk.length)) ? 28 : 8;
-    const origin = n ? [n.x, n.y + y0] : [0, 0];
+    const origin = extra ? extra.origin : (n ? [n.x, n.y + y0] : [0, 0]);
     const lx = wx - origin[0], ly = wy - origin[1];
     const pr = e.pressure || 0.5;
     const s = { id: newId('s'), tool: 'pen', color: ST.penColor, width: ST.penWidth, points: [[+lx.toFixed(1), +ly.toFixed(1), +pr.toFixed(2)]] };
-    ST.g = { typ: 'ink', pid: e.pointerId, stroke: s, note: n, origin, last: [wx, wy] };
+    ST.g = { typ: 'ink', pid: e.pointerId, stroke: s, note: n, frame: extra && extra.frame, origin, last: [wx, wy] };
     paintLiveStroke(s, origin);
   }
   function startErase(e, wx, wy) {
@@ -1070,12 +1089,14 @@
       if (g.note) {
         g.note.strokes = (g.note.strokes || []).concat([s]);
         invalidateNote(g.note.id);
+      } else if (g.frame) {
+        g.frame.titleInk = (g.frame.titleInk || []).concat([s]);
       } else {
         // stroke was in world coords already (origin 0,0)
         model().strokes.push(s);
         invalidateStroke(s);
       }
-      pushCmd({ typ: 'addStroke', noteId: g.note && g.note.id, stroke: copy(s) });
+      pushCmd({ typ: 'addStroke', noteId: g.note && g.note.id, frameId: g.frame && g.frame.id, stroke: copy(s) });
       ST.stroke = false; ST.g = null;
       clearLive(); paintAll();
       scheduleSave();
@@ -1085,7 +1106,8 @@
     if (g && g.typ === 'erase') {
       if (g.erased) {
         const notes = Object.keys(g.notes || {}).map(k => g.notes[k]);
-        pushCmd({ typ: 'erase', free: g.free || [], notes });
+        const frames = Object.keys(g.frames || {}).map(k => g.frames[k]);
+        pushCmd({ typ: 'erase', free: g.free || [], notes, frames });
       }
       ST.stroke = false; ST.g = null;
       clearLive(); paintAll();
@@ -1143,6 +1165,7 @@
       const n = g.note, a = g.arrow, f = g.frame;
       ST.g = null;
       if (g.hit) { if (Math.hypot(e.clientX - g.cx, e.clientY - g.cy) < 10 && typeof EXT.frameHit === 'function') EXT.frameHit(g.hit.f, g.hit.act); paintAll(); return; }
+      if (e.pointerType !== 'pen' && Math.hypot(e.clientX - g.cx, e.clientY - g.cy) < 8 && typeof EXT.tapAt === 'function' && EXT.tapAt(wx, wy)) return;
       if (a && Math.hypot(e.clientX - g.cx, e.clientY - g.cy) < 8) {
         pushUndo();
         const fm = model();
@@ -1632,7 +1655,7 @@
     version: VERSION, isOpen: isIdeasOpen, open: openBoard, migrate, model, view: () => ST.view,
     setTool, tool: () => ST.tool, strokeActive, addNote, addArrow, addFrame, fit: fitToScreen,
     scheduleSave, flushSave, undo: doUndo, redo: doRedo, paintAll, paintScene,
-    screenToWorld, worldToScreen, seedPerfBoard, ST, frameHitAt, renderNoteImage, drawNoteBody, COLORS, COLOR_KEYS, stats,
+    screenToWorld, worldToScreen, seedPerfBoard, ST, frameHitAt, renderNoteImage, drawNoteBody, drawStroke, COLORS, COLOR_KEYS, stats,
     find: (q) => { const ov = host() && host().querySelector('.fm-overflow'); if (ov) { ov.hidden = false; const i = ov.querySelector('#fmFind'); i.value = q; renderHits(q); } },
     setNoteColor: (c) => { ST.noteColor = c; },
     setPen: (c, w) => { if (c) ST.penColor = c; if (w) ST.penWidth = w; },

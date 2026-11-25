@@ -1,0 +1,15 @@
+/* v21fq — tap-to-type overlay for the Pros / Cons title band */
+#fqTitleWrap {
+  position: fixed; left: 0; top: 0; z-index: 40;
+  pointer-events: auto;
+}
+#fqTitleWrap[hidden] { display: none !important; }
+#fqTitleWrap input {
+  display: block; width: 100%; box-sizing: border-box; margin: 0;
+  border: 0; background: transparent; color: #1d1d1f;
+  font: 650 20px/1.2 -apple-system, system-ui, sans-serif;
+  padding: 0 12px; min-height: 36px; outline: none;
+  caret-color: #4f46e5;
+}
+#fqTitleWrap input::placeholder { color: #b0aea6; font-style: italic; font-weight: 500; }
+@media print { #fqTitleWrap { display: none !important; } }
