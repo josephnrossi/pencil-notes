@@ -12,6 +12,9 @@
 (() => {
   'use strict';
   const VERSION = 'v21fm';
+  // v21fn: extension hooks (media cards, insert button) live in v21fn.js
+  const EXT = window.V21fmExt || (window.V21fmExt = {});
+  const isMedia = n => !!(n && n.kind && n.kind !== 'note' && n.media);
   const NOTE_W = 220, NOTE_H = 170, TILE = 512, HOLD_MS = 280, HOLD_SLOP = 12, SAVE_MS = 220;
   const COLORS = {
     yellow: { fill: '#ffeaa3', edge: '#e2c46a', ink: '#3a2f10' },
@@ -251,6 +254,14 @@
       const n = noteById(cmd.id); if (!n) return;
       const p = back ? cmd.from : cmd.to;
       n.x = p.x; n.y = p.y;
+      if (cmd.memFrom) memApply(back ? cmd.memFrom : cmd.memTo);
+      paintAll(); scheduleSave();
+      return;
+    }
+    if (cmd.typ === 'resizeNote') {
+      const n = noteById(cmd.id); if (!n) return;
+      const p = back ? cmd.from : cmd.to;
+      n.w = p.w; n.h = p.h; invalidateNote(n.id);
       paintAll(); scheduleSave();
       return;
     }
@@ -400,6 +411,12 @@
     const ctx = cv.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
+    if (isMedia(n) && typeof EXT.paintMedia === 'function') {
+      try { EXT.paintMedia(ctx, n, w, h); } catch (err) { console.warn('paintMedia', err); }
+      (n.strokes || []).forEach(s => drawStroke(ctx, s, 0, 8));
+      rec.y0 = 8;
+      return rec;
+    }
     const c = COLORS[n.color] || COLORS.yellow;
     roundRect(ctx, 0.5, 0.5, w - 1, h - 1, 8);
     ctx.fillStyle = c.fill; ctx.fill();
@@ -532,6 +549,64 @@
       drawArrow(ctx, pts[0], pts[1], pts[2], pts[3], a.color || '#4f46e5', 2.2 / v.s);
     }
     ctx.restore();
+    if (!strokeActive()) placeSelChrome();
+  }
+  /* v21fn: selection bar (Open · Delete) and a corner resize handle for the selected note */
+  function placeSelChrome() {
+    const hs = host(); if (!hs) return;
+    const bar = hs.querySelector('.fm-sel-bar'), hd = hs.querySelector('.fm-resize'), st = stageEl();
+    if (!bar || !hd || !st) return;
+    const n = ST.sel && ST.sel.kind === 'note' ? noteById(ST.sel.id) : null;
+    const busy = ST.g && /^(pinch|moveNote|moveFrame)$/.test(ST.g.typ);
+    if (!n || busy) { bar.hidden = true; hd.hidden = true; return; }
+    const v = ST.view, sw = st.clientWidth, sh = st.clientHeight;
+    const x0 = (n.x - v.x) * v.s, y0 = (n.y - v.y) * v.s, x1 = (n.x + n.w - v.x) * v.s, y1 = (n.y + n.h - v.y) * v.s;
+    if (x1 < 0 || y1 < 0 || x0 > sw || y0 > sh) { bar.hidden = true; hd.hidden = true; return; }
+    const op = bar.querySelector('[data-sel="open"]');
+    if (op) { op.hidden = !isMedia(n); op.textContent = n.kind === 'pdf' ? 'Open PDF' : n.kind === 'link' ? 'Open link' : 'View photo'; }
+    bar.hidden = false;
+    const bw = bar.offsetWidth || 160, bh = bar.offsetHeight || 40;
+    let bx = clamp((x0 + x1) / 2 - bw / 2, 6, Math.max(6, sw - bw - 6));
+    let by = y0 - bh - 10; if (by < 60) by = Math.min(sh - bh - 6, y1 + 10);
+    bar.style.transform = 'translate(' + Math.round(bx) + 'px,' + Math.round(by) + 'px)';
+    hd.hidden = false;
+    hd.style.transform = 'translate(' + Math.round(x1 - 18) + 'px,' + Math.round(y1 - 18) + 'px)';
+  }
+  function deleteNote(id) {
+    const fm = model(), n = noteById(id); if (!n) return false;
+    pushUndo();
+    fm.notes = fm.notes.filter(x => x.id !== id);
+    fm.arrows = fm.arrows.filter(a => a.from !== id && a.to !== id);
+    for (const f of fm.frames) if (f.members) f.members = f.members.filter(m => m !== id);
+    caches.notes.delete(id); caches.dirtyNotes.delete(id);
+    if (ST.sel && ST.sel.id === id) ST.sel = null;
+    paintAll(); scheduleSave();
+    const label = isMedia(n) ? (n.kind === 'pdf' ? 'PDF' : n.kind === 'link' ? 'Link' : 'Photo') + ' removed' : 'Note removed';
+    if (typeof actionToast === 'function') actionToast(label, 'Undo', () => doUndo(), 6000); else toastMsg(label, 2000);
+    return true;
+  }
+  function resizeNote(n, w, h) {
+    const minW = isMedia(n) ? 120 : 140, minH = isMedia(n) ? 90 : 110;
+    n.w = Math.round(clamp(w, minW, 1600)); n.h = Math.round(clamp(h, minH, 1600));
+    invalidateNote(n.id);
+  }
+  function frameOf(n) {
+    const cx = n.x + n.w / 2, cy = n.y + n.h / 2;
+    let best = null;
+    for (const f of model().frames) if (cx >= f.x && cx <= f.x + f.w && cy >= f.y && cy <= f.y + f.h) { if (!best || f.w * f.h < best.w * best.h) best = f; }
+    return best;
+  }
+  function memSnap() { return model().frames.map(f => ({ id: f.id, members: (f.members || []).slice() })); }
+  function memApply(snap) { if (!snap) return; const fm = model(); for (const m of snap) { const f = fm.frames.find(x => x.id === m.id); if (f) f.members = m.members.slice(); } }
+  function updateMembership(n) {   // a note dragged into a frame joins it; dragged out, it leaves
+    const fm = model(), target = frameOf(n);
+    let changed = false;
+    for (const f of fm.frames) {
+      const has = (f.members || []).includes(n.id);
+      if (f === target && !has) { f.members = (f.members || []).concat([n.id]); changed = true; }
+      if (f !== target && has) { f.members = f.members.filter(m => m !== n.id); changed = true; }
+    }
+    return changed;
   }
   function drawArrow(ctx, x1, y1, x2, y2, color, lw) {
     const ang = Math.atan2(y2 - y1, x2 - x1), len = Math.hypot(x2 - x1, y2 - y1);
@@ -619,7 +694,7 @@
       ctx.strokeStyle = 'rgba(79,70,229,.5)'; ctx.strokeRect(f.x * sc + ox, f.y * sc + oy, f.w * sc, f.h * sc);
     }
     for (const n of fm.notes) {
-      const c = COLORS[n.color] || COLORS.yellow;
+      const c = isMedia(n) ? { fill: n.kind === 'photo' ? '#9fb4cc' : n.kind === 'pdf' ? '#e8b4ae' : '#c9c4f2' } : (COLORS[n.color] || COLORS.yellow);
       ctx.fillStyle = c.fill; ctx.fillRect(n.x * sc + ox, n.y * sc + oy, Math.max(2, n.w * sc), Math.max(2, n.h * sc));
     }
     for (const a of fm.arrows) {
@@ -719,7 +794,7 @@
   /* ---------- pointer ---------- */
   function onDown(e) {
     if (!mounted || !isIdeasOpen()) return;
-    if (e.target && e.target.closest && e.target.closest('.fm-tools, .fm-overflow, .fm-lasso-menu, .fm-fit, .fm-map')) return;
+    if (e.target && e.target.closest && e.target.closest('.fm-tools, .fm-overflow, .fm-lasso-menu, .fm-fit, .fm-map, .fm-sel-bar, .fm-resize, .fn-insert-pop')) return;
     const stage = stageEl(); if (!stage) return;
     ST.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, typ: e.pointerType, t: Date.now() });
     if (ST.ptrs.size === 2 && e.pointerType !== 'pen' && !(ST.g && ST.g.typ === 'ink')) {
@@ -763,6 +838,7 @@
   }
   function startInk(e, wx, wy) {
     ST.stroke = true;
+    if (ST.sel) { ST.sel = null; const hs = host(); if (hs) hs.querySelectorAll('.fm-sel-bar, .fm-resize').forEach(x => { x.hidden = true; }); }
     const n = noteAt(wx, wy);
     const y0 = n && (n.title || (n.titleInk && n.titleInk.length)) ? 28 : 8;
     const origin = n ? [n.x, n.y + y0] : [0, 0];
@@ -802,6 +878,7 @@
   }
   function startPinch() {
     if (ST.g && ST.g.timer) clearTimeout(ST.g.timer);
+    { const hs = host(); if (hs) hs.querySelectorAll('.fm-sel-bar, .fm-resize').forEach(x => { x.hidden = true; }); }
     const pts = [...ST.ptrs.values()];
     if (pts.length < 2) return;
     const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y;
@@ -910,6 +987,14 @@
       e.preventDefault();
       return;
     }
+    if (g.typ === 'resize' && g.note) {
+      const n = g.note, dx = (e.clientX - g.cx) / ST.view.s, dy = (e.clientY - g.cy) / ST.view.s;
+      if (g.aspect) { const w = g.from.w + Math.max(dx, dy * g.aspect); resizeNote(n, w, w / g.aspect); if (n.w / n.h !== g.aspect) n.h = Math.round(n.w / g.aspect); }
+      else resizeNote(n, g.from.w + dx, g.from.h + dy);
+      paintAll();
+      e.preventDefault();
+      return;
+    }
     if (g.typ === 'moveNote' && g.note) {
       const dx = wx - g.lx, dy = wy - g.ly;
       moveNote(g.note, dx, dy); g.lx = wx; g.ly = wy;
@@ -986,8 +1071,17 @@
     }
     if (g && g.typ === 'moveNote') {
       const st = stageEl(); if (st) st.classList.remove('fm-grabbing');
-      if (g.note) pushCmd({ typ: 'moveNote', id: g.note.id, from: g.from, to: { x: g.note.x, y: g.note.y } });
+      if (g.note) {
+        const memFrom = memSnap(), changed = updateMembership(g.note);
+        pushCmd({ typ: 'moveNote', id: g.note.id, from: g.from, to: { x: g.note.x, y: g.note.y }, memFrom: changed ? memFrom : null, memTo: changed ? memSnap() : null });
+      }
       ST.g = null; scheduleSave(); paintAll();
+      return;
+    }
+    if (g && g.typ === 'resize') {
+      ST.g = null;
+      if (g.note && (g.note.w !== g.from.w || g.note.h !== g.from.h)) pushCmd({ typ: 'resizeNote', id: g.note.id, from: g.from, to: { w: g.note.w, h: g.note.h } });
+      scheduleSave(); paintAll();
       return;
     }
     if (g && g.typ === 'moveFrame') {
@@ -1007,8 +1101,10 @@
         toastMsg('Arrow removed', 1200);
         return;
       }
+      const again = n && ST.sel && ST.sel.id === n.id && isMedia(n) && Math.hypot(e.clientX - g.cx, e.clientY - g.cy) < 8;
       ST.sel = n ? { kind: 'note', id: n.id } : f ? { kind: 'frame', id: f.id } : null;
       paintAll();
+      if (again && typeof EXT.openMedia === 'function') EXT.openMedia(n);
       return;
     }
     if (g && g.typ === 'pinch') {
@@ -1148,6 +1244,7 @@
       frame: '<rect x="4" y="6" width="15" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2"/>',
       undo: '<path d="M8 11H5l4-5M5 11c2 5 12 6 14 1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
       more: '<circle cx="6" cy="12" r="1.5" fill="currentColor"/><circle cx="11.5" cy="12" r="1.5" fill="currentColor"/><circle cx="17" cy="12" r="1.5" fill="currentColor"/>',
+      insert: '<rect x="4" y="5" width="16" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 9v6M9 12h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
       fit: '<path d="M6 9V6h3M16 6h3v3M19 16v3h-3M9 19H6v-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'
     };
     return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (p[name] || '') + '</svg>';
@@ -1166,9 +1263,10 @@
     const tools = [['pen', 'Pen'], ['eraser', 'Eraser'], ['lasso', 'Lasso'], ['note', 'Note'], ['arrow', 'Arrow'], ['frame', 'Frame']];
     return '<div class="fm-tools" role="toolbar" aria-label="Idea Board tools">' +
       tools.map(([k, l]) => '<button type="button" class="fm-tb' + (ST.tool === k ? ' on' : '') + '" data-tool="' + k + '" aria-label="' + l + '" title="' + l + '">' + icon(k) + '<span>' + l + '</span></button>').join('') +
+      '<button type="button" class="fm-tb" id="fmInsert" aria-label="Insert photo, PDF or link" title="Insert a photo, PDF or link" aria-haspopup="menu">' + icon('insert') + '<span>Insert</span></button>' +
       '<span class="fm-flex"></span>' +
       '<button type="button" class="fm-tb" id="fmUndo" aria-label="Undo" title="Undo">' + icon('undo') + '<span>Undo</span></button>' +
-      '<button type="button" class="fm-tb" id="fmMore" aria-label="More" title="Color, size and Find cards">' + icon('more') + '<span>More</span></button>' +
+      '<button type="button" class="fm-tb" id="fmMore" aria-label="More" title="Color, size and Find notes">' + icon('more') + '<span>More</span></button>' +
       '</div>';
   }
   function overflowHTML() {
@@ -1182,8 +1280,8 @@
       '<h3>Note color</h3><div class="fm-row" id="fmNoteColors">' +
       COLOR_KEYS.map(k => '<button type="button" class="fm-ncolor' + (ST.noteColor === k ? ' on' : '') + '" data-n="' + k + '" style="background:' + COLORS[k].fill + '" aria-label="' + k + ' note"></button>').join('') +
       '</div>' +
-      '<h3>Find cards</h3>' +
-      '<input type="search" id="fmFind" placeholder="Find cards…" aria-label="Find cards">' +
+      '<h3>Find notes</h3>' +
+      '<input type="search" id="fmFind" placeholder="Find notes…" aria-label="Find notes">' +
       '<div class="fm-hits" id="fmHits"></div>' +
       '<div class="fm-actions"><button type="button" class="fm-redo" aria-label="Redo">Redo</button>' +
       '<button type="button" data-act="fit">Fit to screen</button></div></div>';
@@ -1197,7 +1295,13 @@
       '<div class="fm-lasso-menu" hidden>' +
       '<button type="button" class="primary" data-lasso="make">Make note</button>' +
       '<button type="button" class="danger" data-lasso="del">Delete</button>' +
-      '<button type="button" data-lasso="cancel">Cancel</button></div></div>' +
+      '<button type="button" data-lasso="cancel">Cancel</button></div>' +
+      '<div class="fm-sel-bar" role="toolbar" aria-label="Selected note" hidden><button type="button" data-sel="open" hidden>Open</button><button type="button" class="danger" data-sel="del">Delete</button></div>' +
+      '<button type="button" class="fm-resize" aria-label="Resize" title="Drag to resize" hidden></button></div>' +
+      '<div class="fn-insert-pop" role="menu" hidden>' +
+      '<button type="button" role="menuitem" data-ins="photo"><i>📷</i><span>Photo</span><small>Camera or library</small></button>' +
+      '<button type="button" role="menuitem" data-ins="pdf"><i>📄</i><span>PDF</span><small>First page as a card</small></button>' +
+      '<button type="button" role="menuitem" data-ins="link"><i>🔗</i><span>Link</span><small>Web address card</small></button></div>' +
       '<button type="button" class="fm-fit" aria-label="Fit to screen" title="Fit to screen">' + icon('fit') + '</button>' +
       '<div class="fm-map" aria-label="Board overview"><canvas></canvas></div>' +
       overflowHTML() + '</div>';
@@ -1240,7 +1344,26 @@
       if (b) setTool(b.dataset.tool);
     });
     root.querySelector('#fmUndo').addEventListener('click', doUndo);
-    root.querySelector('#fmMore').addEventListener('click', toggleOverflow);
+    root.querySelector('#fmMore').addEventListener('click', () => { hideInsert(); toggleOverflow(); });
+    const pop = root.querySelector('.fn-insert-pop');
+    root.querySelector('#fmInsert').addEventListener('click', () => { hideOverflow(); pop.hidden = !pop.hidden; root.querySelector('#fmInsert').classList.toggle('on', !pop.hidden); });
+    pop.addEventListener('click', ev => { const b = ev.target.closest('[data-ins]'); if (!b) return; hideInsert(); if (typeof EXT.insert === 'function') EXT.insert(b.dataset.ins); });
+    const bar = root.querySelector('.fm-sel-bar');
+    bar.addEventListener('click', ev => {
+      const b = ev.target.closest('[data-sel]'); if (!b || !ST.sel) return;
+      const n = noteById(ST.sel.id); if (!n) return;
+      if (b.dataset.sel === 'del') deleteNote(n.id);
+      else if (b.dataset.sel === 'open' && typeof EXT.openMedia === 'function') EXT.openMedia(n);
+    });
+    const hd = root.querySelector('.fm-resize');
+    hd.addEventListener('pointerdown', ev => {
+      const n = ST.sel && noteById(ST.sel.id); if (!n) return;
+      ev.preventDefault(); ev.stopPropagation();
+      const aspect = isMedia(n) && (n.kind === 'photo' || n.kind === 'pdf') ? n.w / n.h : 0;
+      ST.g = { typ: 'resize', pid: ev.pointerId, note: n, cx: ev.clientX, cy: ev.clientY, from: { w: n.w, h: n.h }, aspect };
+      bar.hidden = true;
+      try { hd.setPointerCapture(ev.pointerId); } catch (_) {}
+    });
     root.querySelector('.fm-fit').addEventListener('click', fitToScreen);
     root.querySelector('.fm-lasso-menu').addEventListener('click', ev => {
       const a = ev.target.closest('[data-lasso]'); if (!a) return;
@@ -1267,6 +1390,11 @@
     ST.overflow = !ov.hidden;
     if (!ov.hidden) ov.querySelector('#fmFind').focus();
   }
+  function hideInsert() {
+    const r = host() && host().querySelector('.fm-root'); if (!r) return;
+    const pop = r.querySelector('.fn-insert-pop'); if (pop) pop.hidden = true;
+    const b = r.querySelector('#fmInsert'); if (b) b.classList.remove('on');
+  }
   function hideOverflow() {
     const ov = host() && host().querySelector('.fm-overflow');
     if (ov) ov.hidden = true;
@@ -1276,8 +1404,10 @@
     const box = host() && host().querySelector('#fmHits'); if (!box) return;
     const s = String(q || '').trim().toLowerCase();
     if (!s) { box.innerHTML = ''; return; }
-    const hits = model().notes.filter(n => (n.title || '').toLowerCase().includes(s));
-    box.innerHTML = hits.slice(0, 8).map(n => '<button type="button" data-hit="' + n.id + '">' + (n.title || 'Untitled note') + '</button>').join('') || '<p class="fine">No cards match</p>';
+    const label = n => (n.title || (n.media && (n.media.title || n.media.name || n.media.domain)) || 'Untitled note');
+    const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const hits = model().notes.filter(n => [n.title, n.media && n.media.title, n.media && n.media.name, n.media && n.media.domain].some(t => (t || '').toLowerCase().includes(s)));
+    box.innerHTML = hits.slice(0, 8).map(n => '<button type="button" data-hit="' + n.id + '">' + esc(label(n)) + '</button>').join('') || '<p class="fine">No notes match</p>';
     box.onclick = ev => {
       const b = ev.target.closest('[data-hit]'); if (!b) return;
       const n = noteById(b.dataset.hit); if (!n) return;
@@ -1451,6 +1581,9 @@
     setPen: (c, w) => { if (c) ST.penColor = c; if (w) ST.penWidth = w; },
     lassoToNote, hideOverflow, toggleOverflow, snapshotOldBoard, showLassoMenu,
     clearCaches: () => { caches.notes.clear(); caches.tiles.clear(); caches.dirtyTiles.clear(); caches.dirtyNotes.clear(); },
-    stageEl, baseCv, liveCv
+    stageEl, baseCv, liveCv,
+    // v21fn
+    EXT, isMedia, invalidateNote, pushUndo, pushCmd, noteById, noteAt, viewBox, deleteNote, resizeNote, frameOf,
+    select: (id) => { ST.sel = id ? { kind: 'note', id } : null; paintAll(); }, hideInsert, placeSelChrome
   };
 })();

@@ -1,0 +1,148 @@
+/* Pencil Notes v21fn — toasts, Idea Board media, quote send, calculator Board mode,
+   backup reminder, version badge / What's new / update banner. */
+
+/* 1. Toasts: one at a time; moved under the top bar when the bottom spot would cover To-Do boxes */
+#toast.fn-top, #undoToast.fn-top { top: var(--fn-toast-top, 72px) !important; bottom: auto !important; }
+body:has(#undoToast:not([hidden])) #toast:not([hidden]) { bottom: calc(20px + var(--sab, 0px)); }
+
+/* 2. Idea Board: Insert popover, selection bar, resize handle, photo viewer, link sheet */
+.fn-insert-pop {
+  position: absolute; z-index: 12; top: 64px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; padding: 8px; border-radius: 16px;
+  background: rgba(255,253,248,.98); border: 1px solid rgba(60,60,80,.14); box-shadow: 0 12px 34px rgba(30,30,50,.2);
+}
+.fn-insert-pop[hidden] { display: none !important; }
+.fn-insert-pop button {
+  display: grid; grid-template-columns: auto; justify-items: center; gap: 2px; min-width: 112px; min-height: 76px; padding: 10px 12px;
+  border: 1px solid rgba(60,60,80,.12); border-radius: 12px; background: #fff; color: #1d1d1f; cursor: pointer;
+  font: 700 14px/1.15 -apple-system, system-ui, sans-serif;
+}
+.fn-insert-pop button i { font-style: normal; font-size: 22px; line-height: 1; }
+.fn-insert-pop button small { font: 500 11px/1.2 -apple-system, system-ui, sans-serif; color: #6e6e76; }
+.fn-insert-pop button:active { transform: scale(.97); }
+
+.fm-sel-bar {
+  position: absolute; left: 0; top: 0; z-index: 9; display: flex; gap: 6px; padding: 5px; border-radius: 14px;
+  background: rgba(255,253,248,.97); border: 1px solid rgba(60,60,80,.14); box-shadow: 0 8px 24px rgba(30,30,50,.16);
+  will-change: transform;
+}
+.fm-sel-bar[hidden], .fm-resize[hidden], .fm-sel-bar button[hidden] { display: none !important; }
+.fm-sel-bar button { min-height: 36px; padding: 0 14px; border: 0; border-radius: 10px; background: #f0eee8; color: #1d1d1f; font: 650 13px/1 -apple-system, system-ui, sans-serif; cursor: pointer; }
+.fm-sel-bar button.danger { color: #b42318; }
+.fm-resize {
+  position: absolute; left: 0; top: 0; z-index: 9; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; touch-action: none; cursor: nwse-resize; will-change: transform;
+}
+.fm-resize::before {
+  content: ''; position: absolute; left: 9px; top: 9px; width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; border: 2.5px solid #4f46e5; box-shadow: 0 2px 6px rgba(30,30,50,.25);
+}
+
+#fnViewer { position: fixed; inset: 0; z-index: 9000; background: rgba(10,10,14,.92); display: flex; align-items: center; justify-content: center; }
+#fnViewer[hidden] { display: none; }
+#fnViewer img { max-width: 96vw; max-height: 90vh; object-fit: contain; border-radius: 6px; }
+#fnViewer button { position: absolute; top: calc(14px + var(--sat, 0px)); right: 14px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(255,255,255,.16); color: #fff; font-size: 18px; }
+
+.fn-sheet-wrap { position: fixed; inset: 0; z-index: 8800; background: rgba(0,0,0,.28); display: flex; align-items: flex-start; justify-content: center; padding-top: calc(110px + var(--sat, 0px)); }
+.fn-sheet-wrap[hidden] { display: none; }
+.fn-sheet { width: min(420px, calc(100vw - 32px)); background: var(--surface, #fff); color: var(--text, #1d1d1f); border-radius: 18px; padding: 18px; box-shadow: 0 20px 50px rgba(0,0,0,.25); display: grid; gap: 12px; font: 500 14px/1.3 -apple-system, system-ui, sans-serif; }
+.fn-sheet h3 { margin: 0; font-size: 18px; }
+.fn-sheet label { display: grid; gap: 6px; font-weight: 650; }
+.fn-sheet label small { font-weight: 500; color: #6e6e76; }
+.fn-sheet input { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line, #d6d8de); background: var(--surface2, #f7f7f9); color: inherit; font: 500 16px -apple-system, system-ui, sans-serif; }
+.fn-sheet .fn-err { margin: 0; color: #b42318; font-weight: 600; }
+.fn-sheet-btns { display: flex; justify-content: flex-end; gap: 8px; }
+.fn-sheet-btns button { min-height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid var(--line, #d6d8de); background: var(--surface2, #f2f2f5); color: inherit; font: 700 15px -apple-system, system-ui, sans-serif; }
+.fn-sheet-btns button.primary { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+
+/* 3. Quote: 📤 Send PDF (DOM only, never printed) */
+.page .overlay .qs-ui.fn-qsend {
+  transform: translateX(-100%); height: 30px; line-height: 28px; padding: 0 12px; border-radius: 15px;
+  background: #4f46e5; color: #fff; border: 1px solid #4f46e5; font: 700 13px -apple-system, system-ui, sans-serif; box-shadow: 0 2px 8px rgba(79,70,229,.25);
+}
+
+/* 4. Calculator Board mode */
+.fn-mode { display: flex; gap: 2px; padding: 2px; border-radius: 10px; background: #15151a; margin-right: auto; }
+.fn-mode button { min-height: 32px; min-width: 58px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: #c9c9d3; font: 700 calc(12px * var(--calc-sz, 1))/1 system-ui; }
+.fn-mode button.on { background: #4f46e5; color: #fff; }
+#fhCalc .fh-calc-sizebar { gap: 8px; }
+#fhCalc .fn-board { display: none; }
+#fhCalc.fn-board-on .fn-board { display: grid; }
+#fhCalc.fn-board-on .fh-calc-expr, #fhCalc.fn-board-on .fh-calc-out, #fhCalc.fn-board-on .fh-calc-keys, #fhCalc.fn-board-on .fh-calc-hist { display: none !important; }
+.fn-board { gap: calc(8px * var(--calc-sz, 1)); padding: calc(10px * var(--calc-sz, 1)) calc(12px * var(--calc-sz, 1)) calc(18px * var(--calc-sz, 1)); font-size: calc(13px * var(--calc-sz, 1)); }
+.fn-board .fn-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 3px; border-radius: 12px; background: #15151a; }
+.fn-board .fn-tabs button { min-height: calc(34px * var(--calc-sz, 1)); border: 0; border-radius: 9px; background: transparent; color: #c9c9d3; font: 700 calc(13px * var(--calc-sz, 1))/1 system-ui; }
+.fn-board .fn-tabs button.on { background: #3a3a46; color: #fff; }
+.fn-board .fn-grid { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 6px; }
+.fn-board .fn-grid2 { display: grid; grid-template-columns: 1.7fr 1fr; align-items: end; gap: 8px; }
+.fn-board .fn-x { padding-bottom: calc(12px * var(--calc-sz, 1)); color: #9a9aa6; font-weight: 700; }
+.fn-board .fn-f { display: grid; gap: 4px; min-width: 0; }
+.fn-board .fn-f span { color: #a9a9b5; font: 600 calc(11px * var(--calc-sz, 1))/1.1 system-ui; }
+.fn-board input {
+  width: 100%; min-width: 0; box-sizing: border-box; min-height: calc(42px * var(--calc-sz, 1)); padding: 0 10px; border-radius: 10px;
+  border: 1px solid #3a3a46; background: #101014; color: #fff; font: 600 calc(17px * var(--calc-sz, 1)) system-ui;
+  user-select: text; -webkit-user-select: text; touch-action: manipulation;
+}
+.fn-board input:focus { outline: 2px solid #4f46e5; outline-offset: 0; }
+.fn-board .fn-seg { display: flex; gap: 2px; padding: 2px; border-radius: 10px; background: #15151a; min-width: 0; }
+.fn-board .fn-seg button { flex: 1 1 0; min-width: 0; min-height: calc(38px * var(--calc-sz, 1)); padding: 0 4px; border: 0; border-radius: 8px; background: transparent; color: #c9c9d3; font: 650 calc(12px * var(--calc-sz, 1))/1.1 system-ui; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fn-board .fn-seg button.on { background: #3f3a88; color: #fff; }
+.fn-board .fn-out { display: grid; gap: 3px; padding: calc(10px * var(--calc-sz, 1)) 12px; border-radius: 12px; background: #26262e; min-height: calc(54px * var(--calc-sz, 1)); align-content: center; }
+.fn-board .fn-out b { font: 800 calc(26px * var(--calc-sz, 1))/1.1 system-ui; color: #fff; }
+.fn-board .fn-out small { font: 500 calc(12px * var(--calc-sz, 1))/1.3 system-ui; color: #b9b9c4; }
+
+/* 5. End-of-day backup banner (top, under the toolbar — never over the bottom toasts or To-Do boxes) */
+#fnEodBanner {
+  position: fixed; left: 0; right: 0; margin: 0 auto; width: max-content; top: var(--fn-banner-top, 72px); z-index: 115;
+  display: flex; align-items: center; gap: 8px; max-width: min(720px, calc(100vw - 24px)); box-sizing: border-box; padding: 8px 8px 8px 14px;
+  background: var(--surface, #fff); color: var(--text, #1d1d1f); border: 1px solid var(--line, #e2e2e8); border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.16); font: 500 14px/1.3 -apple-system, system-ui, sans-serif;
+}
+#fnEodBanner[hidden] { display: none; }
+#fnEodBanner .fn-eod-t { flex: 1 1 auto; min-width: 0; }
+#fnEodBanner .fn-eod-t b { margin-right: 4px; }
+#fnEodBanner button { flex: none; white-space: nowrap; min-height: 40px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--line, #e2e2e8); background: var(--surface2, #f2f2f5); color: inherit; font: 700 13px -apple-system, system-ui, sans-serif; }
+#fnEodBanner button.primary { background: var(--accent, #4f46e5); border-color: var(--accent, #4f46e5); color: #fff; }
+#fnEodBanner button.fn-eod-off { background: transparent; border-color: transparent; color: #6e6e76; font-weight: 600; padding: 0 6px; }
+body.fn-eod-show #eqBackupNag { display: none !important; }
+
+/* 6. Version badge, What's new card, changelog, update banner */
+#sidebar .brand { position: relative; }
+.fn-ver {
+  margin-left: 8px; padding: 2px 8px; min-height: 22px; border-radius: 11px; border: 1px solid var(--line, #dcdce3);
+  background: var(--surface2, #f2f2f6); color: var(--muted, #6e6e76); font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .02em; cursor: pointer; vertical-align: middle; position: relative;
+}
+.fn-ver::after { content: ''; position: absolute; inset: -11px -6px; }   /* 44px tap target, same small look */
+#fnWhatsNew { position: fixed; inset: 0; z-index: 8900; display: flex; align-items: flex-start; justify-content: center; padding-top: calc(96px + var(--sat, 0px)); background: rgba(0,0,0,.18); }
+#fnWhatsNew[hidden] { display: none; }
+.fn-wn { width: min(480px, calc(100vw - 32px)); background: var(--surface, #fff); color: var(--text, #1d1d1f); border-radius: 20px; padding: 18px 18px 16px; box-shadow: 0 24px 60px rgba(0,0,0,.25); font: 500 15px/1.4 -apple-system, system-ui, sans-serif; }
+.fn-wn-head { display: flex; align-items: center; gap: 10px; }
+.fn-wn-head h3 { flex: 1; margin: 0; font-size: 18px; line-height: 1.25; }
+.fn-wn-badge { padding: 4px 9px; border-radius: 10px; background: #4f46e5; color: #fff; font: 800 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.fn-wn-x { width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--surface2, #f2f2f5); color: inherit; font-size: 15px; }
+.fn-wn ul { margin: 14px 0 16px; padding-left: 20px; display: grid; gap: 8px; }
+.fn-wn-btns { display: flex; justify-content: flex-end; gap: 8px; }
+.fn-wn-btns button { min-height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid var(--line, #e2e2e8); background: var(--surface2, #f2f2f5); color: inherit; font: 700 15px -apple-system, system-ui, sans-serif; }
+.fn-wn-btns button.primary { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+.fn-changelog { display: grid; gap: 10px; padding: 4px 14px 12px; font: 500 13px/1.4 -apple-system, system-ui, sans-serif; }
+.fn-changelog b { font-weight: 800; }
+.fn-changelog b i { font-style: normal; font-weight: 600; font-size: 11px; color: #4f46e5; margin-left: 6px; }
+.fn-changelog ul { margin: 4px 0 0; padding-left: 18px; color: var(--muted, #555); }
+#fnUpdate {
+  position: fixed; left: 50%; top: calc(10px + var(--sat, 0px)); transform: translateX(-50%); z-index: 9100;
+  min-height: 44px; padding: 0 18px; border-radius: 22px; border: 0; background: #1d1d1f; color: #fff;
+  box-shadow: 0 10px 26px rgba(0,0,0,.25); font: 500 14px -apple-system, system-ui, sans-serif;
+}
+#fnUpdate[hidden] { display: none; }
+#fnUpdate b { font-weight: 800; }
+:root[data-theme="dark"] #fnUpdate { background: #f4f4f6; color: #1d1d1f; }
+
+/* Top-bar badge: next to the title, never in the right-hand cluster, never in print / exports */
+#topbar #fnTopVer, #topbar .fn-ver-top {
+  flex: 0 0 auto; align-self: center; margin: 0 2px 0 4px; position: relative; z-index: 2;
+}
+#topbar #fnTopVer::after { inset: -10px -4px; }   /* 44px-tall target, tight sides so it doesn't cover the title or undo */
+@media print {
+  .fn-ver, #fnWhatsNew, #fnUpdate, #fnEodBanner, #fnViewer, #fnLinkSheet { display: none !important; }
+}
