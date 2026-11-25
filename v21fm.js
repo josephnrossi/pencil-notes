@@ -398,6 +398,15 @@
     }
     ctx.restore();
   }
+  const frameLinks = new Map();   // v21fo: frame id → [{x,y,w,h,act}] tappable bits painted by EXT.paintFrameExtra
+  function frameHitAt(wx, wy) {
+    if (!frameLinks.size) return null;
+    const pad = 6 / ST.view.s;
+    for (const [fid, hits] of frameLinks) for (const r of hits) if (wx >= r.x - pad && wx <= r.x + r.w + pad && wy >= r.y - pad && wy <= r.y + r.h + pad) {
+      const f = model().frames.find(x => x.id === fid); if (f) return { f, act: r.act };
+    }
+    return null;
+  }
   function paintNoteBmp(n) {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     let rec = caches.notes.get(n.id);
@@ -411,11 +420,16 @@
     const ctx = cv.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
+    rec.y0 = drawNoteBody(ctx, n, w, h, true);
+    return rec;
+  }
+  // v21fo: one painter for the live bitmap and for exported images (Make note / Add to To-Do)
+  function drawNoteBody(ctx, n, w, h, extra) {
     if (isMedia(n) && typeof EXT.paintMedia === 'function') {
       try { EXT.paintMedia(ctx, n, w, h); } catch (err) { console.warn('paintMedia', err); }
       (n.strokes || []).forEach(s => drawStroke(ctx, s, 0, 8));
-      rec.y0 = 8;
-      return rec;
+      if (extra && typeof EXT.paintNoteExtra === 'function') try { EXT.paintNoteExtra(ctx, n, w, h); } catch (_) {}
+      return 8;
     }
     const c = COLORS[n.color] || COLORS.yellow;
     roundRect(ctx, 0.5, 0.5, w - 1, h - 1, 8);
@@ -431,8 +445,16 @@
     const y0 = n.title || (n.titleInk && n.titleInk.length) ? 28 : 8;
     if (n.titleInk && n.titleInk.length) n.titleInk.forEach(s => drawStroke(ctx, s, 0, 4));
     (n.strokes || []).forEach(s => drawStroke(ctx, s, 0, y0));
-    rec.y0 = y0;
-    return rec;
+    if (extra && typeof EXT.paintNoteExtra === 'function') try { EXT.paintNoteExtra(ctx, n, w, h); } catch (_) {}
+    return y0;
+  }
+  function renderNoteImage(n, k) {
+    k = k || 2;
+    const w = Math.max(8, n.w), h = Math.max(8, n.h), cv = document.createElement('canvas');
+    cv.width = Math.round(w * k); cv.height = Math.round(h * k);
+    const ctx = cv.getContext('2d'); ctx.setTransform(k, 0, 0, k, 0, 0);
+    drawNoteBody(ctx, n, w, h, false);
+    return cv;
   }
   function invalidateNote(id) { caches.dirtyNotes.add(id); caches.notes.delete(id); }
   function tileKey(tx, ty) { return tx + ',' + ty; }
@@ -520,6 +542,10 @@
       roundRect(ctx, f.x, f.y - th - 4 / v.s, tw, th, 6 / v.s);
       ctx.fillStyle = '#4f46e5'; ctx.fill();
       ctx.fillStyle = '#fff'; ctx.fillText(label, f.x + 8 / v.s, f.y - 9 / v.s);
+      frameLinks.delete(f.id);
+      if (typeof EXT.paintFrameExtra === 'function') {
+        try { const hits = EXT.paintFrameExtra(ctx, f, v.s, { tw, th, roundRect }); if (hits && hits.length) frameLinks.set(f.id, hits); } catch (err) { console.warn('paintFrameExtra', err); }
+      }
       ctx.restore();
     }
     // free ink tiles
@@ -556,20 +582,39 @@
     const hs = host(); if (!hs) return;
     const bar = hs.querySelector('.fm-sel-bar'), hd = hs.querySelector('.fm-resize'), st = stageEl();
     if (!bar || !hd || !st) return;
+    const fr = ST.sel && ST.sel.kind === 'frame' ? model().frames.find(x => x.id === ST.sel.id) : null;
     const n = ST.sel && ST.sel.kind === 'note' ? noteById(ST.sel.id) : null;
+    const t = n || fr;
     const busy = ST.g && /^(pinch|moveNote|moveFrame)$/.test(ST.g.typ);
-    if (!n || busy) { bar.hidden = true; hd.hidden = true; return; }
+    if (!t || busy) { bar.hidden = true; hd.hidden = true; return; }
     const v = ST.view, sw = st.clientWidth, sh = st.clientHeight;
-    const x0 = (n.x - v.x) * v.s, y0 = (n.y - v.y) * v.s, x1 = (n.x + n.w - v.x) * v.s, y1 = (n.y + n.h - v.y) * v.s;
+    const lab = fr ? 26 / v.s : 0;
+    const x0 = (t.x - v.x) * v.s, y0 = (t.y - lab - v.y) * v.s, x1 = (t.x + t.w - v.x) * v.s, y1 = (t.y + t.h - v.y) * v.s;
     if (x1 < 0 || y1 < 0 || x0 > sw || y0 > sh) { bar.hidden = true; hd.hidden = true; return; }
-    const op = bar.querySelector('[data-sel="open"]');
-    if (op) { op.hidden = !isMedia(n); op.textContent = n.kind === 'pdf' ? 'Open PDF' : n.kind === 'link' ? 'Open link' : 'View photo'; }
+    const acts = typeof EXT.selActions === 'function' ? EXT.selActions(fr ? 'frame' : 'note', t) : null;
+    const list = acts || (fr ? [] : [...(isMedia(n) ? [{ k: 'open', label: n.kind === 'pdf' ? 'Open PDF' : n.kind === 'link' ? 'Open link' : 'View photo' }] : []), { k: 'del', label: 'Delete', cls: 'danger' }]);
+    const key = (fr ? 'f:' : 'n:') + t.id + '|' + list.map(a => a.k + ':' + a.label).join(',');
+    if (!list.length) { bar.hidden = true; hd.hidden = true; return; }
+    if (bar.dataset.key !== key) {
+      bar.dataset.key = key;
+      bar.innerHTML = list.map(a => '<button type="button" data-sel="' + a.k + '"' + (a.cls ? ' class="' + a.cls + '"' : '') + '>' + a.label + '</button>').join('');
+    }
     bar.hidden = false;
     const bw = bar.offsetWidth || 160, bh = bar.offsetHeight || 40;
     let bx = clamp((x0 + x1) / 2 - bw / 2, 6, Math.max(6, sw - bw - 6));
     let by = y0 - bh - 10; if (by < 60) by = Math.min(sh - bh - 6, y1 + 10);
+    if (fr) {   // frames: sit on the label row, right of the label (and its "Open note" link)
+      const mc = placeSelChrome._c || (placeSelChrome._c = document.createElement('canvas').getContext('2d'));
+      mc.font = '700 12px -apple-system, system-ui, sans-serif';
+      const hits = frameLinks.get(fr.id) || [], lk = hits.find(h => h.act === 'opennote');
+      const lx = lk ? (lk.x + lk.w - v.x) * v.s : x0 + mc.measureText(fr.label || 'Group').width + 16;
+      bx = clamp(lx + 8, 6, Math.max(6, sw - bw - 6));
+      by = y0 + 13 - bh / 2;
+      if (by < 4) by = clamp((fr.y - v.y) * v.s + 8, 4, sh - bh - 6);
+    }
     bar.style.transform = 'translate(' + Math.round(bx) + 'px,' + Math.round(by) + 'px)';
-    hd.hidden = false;
+    hd.hidden = !!fr;
+    if (fr) return;
     hd.style.transform = 'translate(' + Math.round(x1 - 18) + 'px,' + Math.round(y1 - 18) + 'px)';
   }
   function deleteNote(id) {
@@ -807,6 +852,8 @@
     const tool = ST.tool;
     // Pencil never pans — only writes (or uses the chosen ink-like tool).
     if (isPen || (e.pointerType === 'mouse' && (tool === 'pen' || tool === 'eraser' || tool === 'lasso'))) {
+      const ph = tool !== 'eraser' && frameHitAt(wx, wy);
+      if (ph) { ST.g = { typ: 'pending', pid: e.pointerId, x: wx, y: wy, cx: e.clientX, cy: e.clientY, t0: Date.now(), hit: ph }; e.preventDefault(); e.stopPropagation(); return; }
       if (tool === 'pen') startInk(e, wx, wy);
       else if (tool === 'eraser') startErase(e, wx, wy);
       else if (tool === 'lasso') startLasso(e, wx, wy);
@@ -823,6 +870,8 @@
     if (tool === 'frame') { startFrame(e, wx, wy); return; }
     if (tool === 'lasso') { startLasso(e, wx, wy); return; }
     if (tool === 'eraser') { startErase(e, wx, wy); return; }
+    const hit = frameHitAt(wx, wy);
+    if (hit) { ST.g = { typ: 'pending', pid: e.pointerId, x: wx, y: wy, cx: e.clientX, cy: e.clientY, t0: Date.now(), hit }; return; }
     const n = noteAt(wx, wy);
     const f = frameAt(wx, wy);
     const a = !n && arrowAt(wx, wy);
@@ -1093,6 +1142,7 @@
     if (g && g.typ === 'pending') {
       const n = g.note, a = g.arrow, f = g.frame;
       ST.g = null;
+      if (g.hit) { if (Math.hypot(e.clientX - g.cx, e.clientY - g.cy) < 10 && typeof EXT.frameHit === 'function') EXT.frameHit(g.hit.f, g.hit.act); paintAll(); return; }
       if (a && Math.hypot(e.clientX - g.cx, e.clientY - g.cy) < 8) {
         pushUndo();
         const fm = model();
@@ -1101,7 +1151,7 @@
         toastMsg('Arrow removed', 1200);
         return;
       }
-      const again = n && ST.sel && ST.sel.id === n.id && isMedia(n) && Math.hypot(e.clientX - g.cx, e.clientY - g.cy) < 8;
+      const again = n && isMedia(n) && Math.hypot(e.clientX - g.cx, e.clientY - g.cy) < 8 && ((ST.sel && ST.sel.id === n.id) || (typeof EXT.tapOpens === 'function' && EXT.tapOpens(n)));
       ST.sel = n ? { kind: 'note', id: n.id } : f ? { kind: 'frame', id: f.id } : null;
       paintAll();
       if (again && typeof EXT.openMedia === 'function') EXT.openMedia(n);
@@ -1351,7 +1401,9 @@
     const bar = root.querySelector('.fm-sel-bar');
     bar.addEventListener('click', ev => {
       const b = ev.target.closest('[data-sel]'); if (!b || !ST.sel) return;
+      if (ST.sel.kind === 'frame') { const fr = model().frames.find(x => x.id === ST.sel.id); if (fr && typeof EXT.selAction === 'function') EXT.selAction(b.dataset.sel, fr, 'frame'); return; }
       const n = noteById(ST.sel.id); if (!n) return;
+      if (typeof EXT.selAction === 'function' && EXT.selAction(b.dataset.sel, n, 'note') === true) return;
       if (b.dataset.sel === 'del') deleteNote(n.id);
       else if (b.dataset.sel === 'open' && typeof EXT.openMedia === 'function') EXT.openMedia(n);
     });
@@ -1575,7 +1627,7 @@
     version: VERSION, isOpen: isIdeasOpen, open: openBoard, migrate, model, view: () => ST.view,
     setTool, tool: () => ST.tool, strokeActive, addNote, addArrow, addFrame, fit: fitToScreen,
     scheduleSave, flushSave, undo: doUndo, redo: doRedo, paintAll, paintScene,
-    screenToWorld, worldToScreen, seedPerfBoard, ST, COLORS, COLOR_KEYS, stats,
+    screenToWorld, worldToScreen, seedPerfBoard, ST, frameHitAt, renderNoteImage, drawNoteBody, COLORS, COLOR_KEYS, stats,
     find: (q) => { const ov = host() && host().querySelector('.fm-overflow'); if (ov) { ov.hidden = false; const i = ov.querySelector('#fmFind'); i.value = q; renderHits(q); } },
     setNoteColor: (c) => { ST.noteColor = c; },
     setPen: (c, w) => { if (c) ST.penColor = c; if (w) ST.penWidth = w; },
