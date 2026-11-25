@@ -1,0 +1,37 @@
+/* v21fp — Clear board in the Idea Board More menu + confirm dialog */
+.fm-overflow .fm-clear {
+  display: block; width: 100%; box-sizing: border-box; margin-top: 10px;
+  min-height: 44px; padding: 10px 12px; border: 0; border-radius: 12px;
+  background: #fdecea; color: #b42318;
+  font: 700 15px/1 -apple-system, system-ui, sans-serif; cursor: pointer;
+}
+.fm-overflow .fm-clear[hidden] { display: none !important; }
+.fm-overflow .fm-clear:active { transform: scale(.98); }
+
+#fpClear {
+  position: fixed; inset: 0; z-index: 8800;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px; background: rgba(20, 20, 30, .32);
+}
+#fpClear[hidden] { display: none !important; }
+#fpClear .fp-clear-card {
+  width: min(420px, calc(100vw - 32px));
+  background: #fffdf8; color: #1d1d1f; border-radius: 18px;
+  padding: 20px 20px 16px; box-shadow: 0 20px 50px rgba(0,0,0,.25);
+  font: 500 15px/1.35 -apple-system, system-ui, sans-serif;
+}
+#fpClear h3 { margin: 0 0 8px; font: 700 20px/1.2 -apple-system, system-ui, sans-serif; }
+#fpClear .fp-lead { margin: 0 0 12px; color: #3a3a40; }
+#fpClear .fp-list {
+  margin: 0 0 16px; padding: 10px 14px 10px 32px;
+  background: #f6f4ee; border-radius: 12px;
+}
+#fpClear .fp-list li { margin: 4px 0; }
+#fpClear .fp-btns { display: flex; justify-content: flex-end; gap: 8px; }
+#fpClear .fp-btns button {
+  min-height: 44px; padding: 0 18px; border-radius: 12px;
+  border: 1px solid #d6d8de; background: #f2f2f5; color: #1d1d1f;
+  font: 700 15px/1 -apple-system, system-ui, sans-serif; cursor: pointer;
+}
+#fpClear .fp-btns button.danger { background: #b42318; border-color: #b42318; color: #fff; }
+@media print { #fpClear { display: none !important; } }

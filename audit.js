@@ -2,7 +2,7 @@
    One ＋ Insert menu, one grouped Settings screen, a Gestures sheet, a short first-run tour,
    Undo for every delete, a safe importer, storage-full handling and lock hardening.
    Nothing is removed — features are only reached through fewer, more consistent doors. */
-const APP_VERSION = 'v21fo';   // v21fo: PDF clips/text cards/images, Make note from a frame, sticky → To-Do / reminder, Pros / Cons (v21fn: Idea Board media, quote PDF, calculator Board mode, backup)
+const APP_VERSION = 'v21fp';   // v21fp: Clear board on the Idea Board (v21fo: PDF clips/text cards, Make note from a frame, sticky → To-Do / reminder, Pros / Cons)
 
 /* ---------- import sanitizer: hostile backups must not inject markup ----------
    Rendering escapes free text, but ids/enums/colors are interpolated into attributes, so they are

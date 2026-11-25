@@ -1334,7 +1334,8 @@
       '<input type="search" id="fmFind" placeholder="Find notes…" aria-label="Find notes">' +
       '<div class="fm-hits" id="fmHits"></div>' +
       '<div class="fm-actions"><button type="button" class="fm-redo" aria-label="Redo">Redo</button>' +
-      '<button type="button" data-act="fit">Fit to screen</button></div></div>';
+      '<button type="button" data-act="fit">Fit to screen</button></div>' +
+      '<button type="button" class="fm-clear danger" data-act="clear" hidden>Clear board</button></div>';
   }
   function mountDOM() {
     const h = host(); if (!h) return;
@@ -1429,6 +1430,7 @@
       const sz = ev.target.closest('.fm-size'); if (sz) { ST.penWidth = +sz.dataset.w; ov.querySelectorAll('.fm-size').forEach(x => x.classList.toggle('on', x === sz)); return; }
       const nc = ev.target.closest('.fm-ncolor'); if (nc) { ST.noteColor = nc.dataset.n; ov.querySelectorAll('.fm-ncolor').forEach(x => x.classList.toggle('on', x === nc)); return; }
       if (ev.target.closest('[data-act="fit"]')) { fitToScreen(); hideOverflow(); }
+      if (ev.target.closest('[data-act="clear"]')) { hideOverflow(); if (typeof EXT.clearBoardAsk === 'function') EXT.clearBoardAsk(); }
       if (ev.target.closest('.fm-redo')) doRedo();
     });
     const find = ov.querySelector('#fmFind');
@@ -1440,7 +1442,10 @@
     const ov = host() && host().querySelector('.fm-overflow'); if (!ov) return;
     ov.hidden = !ov.hidden;
     ST.overflow = !ov.hidden;
-    if (!ov.hidden) ov.querySelector('#fmFind').focus();
+    if (!ov.hidden) {
+      ov.querySelector('#fmFind').focus();
+      if (typeof EXT.syncOverflow === 'function') try { EXT.syncOverflow(ov); } catch (err) { console.warn('syncOverflow', err); }
+    }
   }
   function hideInsert() {
     const r = host() && host().querySelector('.fm-root'); if (!r) return;
